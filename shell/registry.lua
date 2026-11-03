@@ -163,8 +163,29 @@ function M.Get(S, sectionId, itemId)
     return S.values[ValueKey(sectionId, itemId)]
 end
 
+--- Find the registered number item for a value key, or nil when the id is not a number item.
+local function FindNumberItem(S, sectionId, itemId)
+    local idx = S.sectionIndexById[sectionId]
+    if not idx then
+        return nil
+    end
+    return FindItemById(S.sections[idx].items, itemId, "number")
+end
+
 function M.Set(S, sectionId, itemId, value)
     local vkey = ValueKey(sectionId, itemId)
+    -- The store keeps the value before the widget sees it, so a number item gets a rounded number
+    -- inside its range here, whether the caller passed a number or text.
+    -- A value that is not numeric is ignored, leaving the stored value and the live control unchanged.
+    -- A nil value resets the item to its default, which the number widget's coerce returns for nil.
+    -- Before Register no item is known, so the value is stored as given and the widget's seed coerces it in Register.
+    local numberItem = FindNumberItem(S, sectionId, itemId)
+    if numberItem then
+        value = Widgets.get("number")._coerce(value, numberItem)
+        if value == nil then
+            return
+        end
+    end
     S.values[vkey] = value
     ApplyLive(S, vkey, value)
 end
@@ -295,13 +316,14 @@ function M.SetOptions(S, sectionId, itemId, options, selectedValue)
     if not item then
         return false
     end
-    if type(options) ~= "table" or #options == 0 then
-        error("SetOptions requires non-empty options array")
+    if type(options) ~= "table" then
+        error("SetOptions requires an options array")
     end
     local list = NormalizeOptions(options)
     item.options = list
     local vkey = ValueKey(sectionId, itemId)
-    if selectedValue == false then
+    -- An empty list has nothing to select, so the value is cleared and the dropdown shows its placeholder.
+    if #list == 0 or selectedValue == false then
         S.values[vkey] = nil
         item.default = nil
     elseif selectedValue ~= nil then
@@ -321,7 +343,12 @@ function M.SetOptions(S, sectionId, itemId, options, selectedValue)
     end
 
     if live and live.searchable and live.listBox ~= nil then
-        Dropdown.refreshLive(live, list, selectedValue, S.values, vkey)
+        -- False tells the live picker to show its placeholder, matching the cleared store value.
+        local liveSelected = selectedValue
+        if #list == 0 then
+            liveSelected = false
+        end
+        Dropdown.refreshLive(live, list, liveSelected, S.values, vkey)
         Debug(string.format(
             "SetOptions(%s.%s) refreshed searchable list (%d options)",
             tostring(sectionId),

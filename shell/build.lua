@@ -230,16 +230,20 @@ function M.Create(S)
     end
 
     -- Names must be unique under GameInstance across ALL mods (ModRef-backed tag/serial).
+    -- Each root field is assigned as soon as its object exists, so that when a later call throws,
+    -- Ensure's Destroy can still find and tear down everything built so far.
     local hud = Construct("/Script/UMG.UserWidget", outer, "ModMenu_Root_" .. suffix)
+    S.menuRoot = hud
     local tree = Construct("/Script/UMG.WidgetTree", hud, "ModMenu_Tree_" .. suffix)
     hud.WidgetTree = tree
 
     local canvas = Construct("/Script/UMG.CanvasPanel", tree, "ModMenu_Canvas_" .. suffix)
-    tree.RootWidget = canvas
     S.menuCanvas = canvas
+    tree.RootWidget = canvas
 
     local colors = Theme.Of(config)
     local fill = Construct("/Script/UMG.Border", canvas, "ModMenu_Border_" .. suffix)
+    S.panelBorder = fill
     pcall(function()
         fill:SetBrushColor(colors.panelBg)
         fill:SetPadding(Theme.PadPanel(config))
@@ -247,6 +251,7 @@ function M.Create(S)
 
     -- Always wrap in a 1px outline. Light uses panelBg so the edge is invisible.
     local outline = Construct("/Script/UMG.Border", canvas, "ModMenu_Outline_" .. suffix)
+    S.panelOutline = outline
     pcall(function()
         outline:SetBrushColor(colors.panelBorder)
         outline:SetPadding({ Left = 1, Top = 1, Right = 1, Bottom = 1 })
@@ -255,9 +260,11 @@ function M.Create(S)
 
     -- ScrollBox fills the docked panel so long section lists are reachable.
     local scroll = Construct("/Script/UMG.ScrollBox", fill, "ModMenu_Scroll_" .. suffix)
+    S.menuScroll = scroll
     fill:SetContent(scroll)
 
     local vbox = Construct("/Script/UMG.VerticalBox", scroll, "ModMenu_VBox_" .. suffix)
+    S.contentBox = vbox
     pcall(function()
         scroll:AddChild(vbox)
     end)
@@ -266,20 +273,20 @@ function M.Create(S)
 
     local slot = canvas:AddChildToCanvas(outline)
     S.panelSlot = slot
-    S.panelBorder = fill
-    S.panelOutline = outline
     if slot then
         Dock.ApplyPercentLayout(slot, config)
     end
 
-    hud:AddToViewport(Instance.GetViewportZ())
+    -- The menu starts collapsed; Open shows it. Content is built before the root joins the viewport,
+    -- so a build that throws leaves nothing on screen.
     hud:SetVisibility(Session.VIS_COLLAPSED)
-    Umg.StyleScrollBox(scroll, config)
-
-    S.menuRoot = hud
-    S.contentBox = vbox
-    S.menuScroll = scroll
     M.BuildContent(S)
+
+    -- Last call that can throw: the tree is complete before it is added.
+    hud:AddToViewport(Instance.GetViewportZ())
+    -- Styling again after the viewport add, because the scrollbar thickness can be ignored until then.
+    -- Every call inside StyleScrollBox is protected, so it cannot throw.
+    Umg.StyleScrollBox(scroll, config)
 
     local thickPct = (config.widthFrac or 0.32) * 100
     local longPct = (1.0 - (config.topFrac or 0) - (config.bottomFrac or 0)) * 100

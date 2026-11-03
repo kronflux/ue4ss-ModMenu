@@ -290,8 +290,10 @@ function Dropdown.validate(item, sectionId, index)
     if item.label == nil then
         error(prefix .. " requires .label")
     end
-    if type(item.options) ~= "table" or #item.options == 0 then
-        error(prefix .. " dropdown requires non-empty .options array")
+    -- An empty array is valid because SetOptions can empty a dropdown, and that list is written into
+    -- the caller's item, which the mod may pass to Register again.
+    if type(item.options) ~= "table" then
+        error(prefix .. " dropdown requires an .options array")
     end
     local ok, err = pcall(Options.NormalizeOptions, item.options)
     if not ok then

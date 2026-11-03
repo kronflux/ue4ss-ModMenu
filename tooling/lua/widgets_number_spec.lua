@@ -23,6 +23,13 @@ assert_eq(
 )
 -- tonumber ignores surrounding whitespace, so a padded string is accepted as its number.
 assert_eq("a whitespace-padded string is accepted", Number._coerce(" 5 ", range), 5)
+-- Set(nil) resets a number item, so nil coerces to the item's default after rounding and clamping.
+assert_eq(
+    "Set(nil) resets to the default",
+    Number._coerce(nil, { min = 0, max = 10, integer = true, default = 12.4 }),
+    10
+)
+assert_eq("Set(nil) without a default resets to zero", Number._coerce(nil, range), 0)
 
 local negItem = { id = "neg", label = "Neg", integer = true, min = -10, max = 10, default = -3 }
 local negValues = {}
@@ -38,13 +45,19 @@ local values = {}
 Number.seed("s", item, values)
 assert_eq("seed stores the default", values["s.n"], 3)
 
+-- A Set before Register leaves the raw value in the store, so seed must coerce it as Set does after Register.
+local early = { ["s.n"] = "12", ["s.j"] = "abc" }
+Number.seed("s", item, early)
+Number.seed("s", { id = "j", label = "J", default = 4 }, early)
+assert_eq("seed coerces a string set before Register", early["s.n"], 10)
+assert_eq("seed replaces a non-numeric value set before Register with the default", early["s.j"], 4)
+
 -- The stub ctx carries only the fields apply reads, so no UE4SS global is needed.
 -- SetText fails on the missing FText global inside apply's pcall, which apply already tolerates.
+-- Set never fires onChange because the host supplied the value, so apply must not call it.
 local calls = 0
-local seen = nil
-item.onChange = function(v)
+item.onChange = function()
     calls = calls + 1
-    seen = v
 end
 local ctrl = {
     kind = "number",
@@ -66,7 +79,7 @@ local ctx = {
     end,
 }
 Number.apply(ctrl, "5", ctx)
+assert_eq("apply with a numeric string stores the number", values["s.n"], 5)
 Number.apply(ctrl, "abc", ctx)
-assert_eq("apply with a numeric string then junk keeps the number", values["s.n"], 5)
-assert_eq("onChange runs once for the numeric string", calls, 1)
-assert_eq("onChange receives a number", type(seen), "number")
+assert_eq("apply with junk keeps the number", values["s.n"], 5)
+assert_eq("apply never calls onChange", calls, 0)

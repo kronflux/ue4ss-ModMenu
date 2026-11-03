@@ -650,6 +650,8 @@ options = {
 
 Labeled numeric field. Value is stored as a Lua number (`Get` / `Set`). Invalid mid-edit text is ignored until a parseable number is typed.
 
+`Set` turns its value into a number in the item's range: a numeric string such as `"5"` is accepted, `integer` items are rounded, and the result is clamped to `min` and `max`. A value that is not numeric is ignored, so the stored value and the field keep what they had. `Set(sectionId, itemId, nil)` resets the item to its `default`, or to `0` when it has none, after the same rounding and clamping. A `Set` made before the section is registered is coerced the same way when `Register` runs, and a value that is not numeric is replaced by the default there. `Set` never fires `onChange`.
+
 ```lua
 {
   type = "number",

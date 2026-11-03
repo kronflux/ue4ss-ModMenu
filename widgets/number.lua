@@ -81,7 +81,11 @@ end
 
 -- This turns a value from Set into a number in the item's range, or nil when it is not numeric.
 -- Set passes whatever the caller gave, so a typed "5" must become 5 before it reaches the store.
+-- A nil value resets the item, so it returns the item's default after the same rounding and clamping.
 local function coerce(raw, item)
+    if raw == nil then
+        return CoerceDefault(item)
+    end
     if raw == "" then
         return nil
     end
@@ -134,9 +138,14 @@ function Number.seed(sectionId, item, values)
         return
     end
     local vkey = tostring(sectionId) .. "." .. tostring(item.id)
-    if values[vkey] == nil then
-        values[vkey] = CoerceDefault(item)
+    -- A Set before Register stores the caller's value as given, because no item is known yet.
+    -- Register seeds every item, so the stored value is coerced here the same way Set coerces it after Register.
+    -- A missing value and a value that is not numeric both become the item's default.
+    local n = coerce(values[vkey], item)
+    if n == nil then
+        n = CoerceDefault(item)
     end
+    values[vkey] = n
 end
 
 function Number.build(ctx)
@@ -206,9 +215,8 @@ function Number.apply(ctrl, value, ctx)
         return
     end
     local n
-    local fromText = type(value) ~= "number"
-    if fromText then
-        -- A non-number is coerced, so the store and onChange only ever see a number.
+    if type(value) ~= "number" then
+        -- A non-number is coerced, so a direct apply with text still stores a number.
         n = coerce(value, ctrl.item)
         if n == nil then
             return
@@ -216,7 +224,6 @@ function Number.apply(ctrl, value, ctx)
     else
         n = RoundAndClamp(value, ctrl.item)
     end
-    local changed = n ~= ctx.values[ctrl.valueKey]
     local text = FormatValue(n, ctrl.item.integer == true)
     pcall(function()
         ctrl.edit:SetText(FText(text))
@@ -224,11 +231,6 @@ function Number.apply(ctrl, value, ctx)
     ctrl.lastText = text
     ctx.values[ctrl.valueKey] = n
     Util.ClearDebouncedOnChange(ctrl, n)
-    -- A number argument keeps its old behaviour of not firing onChange.
-    -- Coerced text fires it once when it changes the stored value, which Set left holding the raw text.
-    if fromText and changed then
-        Util.SafeCall(ctrl.item.onChange, n)
-    end
 end
 
 return Number
