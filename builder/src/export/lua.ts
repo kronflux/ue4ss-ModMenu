@@ -5,9 +5,12 @@ import type {
   DropdownOption,
   FoldItem,
   Item,
+  KeybindItem,
   MenuDocument,
   NumberItem,
+  RadioItem,
   Section,
+  SliderItem,
   TextInputItem,
 } from "../schema";
 import { ensureIds } from "../editor/model";
@@ -27,6 +30,13 @@ function keyExpr(hint: string): string | null {
   return null;
 }
 
+// A JSON document can hold a number where the schema names a string, such as { label: "One", value: 1 }.
+// Options.NormalizeOptions in core/options.lua turns such a field into a string with tostring, and
+// validation compares String(value), so the export writes the same string.
+function plainString(value: unknown): string | undefined {
+  return value === undefined || value === null ? undefined : String(value);
+}
+
 function emitOptions(options: DropdownOption[], level: number): string {
   const pad = indent(level);
   const inner = indent(level + 1);
@@ -34,8 +44,8 @@ function emitOptions(options: DropdownOption[], level: number): string {
     if (typeof opt === "string") {
       return `${inner}${luaString(opt)},`;
     }
-    const label = opt.label;
-    const value = opt.value;
+    const label = plainString(opt.label);
+    const value = plainString(opt.value);
     if (label !== undefined && value !== undefined && label !== value) {
       return `${inner}{ label = ${luaString(label)}, value = ${luaString(value)} },`;
     }
@@ -96,12 +106,16 @@ function emitFieldLines(lines: string[], pad: string, fields: Array<[string, str
 function emitItem(item: Item, sectionId: string, level: number): string {
   const pad = indent(level);
   const inner = indent(level + 1);
+  const tooltip = item.tooltip !== undefined ? luaString(item.tooltip) : undefined;
   if (item.type === "separator") {
-    return `${pad}{ type = "separator" },`;
+    return tooltip !== undefined ? `${pad}{ type = "separator", tooltip = ${tooltip} },` : `${pad}{ type = "separator" },`;
   }
   if (item.type === "row") {
     const children = item.items.map((child) => emitItem(child, sectionId, level + 2)).join("\n");
-    return `${pad}{\n${inner}type = "row",\n${inner}items = {\n${children}\n${inner}},\n${pad}},`;
+    const lines = [`${pad}{`, `${inner}type = "row",`];
+    emitFieldLines(lines, inner, [["tooltip", tooltip]]);
+    lines.push(`${inner}items = {`, children, `${inner}},`, `${pad}},`);
+    return lines.join("\n");
   }
   if (item.type === "fold") {
     const fold = item as FoldItem;
@@ -112,6 +126,7 @@ function emitItem(item: Item, sectionId: string, level: number): string {
       `${inner}id = ${luaString(fold.id)},`,
       `${inner}label = ${luaString(fold.label)},`,
     ];
+    emitFieldLines(lines, inner, [["tooltip", tooltip]]);
     if (fold.collapsed !== undefined) {
       lines.push(`${inner}collapsed = ${fold.collapsed ? "true" : "false"},`);
     }
@@ -126,6 +141,7 @@ function emitItem(item: Item, sectionId: string, level: number): string {
   if ("label" in item) {
     lines.push(`${inner}label = ${luaString(item.label)},`);
   }
+  emitFieldLines(lines, inner, [["tooltip", tooltip]]);
 
   if (item.type === "button") {
     const button = item as ButtonItem;
@@ -187,6 +203,40 @@ function emitItem(item: Item, sectionId: string, level: number): string {
       ["labelWidth", text.labelWidth !== undefined ? String(text.labelWidth) : undefined],
     ]);
     for (const stub of stubOnChange(sectionId, text.id, "text")) {
+      lines.push(`${inner}${stub}`);
+    }
+  } else if (item.type === "slider") {
+    const slider = item as SliderItem;
+    emitFieldLines(lines, inner, [
+      ["default", slider.default !== undefined ? String(slider.default) : undefined],
+      ["min", String(slider.min)],
+      ["max", String(slider.max)],
+      ["step", slider.step !== undefined ? String(slider.step) : undefined],
+      ["integer", slider.integer === true ? "true" : undefined],
+      ["format", slider.format !== undefined ? luaString(slider.format) : undefined],
+      ["live", slider.live === true ? "true" : undefined],
+    ]);
+    for (const stub of stubOnChange(sectionId, slider.id, "value")) {
+      lines.push(`${inner}${stub}`);
+    }
+  } else if (item.type === "radio") {
+    const radio = item as RadioItem;
+    lines.push(`${inner}options = ${emitOptions(radio.options, level + 1)},`);
+    emitFieldLines(lines, inner, [
+      ["default", radio.default !== undefined && radio.default !== null ? luaString(String(radio.default)) : undefined],
+      ["inline", radio.inline === true ? "true" : undefined],
+    ]);
+    for (const stub of stubOnChange(sectionId, radio.id, "value")) {
+      lines.push(`${inner}${stub}`);
+    }
+  } else if (item.type === "keybind") {
+    // No onConflict stub is written, because without one the widget refuses a binding another item holds.
+    const bind = item as KeybindItem;
+    emitFieldLines(lines, inner, [
+      ["default", bind.default !== undefined ? luaString(bind.default) : undefined],
+      ["allowModifiers", bind.allowModifiers === true ? "true" : undefined],
+    ]);
+    for (const stub of stubOnChange(sectionId, bind.id, "binding")) {
       lines.push(`${inner}${stub}`);
     }
   }

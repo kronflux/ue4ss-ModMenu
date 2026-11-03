@@ -50,6 +50,69 @@ export const THEME_KEYS = [
 export type ThemeKey = (typeof THEME_KEYS)[number];
 export type ThemeColors = Record<ThemeKey, Color>;
 
+// These are the optional hover and pressed keys in core/theme.lua's KEYS list. No preset sets
+// them, so they sit apart from THEME_KEYS, and buttonStates derives each one from the variant fill.
+export const BUTTON_STATE_KEYS = [
+  "buttonHover",
+  "buttonPressed",
+  "buttonPrimaryHover",
+  "buttonPrimaryPressed",
+  "buttonSecondaryHover",
+  "buttonSecondaryPressed",
+  "buttonSuccessHover",
+  "buttonSuccessPressed",
+  "buttonDangerHover",
+  "buttonDangerPressed",
+  "buttonWarningHover",
+  "buttonWarningPressed",
+  "buttonInfoHover",
+  "buttonInfoPressed",
+] as const;
+
+export type ButtonStateKey = (typeof BUTTON_STATE_KEYS)[number];
+
+// The fill key and the state key prefix for each variant, as BUTTON_STATE_KEYS in core/theme.lua has them.
+const VARIANT_STATE: Record<string, { fill: ThemeKey; prefix: string }> = {
+  default: { fill: "buttonBg", prefix: "button" },
+  primary: { fill: "buttonBgPrimary", prefix: "buttonPrimary" },
+  secondary: { fill: "buttonBgSecondary", prefix: "buttonSecondary" },
+  success: { fill: "buttonBgSuccess", prefix: "buttonSuccess" },
+  danger: { fill: "buttonBgDanger", prefix: "buttonDanger" },
+  warning: { fill: "buttonBgWarning", prefix: "buttonWarning" },
+  info: { fill: "buttonBgInfo", prefix: "buttonInfo" },
+};
+
+export const BUTTON_STATE_VARIANTS = Object.keys(VARIANT_STATE);
+
+const STATE_SHADE = 0.12;
+
+function shadeChannel(c: number, fraction: number): number {
+  const n = fraction >= 0 ? c + (1 - c) * fraction : c * (1 + fraction);
+  return Math.min(1, Math.max(0, n));
+}
+
+/** Theme.Shade: move R, G and B toward white for a positive fraction and toward black for a negative one, keeping alpha. */
+export function shade(color: Color, fraction: number): Color {
+  return {
+    R: shadeChannel(color.R, fraction),
+    G: shadeChannel(color.G, fraction),
+    B: shadeChannel(color.B, fraction),
+    A: color.A,
+  };
+}
+
+/** Theme.ButtonStates: an explicit state colour wins, otherwise the variant fill is lightened for hover and darkened for pressed. */
+export function buttonStates(
+  colors: ThemeColors & Partial<Record<ButtonStateKey, Color>>,
+  variant: string,
+): { hover: Color; pressed: Color } {
+  const keys = VARIANT_STATE[variant] ?? VARIANT_STATE.default;
+  const fill = colors[keys.fill];
+  const hover = colors[`${keys.prefix}Hover` as ButtonStateKey] ?? shade(fill, STATE_SHADE);
+  const pressed = colors[`${keys.prefix}Pressed` as ButtonStateKey] ?? shade(fill, -STATE_SHADE);
+  return { hover, pressed };
+}
+
 export const LIGHT: ThemeColors = {
   panelBg: C(0.05, 0.07, 0.12, 0.92),
   panelBorder: C(0.05, 0.07, 0.12, 0.92),

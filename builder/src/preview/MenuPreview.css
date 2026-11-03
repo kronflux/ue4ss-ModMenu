@@ -351,6 +351,94 @@
   margin-top: 8px;
 }
 
+.mm-tip {
+  display: contents;
+}
+
+/* The slider matches widgets/slider.lua: a header with the label and the value, then an 18 px
+   track whose fill and rest share the width by weight around a 12 px knob. */
+.mm-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.mm-slider-inline {
+  width: 160px;
+  flex: 0 0 auto;
+}
+
+.mm-slider-head {
+  display: flex;
+  align-items: center;
+  font-size: var(--mm-font-item);
+}
+
+.mm-slider-label {
+  flex: 1;
+  color: var(--mm-text-primary);
+}
+
+.mm-slider-value {
+  margin-left: 8px;
+  color: var(--mm-text-muted);
+}
+
+.mm-slider-track {
+  display: flex;
+  height: 18px;
+  background: var(--mm-button-bg);
+}
+
+.mm-slider-fill {
+  flex-basis: 0;
+  background: var(--mm-button-bg-primary);
+}
+
+.mm-slider-knob {
+  flex: 0 0 12px;
+  background: var(--mm-text-primary);
+}
+
+.mm-slider-rest {
+  flex-basis: 0;
+}
+
+.mm-radio {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mm-radio-label {
+  font-size: var(--mm-font-hint);
+  color: var(--mm-text-muted);
+}
+
+.mm-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mm-radio-inline {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.mm-key-chip {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  font-family: ui-monospace, Consolas, monospace;
+}
+
+.mm-key-chip.is-unbound {
+  opacity: 0.6;
+}
+
 .mm-confirm-dim {
   position: absolute;
   inset: 0;

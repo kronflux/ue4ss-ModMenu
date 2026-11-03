@@ -5,12 +5,16 @@ import type {
   DropdownItem,
   FoldItem,
   Item,
+  KeybindItem,
   NumberItem,
+  RadioItem,
   RowItem,
+  SliderItem,
   TextInputItem,
 } from "../schema";
 import { buttonChrome } from "./chrome";
 import { normalizeOptions, optionLabel } from "./options";
+import { sliderText, sliderValue } from "./slider";
 
 export type PreviewActions = {
   openDropdown: string | null;
@@ -185,6 +189,57 @@ function MmDropdown({
   );
 }
 
+function MmSlider({ item, fill }: { item: SliderItem; fill?: boolean }) {
+  const span = item.max - item.min;
+  const value = sliderValue(item);
+  const fraction = span > 0 ? (value - item.min) / span : 0;
+  return (
+    <div className={`mm-slider${fill === false ? " mm-slider-inline" : ""}`}>
+      <div className="mm-slider-head">
+        <span className="mm-slider-label">{item.label}</span>
+        <span className="mm-slider-value">{sliderText(value, item)}</span>
+      </div>
+      <div className="mm-slider-track">
+        <span className="mm-slider-fill" style={{ flexGrow: fraction }} />
+        <span className="mm-slider-knob" />
+        <span className="mm-slider-rest" style={{ flexGrow: 1 - fraction }} />
+      </div>
+    </div>
+  );
+}
+
+function MmRadio({ item, inline }: { item: RadioItem; inline: boolean }) {
+  const list = normalizeOptions(item.options);
+  const chosen = item.default ?? null;
+  return (
+    <div className="mm-radio">
+      <span className="mm-radio-label">{item.label}</span>
+      <div className={`mm-radio-group${inline ? " mm-radio-inline" : ""}`}>
+        {list.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            className={`mm-btn${inline ? " mm-btn-inline" : ""}`}
+            style={buttonChrome({ active: opt.value === chosen })}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// The runtime button reads "Label: F7", or "Label: None" without a binding, as Caption in widgets/keybind.lua writes it.
+function MmKeybind({ item }: { item: KeybindItem }) {
+  const bound = item.default !== undefined && item.default !== "";
+  return (
+    <button type="button" className="mm-btn mm-keybind" style={buttonChrome({})}>
+      {item.label}: <span className={`mm-key-chip${bound ? "" : " is-unbound"}`}>{bound ? item.default : "None"}</span>
+    </button>
+  );
+}
+
 function MmFold({
   item,
   sectionId,
@@ -250,19 +305,30 @@ function MmRow({
   );
 }
 
-export function PreviewItem({
-  item,
-  sectionId,
-  actions,
-  index,
-  layout = "vertical",
-}: {
+type PreviewItemProps = {
   item: Item;
   sectionId: string;
   actions: PreviewActions;
   index: number;
   layout?: "vertical" | "horizontal";
-}) {
+};
+
+// A tooltip shows as the browser's own title text. The wrapper uses display: contents, so it adds
+// no box and the row and fold layouts stay as they are without a tooltip.
+export function PreviewItem(props: PreviewItemProps) {
+  const body = <PreviewItemBody {...props} />;
+  const tooltip = props.item.tooltip;
+  if (tooltip === undefined || tooltip === "") {
+    return body;
+  }
+  return (
+    <span className="mm-tip" title={tooltip}>
+      {body}
+    </span>
+  );
+}
+
+function PreviewItemBody({ item, sectionId, actions, index, layout = "vertical" }: PreviewItemProps) {
   const horizontal = layout === "horizontal";
   if (item.type === "separator") {
     return <div className="mm-sep" />;
@@ -297,6 +363,15 @@ export function PreviewItem({
   }
   if (item.type === "dropdown") {
     return <MmDropdown item={item} dropKey={itemKey(sectionId, item.id, String(index))} actions={actions} />;
+  }
+  if (item.type === "slider") {
+    return <MmSlider item={item} fill={!horizontal} />;
+  }
+  if (item.type === "radio") {
+    return <MmRadio item={item} inline={item.inline === true} />;
+  }
+  if (item.type === "keybind") {
+    return <MmKeybind item={item} />;
   }
   if (item.type === "row") {
     return <MmRow item={item} sectionId={sectionId} actions={actions} />;

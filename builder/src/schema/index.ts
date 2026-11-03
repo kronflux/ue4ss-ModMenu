@@ -12,12 +12,15 @@ export type {
   Issue,
   Item,
   ItemType,
+  KeybindItem,
   LabelItem,
   MenuDocument,
   NumberItem,
+  RadioItem,
   RowItem,
   Section,
   SeparatorItem,
+  SliderItem,
   TextInputItem,
   ThemeName,
 } from "./types";
@@ -32,5 +35,13 @@ export {
 export { countItems, isValidDocument, validateDocument } from "./validate";
 export { emptyDocument } from "./defaults";
 export { hostFixture } from "./fixture";
-export { DEFAULT_KEY, KEY_GROUPS, TOGGLE_KEYS, isToggleKey } from "./keys";
-export type { KeyGroup } from "./keys";
+export {
+  DEFAULT_KEY,
+  KEYBIND_CAPTURE_KEYS,
+  KEYBIND_MODIFIERS,
+  KEY_GROUPS,
+  TOGGLE_KEYS,
+  isToggleKey,
+  parseKeybind,
+} from "./keys";
+export type { KeyGroup, KeybindParts } from "./keys";

@@ -1,5 +1,14 @@
 import type { ThemeName } from "../schema";
-import { PANEL_PAD, PREVIEW_FONTS, THEME_KEYS, preset, type Color, type ThemeColors } from "./tokens";
+import {
+  BUTTON_STATE_VARIANTS,
+  PANEL_PAD,
+  PREVIEW_FONTS,
+  THEME_KEYS,
+  buttonStates,
+  preset,
+  type Color,
+  type ThemeColors,
+} from "./tokens";
 
 export function colorCss(c: Color): string {
   const r = Math.round(c.R * 255);
@@ -31,6 +40,13 @@ export function themeVars(name: ThemeName): Record<string, string> {
   };
   for (const key of THEME_KEYS) {
     vars[`--mm-${kebab(key)}`] = colorCss(colors[key]);
+  }
+  // The derived state colours get the same names as the Lua state keys, such as --mm-button-primary-hover.
+  for (const variant of BUTTON_STATE_VARIANTS) {
+    const states = buttonStates(colors, variant);
+    const prefix = variant === "default" ? "button" : `button-${variant}`;
+    vars[`--mm-${prefix}-hover`] = colorCss(states.hover);
+    vars[`--mm-${prefix}-pressed`] = colorCss(states.pressed);
   }
   return vars;
 }

@@ -23,6 +23,9 @@ export type ItemType =
   | "dropdown"
   | "number"
   | "textinput"
+  | "slider"
+  | "radio"
+  | "keybind"
   | "row"
   | "fold";
 
@@ -34,11 +37,15 @@ export type ConfirmSpec = {
   variant?: ButtonVariant;
 };
 
-export type SeparatorItem = { type: "separator" };
+// The registry checks tooltip on every item type, so every item shape carries it.
+// The runtime shows the text 400 ms after the pointer starts hovering the item.
+type WithTooltip = { tooltip?: string };
 
-export type LabelItem = { type: "label"; id?: string; label: string };
+export type SeparatorItem = WithTooltip & { type: "separator" };
 
-export type ButtonItem = {
+export type LabelItem = WithTooltip & { type: "label"; id?: string; label: string };
+
+export type ButtonItem = WithTooltip & {
   type: "button";
   id: string;
   label: string;
@@ -48,14 +55,14 @@ export type ButtonItem = {
   confirm?: ConfirmSpec;
 };
 
-export type CheckboxItem = {
+export type CheckboxItem = WithTooltip & {
   type: "checkbox";
   id: string;
   label: string;
   default?: boolean;
 };
 
-export type DropdownItem = {
+export type DropdownItem = WithTooltip & {
   type: "dropdown";
   id: string;
   label: string;
@@ -68,7 +75,7 @@ export type DropdownItem = {
   allowEmpty?: boolean;
 };
 
-export type NumberItem = {
+export type NumberItem = WithTooltip & {
   type: "number";
   id: string;
   label: string;
@@ -82,7 +89,7 @@ export type NumberItem = {
   debounceMs?: number;
 };
 
-export type TextInputItem = {
+export type TextInputItem = WithTooltip & {
   type: "textinput";
   id: string;
   label: string;
@@ -94,21 +101,58 @@ export type TextInputItem = {
   debounceMs?: number;
 };
 
-export type RowChild = ButtonItem | CheckboxItem | LabelItem | NumberItem | TextInputItem;
+// A slider snaps its value to step counted from min, and rounds it when integer is true.
+// The format string goes through Lua's string.format; the document cannot hold a Lua function.
+export type SliderItem = WithTooltip & {
+  type: "slider";
+  id: string;
+  label: string;
+  min: number;
+  max: number;
+  default?: number;
+  step?: number;
+  integer?: boolean;
+  format?: string;
+  live?: boolean;
+};
 
-export type RowItem = { type: "row"; items: RowChild[] };
+// Radio options use the dropdown's option shape, and default must be one of the option values.
+export type RadioItem = WithTooltip & {
+  type: "radio";
+  id: string;
+  label: string;
+  options: DropdownOption[];
+  default?: string;
+  inline?: boolean;
+};
+
+// A keybind value is an FKey name such as "F7" or "LeftControl+F7", and "" means no binding.
+export type KeybindItem = WithTooltip & {
+  type: "keybind";
+  id: string;
+  label: string;
+  default?: string;
+  allowModifiers?: boolean;
+};
+
+export type RowChild = ButtonItem | CheckboxItem | LabelItem | NumberItem | SliderItem | TextInputItem;
+
+export type RowItem = WithTooltip & { type: "row"; items: RowChild[] };
 
 export type FoldChild =
   | ButtonItem
   | CheckboxItem
   | DropdownItem
+  | KeybindItem
   | LabelItem
   | NumberItem
+  | RadioItem
   | RowItem
   | SeparatorItem
+  | SliderItem
   | TextInputItem;
 
-export type FoldItem = {
+export type FoldItem = WithTooltip & {
   type: "fold";
   id: string;
   label: string;
@@ -116,7 +160,19 @@ export type FoldItem = {
   items: FoldChild[];
 };
 
-export type Item = SeparatorItem | LabelItem | ButtonItem | CheckboxItem | DropdownItem | NumberItem | TextInputItem | RowItem | FoldItem;
+export type Item =
+  | SeparatorItem
+  | LabelItem
+  | ButtonItem
+  | CheckboxItem
+  | DropdownItem
+  | NumberItem
+  | TextInputItem
+  | SliderItem
+  | RadioItem
+  | KeybindItem
+  | RowItem
+  | FoldItem;
 
 export type Section = {
   id: string;
@@ -152,17 +208,22 @@ export const ROW_CHILD_TYPES: ReadonlySet<ItemType> = new Set([
   "checkbox",
   "label",
   "number",
+  "slider",
   "textinput",
 ]);
 
+// These two lists match ALLOWED in widgets/row.lua and widgets/fold.lua.
 export const FOLD_CHILD_TYPES: ReadonlySet<ItemType> = new Set([
   "button",
   "checkbox",
   "dropdown",
+  "keybind",
   "label",
   "number",
+  "radio",
   "row",
   "separator",
+  "slider",
   "textinput",
 ]);
 
@@ -187,6 +248,9 @@ export const ITEM_TYPES: ReadonlySet<string> = new Set([
   "dropdown",
   "number",
   "textinput",
+  "slider",
+  "radio",
+  "keybind",
   "row",
   "fold",
 ]);

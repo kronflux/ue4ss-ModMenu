@@ -7,6 +7,7 @@ import {
   ROW_CHILD_TYPES,
   THEMES,
 } from "./types";
+import { parseKeybind } from "./keys";
 import type {
   ButtonItem,
   ConfirmSpec,
@@ -15,10 +16,13 @@ import type {
   InitSpec,
   Issue,
   Item,
+  KeybindItem,
   MenuDocument,
   NumberItem,
+  RadioItem,
   RowItem,
   Section,
+  SliderItem,
   TextInputItem,
 } from "./types";
 
@@ -155,6 +159,91 @@ function validateTextInput(path: string, item: TextInputItem, issues: Issue[]) {
   checkDebounce(path, item.debounceMs, issues);
 }
 
+function checkBoolean(path: string, field: string, value: unknown, issues: Issue[]) {
+  if (value !== undefined && typeof value !== "boolean") {
+    issues.push(issue(path, `${field} must be a boolean`));
+  }
+}
+
+// The rules and messages follow Slider.validate in widgets/slider.lua. The Lua widget stops at
+// the first error, while the builder reports every one, so the order of checks is the same.
+function validateSlider(path: string, item: SliderItem, issues: Issue[]) {
+  requireId(path, item.id, issues);
+  requireLabel(path, item.label, issues);
+  if (typeof item.min !== "number") {
+    issues.push(issue(path, "min must be a number"));
+  }
+  if (typeof item.max !== "number") {
+    issues.push(issue(path, "max must be a number"));
+  }
+  if (typeof item.min === "number" && typeof item.max === "number" && item.min >= item.max) {
+    issues.push(issue(path, "min must be less than max"));
+  }
+  if (item.step !== undefined && (typeof item.step !== "number" || item.step <= 0)) {
+    issues.push(issue(path, "step must be a positive number"));
+  }
+  if (item.default !== undefined && typeof item.default !== "number") {
+    issues.push(issue(path, "default must be numeric"));
+  }
+  checkBoolean(path, "integer", item.integer, issues);
+  checkBoolean(path, "live", item.live, issues);
+  // The Lua widget also takes a function, which a JSON document cannot hold, so the message names both.
+  if (item.format !== undefined && typeof item.format !== "string") {
+    issues.push(issue(path, "format must be a string or a function"));
+  }
+}
+
+// This returns the option values the same way core/options.lua normalizes them: a string is its
+// own value, and a table's value falls back to its label. A bad option is reported and skipped.
+function radioValues(path: string, options: unknown[], issues: Issue[]): string[] {
+  const values: string[] = [];
+  for (let i = 0; i < options.length; i += 1) {
+    const opt = options[i];
+    if (typeof opt === "string") {
+      values.push(opt);
+      continue;
+    }
+    if (!isRecord(opt)) {
+      issues.push(issue(`${path}.options[${i}]`, "option must be a string or { label, value }"));
+      continue;
+    }
+    if (opt.label === undefined && opt.value === undefined) {
+      issues.push(issue(`${path}.options[${i}]`, "dropdown option needs .label or .value"));
+      continue;
+    }
+    values.push(String(opt.value ?? opt.label));
+  }
+  return values;
+}
+
+// The rules and messages follow Radio.validate in widgets/radio.lua.
+function validateRadio(path: string, item: RadioItem, issues: Issue[]) {
+  requireId(path, item.id, issues);
+  requireLabel(path, item.label, issues);
+  if (!Array.isArray(item.options)) {
+    issues.push(issue(path, "radio requires an .options array"));
+  } else {
+    const values = radioValues(path, item.options, issues);
+    if (values.length === 0) {
+      issues.push(issue(path, "radio requires at least one option"));
+    } else if (item.default !== undefined && item.default !== null && !values.includes(String(item.default))) {
+      issues.push(issue(path, `default must be one of ${values.join(", ")}`));
+    }
+  }
+  checkBoolean(path, "inline", item.inline, issues);
+}
+
+// The rules and messages follow Keybind.validate in widgets/keybind.lua. An empty default means no binding.
+function validateKeybind(path: string, item: KeybindItem, issues: Issue[]) {
+  requireId(path, item.id, issues);
+  requireLabel(path, item.label, issues);
+  const value: unknown = item.default;
+  if (value !== undefined && (typeof value !== "string" || (value !== "" && parseKeybind(value) === null))) {
+    issues.push(issue(path, 'default must be an FKey name string such as "F7" or "LeftControl+F7"'));
+  }
+  checkBoolean(path, "allowModifiers", item.allowModifiers, issues);
+}
+
 function validateButton(path: string, item: ButtonItem, issues: Issue[]) {
   requireId(path, item.id, issues);
   requireLabel(path, item.label, issues);
@@ -179,6 +268,10 @@ function validateItem(path: string, item: unknown, issues: Issue[]) {
   if (typeof typeName !== "string" || !ITEM_TYPES.has(typeName)) {
     issues.push(issue(path, `unsupported type '${String(typeName)}'`));
     return;
+  }
+  // The registry checks tooltip for every item type before the widget's own rules, as core/tooltip.lua's Validate does.
+  if (item.tooltip !== undefined && typeof item.tooltip !== "string") {
+    issues.push(issue(path, "tooltip must be a string"));
   }
 
   if (typeName === "separator") {
@@ -215,6 +308,18 @@ function validateItem(path: string, item: unknown, issues: Issue[]) {
     validateTextInput(path, item as TextInputItem, issues);
     return;
   }
+  if (typeName === "slider") {
+    validateSlider(path, item as SliderItem, issues);
+    return;
+  }
+  if (typeName === "radio") {
+    validateRadio(path, item as RadioItem, issues);
+    return;
+  }
+  if (typeName === "keybind") {
+    validateKeybind(path, item as KeybindItem, issues);
+    return;
+  }
   if (typeName === "row") {
     validateRow(path, item as RowItem, issues);
     return;
@@ -238,7 +343,7 @@ function validateRow(path: string, item: RowItem, issues: Issue[]) {
     }
     const t = child.type;
     if (typeof t !== "string" || !ROW_CHILD_TYPES.has(t as never)) {
-      issues.push(issue(childPath, `unsupported row child type '${String(t)}' (button|checkbox|label|number|textinput)`));
+      issues.push(issue(childPath, `unsupported row child type '${String(t)}' (button|checkbox|label|number|slider|textinput)`));
       continue;
     }
     validateItem(childPath, child, issues);
