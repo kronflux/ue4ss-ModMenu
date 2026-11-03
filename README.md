@@ -437,7 +437,17 @@ ModMenu.OnDockChange(function(side)
 end)
 ```
 
-`Init` the store **before** `ModMenu.Init` when launch options (dock, toggle key) come from disk. `Get` / `Set` / `Save` / `File` match the old standalone ConfigManager. Implementation is `store/` (`init`, `json`, `paths`). Path is `Mods/<id>/config.json`. Hosts own what is written; ModMenu does not auto-save.
+`Init` the store **before** `ModMenu.Init` when launch options (dock, toggle key) come from disk. The store's functions are `Init`, `Get`, `Set`, `Save`, `File`, `LoadFailed` and `Overwrite`. Implementation is `store/` (`init`, `json`, `paths`). Path is `Mods/<id>/config.json`. Hosts own what is written; ModMenu does not auto-save.
+
+The store never opens `config.json` for writing, because opening it would empty it before the new text is on disk. A save writes the whole file to `config.json.tmp` and renames it over `config.json`. Where that rename fails because the file exists, as it can on Windows, the old file is first moved to `config.json.prev` and is removed once the new file is in place. A crash at any point therefore leaves a whole config on disk.
+
+If `config.json` does not parse, `Init` loads the defaults, leaves the file untouched and copies it to `config.json.bad`. If a crash left the old config at `.prev` and the newer one at `.tmp`, `Init` moves `.prev` back, loads that older config and copies the newer one from `.tmp` to `.bad`. When `.bad` already holds a different file, the copy goes to `.bad.2`, `.bad.3` and so on, and a file already copied with the same bytes is not copied again.
+
+`LoadFailed()` returns true after a parse failure, after `.prev` could not be moved back, or while the newer config at `.tmp` could not be copied to `.bad`. While it is true, `Set` keeps the value in memory and returns false, and `Save` writes nothing and returns false, so that the user's file is not replaced by defaults. Otherwise `Set` returns true when the value is unchanged or was stored, and with autosave on it returns the result of `Save`.
+
+The store does not recover on its own. A host checks `LoadFailed()`, decides when the old file may be replaced, for example after telling the user where the `.bad` copy is, and then calls `Overwrite()`. `Overwrite` writes the current in-memory values, including any values set while saves were refused, and returns the result of that save. It refuses and returns false while the unparsed file or the newer config at `.tmp` still has no copy at `.bad`, and it tries that copy again on each call. After a failed restore the older config stays at `.prev` until a later save removes it. A host that never calls `Overwrite` gets false from every `Set` and `Save` until a later launch finds a usable file.
+
+`Get` can return a table whose array holds `require("ModMenu.store.json").null` where the file had `null`. Compare an element with `==` against that value. It is read-only, so writing into it raises `json.null is read-only`; replace the element instead.
 
 ### Tests (no game)
 
