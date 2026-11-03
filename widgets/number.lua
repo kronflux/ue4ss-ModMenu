@@ -12,13 +12,20 @@ local function Prefix(sectionId, index)
     return string.format("Register(%s) items[%d]", tostring(sectionId), index)
 end
 
-local function CoerceDefault(item)
-    local n = tonumber(item.default)
-    if n == nil then
-        n = 0
+-- This rounds half away from zero, and every integer path in this widget uses it as the one rule.
+-- A negative value uses ceil, because floor(n - 0.5) would turn -2.7 and even -3 into -4.
+local function RoundInteger(n)
+    if n >= 0 then
+        return math.floor(n + 0.5)
     end
+    return math.ceil(n - 0.5)
+end
+
+-- This rounds an integer item's value and clamps it to the item's range.
+-- Text and number arguments share this so "2.7" and 2.7 land on the same value.
+local function RoundAndClamp(n, item)
     if item.integer then
-        n = math.floor(n + (n >= 0 and 0.5 or -0.5))
+        n = RoundInteger(n)
     end
     if item.min ~= nil and n < item.min then
         n = item.min
@@ -29,9 +36,17 @@ local function CoerceDefault(item)
     return n
 end
 
+local function CoerceDefault(item)
+    local n = tonumber(item.default)
+    if n == nil then
+        n = 0
+    end
+    return RoundAndClamp(n, item)
+end
+
 local function FormatValue(n, integer)
     if integer then
-        return tostring(math.floor(n + (n >= 0 and 0.5 or -0.5)))
+        return tostring(RoundInteger(n))
     end
     -- Trim trailing zeros from floats for cleaner fields.
     local s = string.format("%.6f", n)
@@ -52,7 +67,7 @@ local function ParseText(text, item)
         return nil
     end
     if item.integer then
-        n = math.floor(n + (n >= 0 and 0.5 or -0.5))
+        n = RoundInteger(n)
     end
     -- Below min: treat as incomplete so typing "10" with min=10 is not forced to 10 on "1".
     if item.min ~= nil and n < item.min then
@@ -63,6 +78,24 @@ local function ParseText(text, item)
     end
     return n
 end
+
+-- This turns a value from Set into a number in the item's range, or nil when it is not numeric.
+-- Set passes whatever the caller gave, so a typed "5" must become 5 before it reaches the store.
+local function coerce(raw, item)
+    if raw == "" then
+        return nil
+    end
+    local n = tonumber(raw)
+    if n == nil then
+        return nil
+    end
+    return RoundAndClamp(n, item)
+end
+
+-- The spec runs without the game and cannot build a widget, so the module exposes these helpers.
+Number._coerce = coerce
+Number._parseText = ParseText
+Number._formatValue = FormatValue
 
 function Number.validate(item, sectionId, index)
     local prefix = Prefix(sectionId, index)
@@ -172,19 +205,18 @@ function Number.apply(ctrl, value, ctx)
     if ctrl.edit == nil then
         return
     end
-    local n = tonumber(value)
-    if n == nil then
-        return
+    local n
+    local fromText = type(value) ~= "number"
+    if fromText then
+        -- A non-number is coerced, so the store and onChange only ever see a number.
+        n = coerce(value, ctrl.item)
+        if n == nil then
+            return
+        end
+    else
+        n = RoundAndClamp(value, ctrl.item)
     end
-    if ctrl.item.integer then
-        n = math.floor(n + (n >= 0 and 0.5 or -0.5))
-    end
-    if ctrl.item.min ~= nil and n < ctrl.item.min then
-        n = ctrl.item.min
-    end
-    if ctrl.item.max ~= nil and n > ctrl.item.max then
-        n = ctrl.item.max
-    end
+    local changed = n ~= ctx.values[ctrl.valueKey]
     local text = FormatValue(n, ctrl.item.integer == true)
     pcall(function()
         ctrl.edit:SetText(FText(text))
@@ -192,6 +224,11 @@ function Number.apply(ctrl, value, ctx)
     ctrl.lastText = text
     ctx.values[ctrl.valueKey] = n
     Util.ClearDebouncedOnChange(ctrl, n)
+    -- A number argument keeps its old behaviour of not firing onChange.
+    -- Coerced text fires it once when it changes the stored value, which Set left holding the raw text.
+    if fromText and changed then
+        Util.SafeCall(ctrl.item.onChange, n)
+    end
 end
 
 return Number

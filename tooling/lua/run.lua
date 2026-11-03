@@ -151,6 +151,7 @@ local specs = {
     "options_spec.lua",
     "config_spec.lua",
     "run_json_spec.lua",
+    "widgets_number_spec.lua",
 }
 
 -- Specs reach the encoder through this global so they can check its JSON output directly.
