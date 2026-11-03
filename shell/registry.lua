@@ -211,6 +211,11 @@ function M.Set(S, sectionId, itemId, value)
             return
         end
     end
+    -- A radio value that no option holds raises here, before the write, so Get keeps the previous value.
+    local radioItem = FindTypedItem(S, sectionId, itemId, "radio")
+    if radioItem then
+        value = Widgets.get("radio")._check(value, radioItem)
+    end
     -- A slider value is snapped and clamped here, as a number is, so the stored value does not depend on a built control.
     local sliderItem = FindTypedItem(S, sectionId, itemId, "slider")
     if sliderItem then

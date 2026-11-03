@@ -6,6 +6,7 @@ if okWidgets then
         assert_true("widgets.init registers " .. name, Widgets.has(name))
     end
     assert_true("widgets.init registers slider", Widgets.has("slider"))
+    assert_true("widgets.init registers radio", Widgets.has("radio"))
     assert_true("widgets.init registers keybind", Widgets.has("keybind"))
 end
 

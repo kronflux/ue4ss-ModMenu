@@ -76,6 +76,18 @@ local N2 = makeState({ { id = "n", type = "number", min = 0, max = 10, default =
 Registry.Set(N2, "s", "n", 99)
 assert_eq("Set on a number item clamps a number above max to max", N2.values["s.n"], 10)
 
+-- A radio value that no option holds raises before it is stored, so Get keeps the previous value.
+-- The live control stands in for a built radio, whose apply raises for such a value.
+local RA = makeState({ { id = "r", type = "radio", options = { "a", "b" }, default = "a" } })
+RA.values["s.r"] = "a"
+RA.liveControls = { { kind = "radio", valueKey = "s.r", item = RA.sections[1].items[1] } }
+assert_true("Set on a radio raises for a value no option holds", pcall(Registry.Set, RA, "s", "r", "zzz") == false)
+assert_eq("Set on a radio keeps the previous value when it raises", RA.values["s.r"], "a")
+local RU = makeState({ { id = "r", type = "radio", options = { "a", "b" }, default = "a" } })
+RU.values["s.r"] = "b"
+assert_true("Set on an unbuilt radio raises for a value no option holds", pcall(Registry.Set, RU, "s", "r", "zzz") == false)
+assert_eq("Set on an unbuilt radio keeps the previous value when it raises", RU.values["s.r"], "b")
+
 local Dropdown = require("ModMenu.widgets.dropdown")
 assert_true(
     "dropdown validate accepts an empty options array",

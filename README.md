@@ -763,6 +763,26 @@ Press the track and drag to move the knob, or click a point on the track to jump
 
 `Register` raises an error when `min` or `max` is missing or not a number, when `min` is not less than `max`, when `step` is not a positive number, or when `default` is not numeric. `Set` turns its value into a number the same way a drag does: a numeric string is accepted, and the value is snapped, rounded for an `integer` item, and clamped. Once the menu has built the item, a value that is not numeric is ignored and the stored value is kept. `Set(sectionId, itemId, nil)` resets the item to its `default`. A `Set` made before the section is registered is coerced when `Register` runs. `Set` never fires `onChange`.
 
+### `radio`
+
+A group of buttons with one chosen option. Options take the same shape as a `dropdown`: plain strings or `{ label, value }` tables. The value is the chosen option's value as a string, or `nil` when nothing is chosen.
+
+```lua
+{
+  type = "radio",
+  id = "difficulty",
+  label = "Difficulty",
+  options = { "Easy", { label = "Normal", value = "normal" }, "Hard" },
+  default = "normal",   -- optional; must be one of the option values
+  inline = true,        -- optional; true puts the buttons in one row, otherwise they stack
+  onChange = function(value) end,
+}
+```
+
+Each option is a button. The chosen one uses the active button fill (`buttonBgActive`), and the others take the default button fill with the same hover and pressed colours as a plain button. Pressing the chosen option again changes nothing and fires no `onChange`.
+
+`Register` raises an error when `options` is missing or empty, or when `default` is not one of the option values. Without a `default`, the group starts with nothing chosen. `Set` with a value that is not one of the options raises `radio <id>: value must be one of <values>` once the menu has built the item. `Set(sectionId, itemId, nil)` clears the choice. A `Set` made before the section is registered is checked when `Register` runs, and a value that is not an option is replaced by the default there. `Set` never fires `onChange`.
+
 ### `keybind`
 
 A button that shows a key binding and captures a new one when clicked. The value is an Unreal FKey name string (`Get` / `Set`), such as `"F7"`, or `"LeftControl+F7"` when modifiers are held. An empty string means no binding, and the button shows `None`.
