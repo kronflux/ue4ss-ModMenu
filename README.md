@@ -739,6 +739,30 @@ Labeled string field.
 
 `Get` / button `onClick` always see the latest parsed value. Only `onChange` waits for typing to pause.
 
+### `slider`
+
+A labelled track with a draggable knob over a numeric range. The current value is printed beside the label. Value is stored as a Lua number (`Get` / `Set`).
+
+```lua
+{
+  type = "slider",
+  id = "volume",
+  label = "Volume",
+  min = 0,              -- required
+  max = 100,            -- required; must be greater than min
+  default = 50,         -- optional; min when unset
+  step = 5,             -- optional; values snap to min + a whole number of steps
+  integer = true,       -- optional; round to the nearest whole number
+  format = "%d%%",      -- optional; a string.format pattern, or function(value) returning the text
+  live = false,         -- optional; true fires onChange on every step while dragging
+  onChange = function(n) end,
+}
+```
+
+Press the track and drag to move the knob, or click a point on the track to jump there. The value snaps to `step` while the knob moves. `min` and `max` are always reachable, even when the range is not a whole number of steps. By default `onChange` fires once, on release, and only when the value changed. With `live = true` it fires on every new step during the drag. In a `row`, the track is 160 pixels wide unless the item sets `fill = true`. In touch mode the track and the knob are larger. The track uses `buttonBg`, the part left of the knob uses `buttonBgPrimary`, the knob uses `textPrimary`, and the value text uses `textMuted`.
+
+`Register` raises an error when `min` or `max` is missing or not a number, when `min` is not less than `max`, when `step` is not a positive number, or when `default` is not numeric. `Set` turns its value into a number the same way a drag does: a numeric string is accepted, and the value is snapped, rounded for an `integer` item, and clamped. Once the menu has built the item, a value that is not numeric is ignored and the stored value is kept. `Set(sectionId, itemId, nil)` resets the item to its `default`. A `Set` made before the section is registered is coerced when `Register` runs. `Set` never fires `onChange`.
+
 ### `keybind`
 
 A button that shows a key binding and captures a new one when clicked. The value is an Unreal FKey name string (`Get` / `Set`), such as `"F7"`, or `"LeftControl+F7"` when modifiers are held. An empty string means no binding, and the button shows `None`.

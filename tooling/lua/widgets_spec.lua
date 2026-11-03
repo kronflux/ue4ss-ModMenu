@@ -5,6 +5,7 @@ if okWidgets then
     for _, name in ipairs({ "separator", "label", "button", "checkbox", "dropdown", "number", "textinput", "row", "fold" }) do
         assert_true("widgets.init registers " .. name, Widgets.has(name))
     end
+    assert_true("widgets.init registers slider", Widgets.has("slider"))
     assert_true("widgets.init registers keybind", Widgets.has("keybind"))
 end
 

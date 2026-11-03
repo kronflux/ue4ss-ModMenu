@@ -154,6 +154,7 @@ local specs = {
     "widgets_number_spec.lua",
     "theme_spec.lua",
     "widgets_spec.lua",
+    "widgets_slider_spec.lua",
     "widgets_keybind_spec.lua",
 }
 

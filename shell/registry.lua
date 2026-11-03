@@ -188,6 +188,15 @@ local function FindNumberItem(S, sectionId, itemId)
     return FindItemById(S.sections[idx].items, itemId, "number")
 end
 
+--- Find the registered item of one type for a value key, or nil when the id is not an item of that type.
+local function FindTypedItem(S, sectionId, itemId, typeName)
+    local idx = S.sectionIndexById[sectionId]
+    if not idx then
+        return nil
+    end
+    return FindItemById(S.sections[idx].items, itemId, typeName)
+end
+
 function M.Set(S, sectionId, itemId, value)
     local vkey = ValueKey(sectionId, itemId)
     -- The store keeps the value before the widget sees it, so a number item gets a rounded number
@@ -198,6 +207,14 @@ function M.Set(S, sectionId, itemId, value)
     local numberItem = FindNumberItem(S, sectionId, itemId)
     if numberItem then
         value = Widgets.get("number")._coerce(value, numberItem)
+        if value == nil then
+            return
+        end
+    end
+    -- A slider value is snapped and clamped here, as a number is, so the stored value does not depend on a built control.
+    local sliderItem = FindTypedItem(S, sectionId, itemId, "slider")
+    if sliderItem then
+        value = Widgets.get("slider")._coerce(value, sliderItem)
         if value == nil then
             return
         end
