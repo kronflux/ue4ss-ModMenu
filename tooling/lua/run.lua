@@ -8,6 +8,33 @@ local failed = 0
 local failures = {}
 local tests = {}
 
+-- JSON gives these characters a short escape; every other control byte below 0x20 uses \u00XX.
+local namedEscapes = {
+    ['"'] = '\\"',
+    ["\\"] = "\\\\",
+    ["\n"] = "\\n",
+    ["\t"] = "\\t",
+    ["\r"] = "\\r",
+    ["\b"] = "\\b",
+    ["\f"] = "\\f",
+}
+
+-- The C# host parses the summary as JSON, so strings are quoted by JSON rules rather than with
+-- Lua's %q, which writes a newline as a backslash followed by a raw newline.
+local function escapeString(s)
+    return '"' .. s:gsub('[%c"\\]', function(c)
+        local named = namedEscapes[c]
+        if named then
+            return named
+        end
+        local byte = c:byte()
+        if byte < 0x20 then
+            return string.format("\\u%04x", byte)
+        end
+        return c
+    end) .. '"'
+end
+
 local function encode(value)
     local t = type(value)
     if value == nil then
@@ -20,10 +47,10 @@ local function encode(value)
         return tostring(value)
     end
     if t == "string" then
-        return string.format("%q", value)
+        return escapeString(value)
     end
     if t ~= "table" then
-        return string.format("%q", tostring(value))
+        return escapeString(tostring(value))
     end
     local max = 0
     local asObject = false
@@ -123,7 +150,11 @@ local specs = {
     "dock_spec.lua",
     "options_spec.lua",
     "config_spec.lua",
+    "run_json_spec.lua",
 }
+
+-- Specs reach the encoder through this global so they can check its JSON output directly.
+_RUNNER = { encode = encode }
 
 local here = _REPO .. "/tooling/lua/"
 for i = 1, #specs do
