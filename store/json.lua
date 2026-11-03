@@ -6,6 +6,20 @@ local M = {}
 
 local LIB_NAME = "ConfigManager"
 
+--- The value that stands for a JSON null inside a decoded array. Lua drops a nil stored in a
+--- table, so without a placeholder `[1,null,3]` would lose its length and the indexes after the
+--- null. Encode writes this value back as `null`. Compare with `==`, because it is one table.
+M.null = setmetatable({}, {
+    __tostring = function()
+        return "null"
+    end,
+    -- Every decode returns this same table, so a write into it would change the null that
+    -- every later decode returns. A write therefore fails instead.
+    __newindex = function()
+        error("json.null is read-only", 2)
+    end,
+})
+
 ---@param value any
 ---@return boolean
 function M.IsSafe(value)
@@ -104,7 +118,7 @@ end
 ---@param level integer
 ---@return string
 function M.Encode(value, level)
-    if value == nil then
+    if value == nil or value == M.null then
         return "null"
     end
     local t = type(value)
@@ -233,7 +247,8 @@ local function ParseNumber(s, i)
     if not num then
         error("bad number")
     end
-    return tonumber(num), i + #num
+    -- The patterns above match only valid numbers, so tonumber cannot fail and the assert only narrows the type.
+    return assert(tonumber(num), "bad number"), i + #num
 end
 
 ---@param s string
@@ -245,10 +260,17 @@ local function ParseArray(s, i)
     if s:sub(i, i) == "]" then
         return arr, i + 1
     end
+    -- An explicit counter is used because `#arr` cannot count a nil, and a null element is
+    -- stored as the sentinel so that it keeps its place.
+    local n = 0
     while true do
         local v
         v, i = ParseValue(s, i)
-        arr[#arr + 1] = v
+        n = n + 1
+        if v == nil then
+            v = M.null
+        end
+        arr[n] = v
         i = SkipWs(s, i)
         local ch = s:sub(i, i)
         if ch == "]" then
@@ -282,6 +304,8 @@ local function ParseObject(s, i)
         end
         local v
         v, i = ParseValue(s, SkipWs(s, i + 1))
+        -- A null member is left out rather than stored as the sentinel, because the store
+        -- reads a missing key as "use the default", and the sentinel would replace it.
         obj[key] = v
         i = SkipWs(s, i)
         local ch = s:sub(i, i)
@@ -322,15 +346,29 @@ ParseValue = function(s, i)
     error("unexpected " .. tostring(ch))
 end
 
+--- Decode any JSON value. A top-level `null` decodes to `M.null`, so that it can be told apart
+--- from a failed or empty result.
 ---@param text string
----@return table
-function M.DecodeObject(text)
+---@return any
+function M.Decode(text)
     local value, i = ParseValue(text, 1)
     i = SkipWs(text, i)
     if i <= #text then
         error("trailing junk")
     end
-    if type(value) ~= "table" or IsArray(value) then
+    if value == nil then
+        value = M.null
+    end
+    return value
+end
+
+---@param text string
+---@return table
+function M.DecodeObject(text)
+    local value = M.Decode(text)
+    -- The sentinel is an empty table, so it is rejected here by name, or a `null` file would
+    -- pass as an empty object.
+    if value == M.null or type(value) ~= "table" or IsArray(value) then
         error("root must be an object")
     end
     return value
