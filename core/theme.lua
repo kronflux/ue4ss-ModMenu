@@ -62,6 +62,7 @@ local KEYS = {
     "overlayDim",
     "confirmCardBg",
     "confirmDivider",
+    "tooltipBg",
 }
 
 local function C(r, g, b, a)
@@ -128,6 +129,8 @@ local LIGHT = {
     overlayDim = C(0.02, 0.03, 0.05, 0.62),
     confirmCardBg = C(0.08, 0.10, 0.16, 0.98),
     confirmDivider = C(0.22, 0.26, 0.34, 1.0),
+    -- Lighter than the panel, so the tooltip card stands out from the menu behind it.
+    tooltipBg = C(0.24, 0.30, 0.45, 0.98),
 }
 
 -- Dark preset: charcoal panel, dark fields. Flat UMG (no bevel/glow).
@@ -169,6 +172,7 @@ local DARK = {
     overlayDim = C(0.04, 0.04, 0.05, 0.62),
     confirmCardBg = C(0.16, 0.16, 0.17, 0.98),
     confirmDivider = C(0.30, 0.30, 0.32, 1.0),
+    tooltipBg = C(0.32, 0.33, 0.36, 0.98),
 }
 
 local PAD = {

@@ -217,6 +217,7 @@ Configure and bind this mod’s shell. Safe to call more than once (updates conf
 | `pointerMode` | `"mouse"` | `"mouse"` (default) or `"touch"` / `"handheld"` (same). Touch: ignore delayed LMB latch; checkbox ON/OFF buttons; fonts + panel width × `touchFontScale`; 28px scrollbar; a tab strip that is `spacing.tabHeight` tall (default 56) with `spacing.dockPadTouch` of space under Dock. Hosts keep `{ type = "checkbox" }` and desktop `font*` / `widthFrac`. |
 | `showClose` | `true` | Title-row **Close** button (same path as the toggle key). Default on so you can dismiss with the mouse. Pass `false` to hide. |
 | `spacing` | see **Spacing** | Optional table of layout gaps and paddings in pixels. Keys you omit keep their defaults. See **Spacing** below. |
+| `tooltipDelayMs` | `400` | How long, in milliseconds, the pointer rests on an item before its `tooltip` shows. A value that is not a finite number of zero or more raises an error. See **Tooltips** under **Item types**. |
 
 Also installs viewport hooks and the input backend (`core/input.lua`): toggle + LMB click latch. Default `ue4ss` uses `RegisterKeyBind`. Pass `inputBackend = "engine"` on games where those binds never fire (e.g. Code Vein 2); that polls Unreal `IsInputKeyDown` for the toggle key and left mouse.
 
@@ -290,6 +291,9 @@ The shell reads its gaps and paddings from `Init`'s `spacing` table instead of f
 | `sectionHeaderPadX` | `10` | The padding at the left and right edges of a collapsible section header. |
 | `sectionHeaderPadY` | `4` | The padding above and below the title and mark of a collapsible section header. |
 | `sectionHeaderGap` | `12` | The gap between a collapsible section header's title and its plus or minus mark. |
+| `tooltipPad` | `6` | The padding on all four sides of the tooltip text. |
+| `tooltipGap` | `12` | The distance between the pointer and the tooltip's nearest corner. |
+| `tooltipMaxWidth` | `320` | The width at which tooltip text wraps onto a new line. |
 | `panelPad` | `nil` | The padding inside the panel on all four sides. When it is not set, the theme's panel padding is used. Once a host sets `panelPad`, a later `Init` cannot unset it, because a key set to `nil` is absent from the table and the merge keeps the earlier value. |
 
 ```lua
@@ -568,6 +572,18 @@ Natural follow-ons (not required for hosts): `slider` / stepper polish — same 
 
 Supported: `checkbox` | `button` | `dropdown` | `label` | `separator` | `number` | `textinput` | `row` | `fold`  
 (Implemented in `widgets/<type>.lua`.)
+
+### Tooltips
+
+Every item type accepts `tooltip = "text"`. A value that is not a string raises an error from `Register`, and the check also covers the children of a `row` or `fold`.
+
+```lua
+{ type = "button", id = "heal", label = "Heal", tooltip = "Restores health to full.", onClick = Heal }
+```
+
+When the pointer rests on the item for `tooltipDelayMs` (default 400 ms), one shared tooltip shows the text beside the pointer, and it hides when the pointer leaves. It opens toward the screen centre, away from the docked edge. It never takes the pointer, so it cannot end the hover that shows it. An open confirm dialog or a closed menu hides it. The box uses `confirmCardBg` (or `panelBg`) behind `textPrimary` at `fontHint` size, with the `tooltipPad`, `tooltipGap` and `tooltipMaxWidth` spacing tokens.
+
+A tooltip shows only on an item that builds a live control. A `separator`, a `row` container and a `label` without an `id` build none, so their `tooltip` is validated but never shown. The children of a `row` or `fold` show their own tooltips.
 
 ### `separator`
 

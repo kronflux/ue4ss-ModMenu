@@ -40,11 +40,15 @@ local expectedSpacing = {
     sectionHeaderPadX = 10,
     sectionHeaderPadY = 4,
     sectionHeaderGap = 12,
+    tooltipPad = 6,
+    tooltipGap = 12,
+    tooltipMaxWidth = 320,
 }
 local expectedOrder = {
     "gapItem", "gapSection", "footerPad", "footerPadTouch", "confirmWidth", "tabHeight",
     "tabGap", "tabGapTouch", "tabPad", "tabPadTouch", "dockPad", "dockPadTouch",
     "headPad", "confirmGap", "sectionHeaderPadX", "sectionHeaderPadY", "sectionHeaderGap",
+    "tooltipPad", "tooltipGap", "tooltipMaxWidth",
 }
 for _, key in ipairs(expectedOrder) do
     assert_eq("spacing default " .. key, defaults[key], expectedSpacing[key])
@@ -87,3 +91,14 @@ assert_true("spacing unknown key error names key", string.find(tostring(errTypo)
 local okTable = pcall(Config.NormalizeSpacing, 5)
 assert_true("spacing non-table errors", okTable == false)
 assert_eq("spacing via Init", apply({ spacing = { tabGap = 20 } }).spacing.tabGap, 20)
+
+-- The tooltip delay is a config token beside spacing, because it is a time rather than a distance.
+assert_eq("tooltipDelayMs default", Config.New().tooltipDelayMs, 400)
+assert_eq("tooltipDelayMs via Init", apply({ tooltipDelayMs = 250 }).tooltipDelayMs, 250)
+local keptDelay = apply({ tooltipDelayMs = 250 })
+Config.ApplyInit(keptDelay, { title = "Keep delay" })
+assert_eq("tooltipDelayMs persists across Init", keptDelay.tooltipDelayMs, 250)
+local okDelay, errDelay = pcall(apply, { tooltipDelayMs = -1 })
+assert_true("tooltipDelayMs negative errors", okDelay == false)
+assert_true("tooltipDelayMs error names the rule",
+    string.find(tostring(errDelay), "tooltipDelayMs must be a number of zero or more", 1, true) ~= nil)

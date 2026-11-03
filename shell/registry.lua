@@ -6,6 +6,7 @@ local Util = require("ModMenu.core.util")
 local Umg = require("ModMenu.core.umg")
 local Input = require("ModMenu.core.input")
 local Options = require("ModMenu.core.options")
+local Tooltip = require("ModMenu.core.tooltip")
 local Widgets = require("ModMenu.widgets.init")
 local Session = require("ModMenu.shell.session")
 local Build = require("ModMenu.shell.build")
@@ -24,11 +25,26 @@ local Button = Widgets.get("button")
 
 local M = {}
 
+--- Check the tooltip field of an item and of the children of a row or fold, at any depth.
+--- The registry does this for every type, because tooltip is common to all of them.
+--- A child that is not a table is skipped here, so the row or fold validate reports it in its own words.
+local function ValidateTooltips(item, prefix)
+    Tooltip.Validate(item, prefix)
+    if (item.type == "row" or item.type == "fold") and type(item.items) == "table" then
+        for i, child in ipairs(item.items) do
+            if type(child) == "table" then
+                ValidateTooltips(child, string.format("%s.items[%d]", prefix, i))
+            end
+        end
+    end
+end
+
 local function ValidateItem(item, sectionId, index)
     local prefix = string.format("Register(%s) items[%d]", tostring(sectionId), index)
     if type(item) ~= "table" then
         error(prefix .. " must be a table")
     end
+    ValidateTooltips(item, prefix)
     local t = item.type
     local widget = Widgets.get(t)
     if not widget then

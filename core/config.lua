@@ -38,6 +38,12 @@ local SPACING_DEFAULTS = {
     sectionHeaderPadY = 4,
     -- sectionHeaderGap is the gap between a collapsible section header's title and its plus or minus mark.
     sectionHeaderGap = 12,
+    -- tooltipPad is the padding on all four sides of the tooltip text.
+    tooltipPad = 6,
+    -- tooltipGap is the distance between the pointer and the tooltip's nearest corner.
+    tooltipGap = 12,
+    -- tooltipMaxWidth is the width at which tooltip text wraps onto a new line.
+    tooltipMaxWidth = 320,
     -- panelPad is one number used as the padding on all four sides of the panel.
     -- Its default is nil, which means the theme's padding is used.
     panelPad = nil,
@@ -113,6 +119,9 @@ function M.New()
         cursorHideClasses = nil, -- optional string[] of UUserWidget class names to collapse while open
         tabs = nil, -- optional string[] top-level tabs; omit = single scroll
         spacing = M.NormalizeSpacing(nil), -- The layout gaps and paddings start as a copy of SPACING_DEFAULTS.
+        -- tooltipDelayMs is how long, in milliseconds, the pointer rests on an item before its tooltip shows.
+        -- It is a time rather than a distance, so it sits beside spacing instead of inside it.
+        tooltipDelayMs = 400,
         debug = false, -- verbose [ModMenu] traces (collapse, open/close, register, click path)
     }
 end
@@ -401,6 +410,13 @@ function M.ApplyInit(config, opts, ctx)
     -- A spacing table is merged over the current spacing, as colors are, so a later Init keeps earlier overrides.
     if opts.spacing ~= nil then
         config.spacing = M.NormalizeSpacing(opts.spacing, config.spacing)
+    end
+    if opts.tooltipDelayMs ~= nil then
+        local n = opts.tooltipDelayMs
+        if type(n) ~= "number" or n ~= n or n < 0 or n == math.huge then
+            error("ModMenu.Init: tooltipDelayMs must be a number of zero or more")
+        end
+        config.tooltipDelayMs = n
     end
     if opts.consoleCommand ~= nil then
         if opts.consoleCommand == false or opts.consoleCommand == "" then

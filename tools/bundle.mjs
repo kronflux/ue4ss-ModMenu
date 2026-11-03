@@ -86,6 +86,7 @@ const MODULES = [
   ["ModMenu.core.input", "core/input.lua"],
   ["ModMenu.core.options", "core/options.lua"],
   ["ModMenu.core.dockmath", "core/dockmath.lua"],
+  ["ModMenu.core.tooltip", "core/tooltip.lua"],
   ...discoverPackageModules("widgets", "ModMenu.widgets"),
   ["ModMenu.shell.session", "shell/session.lua"],
   ["ModMenu.shell.dock", "shell/dock.lua"],

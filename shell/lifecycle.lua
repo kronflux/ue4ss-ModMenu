@@ -16,6 +16,7 @@ local Tabs = require("ModMenu.shell.tabs")
 local Build = require("ModMenu.shell.build")
 local Confirm = require("ModMenu.shell.confirm")
 local Theme = require("ModMenu.core.theme")
+local Tooltip = require("ModMenu.core.tooltip")
 
 local Log = Util.Log
 local Debug = Util.Debug
@@ -37,6 +38,10 @@ function M.StopPoll(S)
 end
 
 local function PollControls(S)
+    -- The tooltip is polled before the confirm check, so an open confirm dialog hides it.
+    -- os.clock is the clock the shell already uses for debounce, and on Windows it counts wall time.
+    Tooltip.Poll(S, os.clock() * 1000)
+
     if Confirm.Poll(S) then
         return
     end
@@ -198,6 +203,8 @@ end
 
 function M.Close(S)
     Confirm.Hide(S, "close")
+    -- Close keeps the tree and the live controls for the next Open, so the tooltip hides but keeps its targets.
+    Tooltip.Hide(S)
     M.StopPoll(S)
     if S.cursorShowHandle ~= nil then
         pcall(function()

@@ -15,6 +15,7 @@ local Dock = require("ModMenu.shell.dock")
 local Collapse = require("ModMenu.shell.collapse")
 local Tabs = require("ModMenu.shell.tabs")
 local Confirm = require("ModMenu.shell.confirm")
+local Tooltip = require("ModMenu.core.tooltip")
 
 local Log = Util.Log
 local Debug = Util.Debug
@@ -47,6 +48,8 @@ function M.BuildContent(S)
         S.contentBox:ClearChildren()
     end)
     Session.ClearLive(S)
+    -- The old controls are gone, so their tooltip targets go too. The shared tooltip widget is kept.
+    Tooltip.Reset(S)
 
     -- Must change every rebuild. Reusing FNames after ClearChildren resurrects zombies —
     -- category (more option rows) breaks harder than language; both are the same control.
@@ -168,7 +171,12 @@ function M.BuildContent(S)
             ctx.section = section
             ctx.item = item
             ctx.namePrefix = namePrefix
+            local firstNew = #S.liveControls + 1
             widget.build(ctx)
+            -- Every control this build added is attached, which includes the children of a row or fold.
+            for c = firstNew, #S.liveControls do
+                Tooltip.Attach(S, S.liveControls[c])
+            end
         end
 
         if sIndex < #visible then
@@ -207,6 +215,8 @@ function M.Teardown(S)
     S.confirmRoot = nil
     S.confirmSlot = nil
     S.confirmControls = nil
+    -- The tooltip widget was under the removed canvas, so the next show builds a new one.
+    S.tooltip = nil
     Session.ClearLive(S)
     S.menuOpen = false
 end
