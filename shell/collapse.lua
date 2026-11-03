@@ -190,7 +190,7 @@ function M.Flush(S)
     ExecuteInGameThreadWithDelay(1, S.collapseApplyFn)
 end
 
-local function AddHeaderText(row, name, text, fontSize, color, fill)
+local function AddHeaderText(row, name, text, fontSize, color, fill, spacing)
     local block = Umg.Construct("/Script/UMG.TextBlock", row, name)
     Umg.StyleText(block, fontSize, color)
     Umg.SetLabelText(block, text)
@@ -219,11 +219,14 @@ local function AddHeaderText(row, name, text, fontSize, color, fill)
             slot:SetHorizontalAlignment(2) -- Right
         end
         slot:SetVerticalAlignment(2) -- Center
+        -- The title carries the whole gap to the mark as its right padding, so the mark's left padding is 0.
+        local padX = spacing.sectionHeaderPadX
+        local padY = spacing.sectionHeaderPadY
         slot:SetPadding({
-            Left = fill and 10 or 4,
-            Top = 4,
-            Right = fill and 8 or 10,
-            Bottom = 4,
+            Left = fill and padX or 0,
+            Top = padY,
+            Right = fill and spacing.sectionHeaderGap or padX,
+            Bottom = padY,
         })
     end)
     return block
@@ -241,8 +244,9 @@ function M.BuildHeader(S, section, contentBox, suffix)
 
     local button = Umg.Construct("/Script/UMG.Button", contentBox, name .. "_Btn")
     local row = Umg.Construct("/Script/UMG.HorizontalBox", button, name .. "_Row")
-    local title = AddHeaderText(row, name .. "_Title", titleText, fontSize, colors.textPrimary, true)
-    local mark = AddHeaderText(row, name .. "_Mark", M.Mark(collapsed), fontSize, colors.sectionMark, false)
+    local spacing = S.config.spacing
+    local title = AddHeaderText(row, name .. "_Title", titleText, fontSize, colors.textPrimary, true, spacing)
+    local mark = AddHeaderText(row, name .. "_Mark", M.Mark(collapsed), fontSize, colors.sectionMark, false, spacing)
 
     pcall(function()
         button:SetContent(row)

@@ -61,9 +61,9 @@ function M.BuildChrome(S, contentBox, suffix)
     )
     contentBox:AddChildToVerticalBox(root)
 
-    local dockPad = 8
+    local dockPad = config.spacing.dockPad
     if config.pointerMode == "touch" then
-        dockPad = 24
+        dockPad = config.spacing.dockPadTouch
     end
     Umg.AddSpacer(contentBox, "ModMenu_DockPad_" .. suffix, dockPad)
 

@@ -98,8 +98,6 @@ function M.IsOpen(S)
     return S.confirm ~= nil
 end
 
-local CARD_WIDTH = 360
-
 local function AddHairline(parent, name, color)
     local box = Construct("/Script/UMG.SizeBox", parent, name)
     pcall(function()
@@ -163,11 +161,13 @@ local function BuildOverlay(S, spec)
         dim:SetContent(inner)
     end)
 
+    -- The card width is read per build from this instance's config, because each menu instance has its own spacing.
+    local cardWidth = S.config.spacing.confirmWidth
     local sizeBox = Construct("/Script/UMG.SizeBox", inner, "ModMenu_ConfirmSize_" .. suffix)
     pcall(function()
-        sizeBox:SetWidthOverride(CARD_WIDTH)
+        sizeBox:SetWidthOverride(cardWidth)
         if sizeBox.SetMaxDesiredWidth then
-            sizeBox:SetMaxDesiredWidth(CARD_WIDTH)
+            sizeBox:SetMaxDesiredWidth(cardWidth)
         end
     end)
 
@@ -230,7 +230,7 @@ local function BuildOverlay(S, spec)
     local cancelSlot = row:AddChildToHorizontalBox(cancel.widget)
     pcall(function()
         cancelSlot:SetSize({ SizeRule = 0, Value = 0.0 })
-        cancelSlot:SetPadding({ Left = 0, Top = 0, Right = 8, Bottom = 0 })
+        cancelSlot:SetPadding({ Left = 0, Top = 0, Right = S.config.spacing.confirmGap, Bottom = 0 })
         cancelSlot:SetVerticalAlignment(2)
     end)
 

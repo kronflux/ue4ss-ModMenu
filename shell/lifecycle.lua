@@ -233,7 +233,8 @@ function M.OnConfigChanged(S)
     if IsValid(S.panelBorder) then
         pcall(function()
             S.panelBorder:SetBrushColor(colors.panelBg)
-            S.panelBorder:SetPadding(Theme.PadPanel(S.config))
+            -- Build's padding keeps a host's spacing.panelPad, which the theme's padding alone would overwrite.
+            S.panelBorder:SetPadding(Build.PanelPadding(S.config))
         end)
     end
     if IsValid(S.panelOutline) then

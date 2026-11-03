@@ -6,6 +6,82 @@ local Theme = require("ModMenu.core.theme")
 
 local M = {}
 
+--- These are the default layout gaps and paddings, in pixels, that the shell reads from config.spacing.
+--- A host tunes them through Init's spacing table without editing the shell.
+--- panelPad is listed with a nil value on purpose, because a nil panelPad means the theme's padding is used.
+local SPACING_DEFAULTS = {
+    -- gapItem is the spacer under a section title. The widgets' own paddings are not spacing tokens.
+    gapItem = 8,
+    gapSection = 18,
+    footerPad = 8,
+    footerPadTouch = 120,
+    confirmWidth = 360,
+    -- tabHeight is the minimum height of a tab button in touch mode only. Desktop tabs keep their text height.
+    tabHeight = 56,
+    -- tabGap is the gap between tab buttons on desktop.
+    tabGap = 4,
+    -- tabGapTouch is the gap between tab buttons in touch mode, and also a touch tab button's horizontal padding.
+    tabGapTouch = 8,
+    -- tabPad is the spacer below the tab strip on desktop.
+    tabPad = 8,
+    -- tabPadTouch is the spacer below the tab strip in touch mode, and also a touch tab button's vertical padding.
+    tabPadTouch = 12,
+    dockPad = 8,
+    dockPadTouch = 24,
+    -- headPad is the spacer between the panel's header controls and the first section.
+    headPad = 16,
+    -- confirmGap is the gap between the Cancel and Confirm buttons of the confirm dialog.
+    confirmGap = 8,
+    -- sectionHeaderPadX is the padding at the left and right edges of a collapsible section header.
+    sectionHeaderPadX = 10,
+    -- sectionHeaderPadY is the padding above and below the title and mark of a collapsible section header.
+    sectionHeaderPadY = 4,
+    -- sectionHeaderGap is the gap between a collapsible section header's title and its plus or minus mark.
+    sectionHeaderGap = 12,
+    -- panelPad is one number used as the padding on all four sides of the panel.
+    -- Its default is nil, which means the theme's padding is used.
+    panelPad = nil,
+}
+
+--- Every key a host may set in spacing, so that a misspelled key raises an error instead of doing nothing.
+--- It is built from SPACING_DEFAULTS, so a token added there is settable without a second edit.
+--- panelPad is added by name because a key whose value is nil does not appear when the defaults are iterated.
+local SPACING_KEYS = { panelPad = true }
+for key, _ in pairs(SPACING_DEFAULTS) do
+    SPACING_KEYS[key] = true
+end
+
+--- Returns a new spacing table with the host's values merged over a base table.
+--- The base is the current spacing when given, so a later Init keeps earlier overrides, and
+--- the defaults otherwise. nil returns a copy of the base. A non-table, an unknown key, or a
+--- value that is not a finite number of zero or more raises an error that names the field,
+--- so a mistake in Init is reported rather than ignored.
+---@param value table|nil
+---@param base table|nil
+---@return table
+function M.NormalizeSpacing(value, base)
+    local out = {}
+    for key, n in pairs(type(base) == "table" and base or SPACING_DEFAULTS) do
+        out[key] = n
+    end
+    if value == nil then
+        return out
+    end
+    if type(value) ~= "table" then
+        error("ModMenu.Init: spacing must be a table of numbers")
+    end
+    for key, n in pairs(value) do
+        if not SPACING_KEYS[key] then
+            error("ModMenu.Init: spacing." .. tostring(key) .. " is not a known spacing key")
+        end
+        if type(n) ~= "number" or n ~= n or n < 0 or n == math.huge then
+            error("ModMenu.Init: spacing." .. key .. " must be a number of zero or more")
+        end
+        out[key] = n
+    end
+    return out
+end
+
 function M.New()
     return {
         title = "Mod Menu",
@@ -36,6 +112,7 @@ function M.New()
         cursorScale = 1, -- overlay pointer multiplier (1 = native ~28x46; 2 = larger)
         cursorHideClasses = nil, -- optional string[] of UUserWidget class names to collapse while open
         tabs = nil, -- optional string[] top-level tabs; omit = single scroll
+        spacing = M.NormalizeSpacing(nil), -- The layout gaps and paddings start as a copy of SPACING_DEFAULTS.
         debug = false, -- verbose [ModMenu] traces (collapse, open/close, register, click path)
     }
 end
@@ -320,6 +397,10 @@ function M.ApplyInit(config, opts, ctx)
     end
     if opts.tabs ~= nil then
         config.tabs = M.NormalizeTabs(opts.tabs)
+    end
+    -- A spacing table is merged over the current spacing, as colors are, so a later Init keeps earlier overrides.
+    if opts.spacing ~= nil then
+        config.spacing = M.NormalizeSpacing(opts.spacing, config.spacing)
     end
     if opts.consoleCommand ~= nil then
         if opts.consoleCommand == false or opts.consoleCommand == "" then

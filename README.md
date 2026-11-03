@@ -214,8 +214,9 @@ Configure and bind this mod’s shell. Safe to call more than once (updates conf
 | `cursorScale` | `1` | Overlay pointer multiplier (`1`–`8`). The glyph is the Windows arrow (~28×46) with a 1px outline + drop shadow. `2` if you want it larger. Only used when `cursorMode = "modmenu"`. Live `Init` updates rebuild the overlay. |
 | `cursorHideClasses` | `nil` | Optional string array of UUserWidget class short names to collapse while the ModMenu cursor is shown (e.g. `{ "WB_Cursor_C" }`). Host-supplied; empty by default. Class defaults (`Default__…`) are skipped. On close, each widget is restored to the visibility it had before hide — not forced visible. |
 | `debug` | `false` | Verbose `[ModMenu]` traces (open/close, collapse, register, click routing). Failures always print. |
-| `pointerMode` | `"mouse"` | `"mouse"` (default) or `"touch"` / `"handheld"` (same). Touch: ignore delayed LMB latch; checkbox ON/OFF buttons; fonts + panel width × `touchFontScale`; 28px scrollbar; 56px-tall tab strip with extra gap under Dock. Hosts keep `{ type = "checkbox" }` and desktop `font*` / `widthFrac`. |
+| `pointerMode` | `"mouse"` | `"mouse"` (default) or `"touch"` / `"handheld"` (same). Touch: ignore delayed LMB latch; checkbox ON/OFF buttons; fonts + panel width × `touchFontScale`; 28px scrollbar; a tab strip that is `spacing.tabHeight` tall (default 56) with `spacing.dockPadTouch` of space under Dock. Hosts keep `{ type = "checkbox" }` and desktop `font*` / `widthFrac`. |
 | `showClose` | `true` | Title-row **Close** button (same path as the toggle key). Default on so you can dismiss with the mouse. Pass `false` to hide. |
+| `spacing` | see **Spacing** | Optional table of layout gaps and paddings in pixels. Keys you omit keep their defaults. See **Spacing** below. |
 
 Also installs viewport hooks and the input backend (`core/input.lua`): toggle + LMB click latch. Default `ue4ss` uses `RegisterKeyBind`. Pass `inputBackend = "engine"` on games where those binds never fire (e.g. Code Vein 2); that polls Unreal `IsInputKeyDown` for the toggle key and left mouse.
 
@@ -264,6 +265,36 @@ ModMenu.Init({
 -- Host can still drive the shell explicitly:
 --   ModMenu.Open()   -- also respects canOpen
 --   ModMenu.Close()  -- always allowed
+```
+
+#### Spacing
+
+The shell reads its gaps and paddings from `Init`'s `spacing` table instead of fixed numbers, so a host can tune the layout without editing ModMenu. Every value is in pixels. A key you omit keeps its default, so `Init` without `spacing` leaves the layout exactly as before. An unknown key, or a value that is not a finite number of zero or more, raises an error that names the key. A later `Init` with a `spacing` table is merged over the current spacing, so it keeps the overrides of earlier calls.
+
+| Token | Default | What it controls |
+|-------|---------|------------------|
+| `gapItem` | `8` | The space between a section's title and its first item. |
+| `gapSection` | `18` | The gap between one section and the next. |
+| `footerPad` | `8` | The empty space below the last section with a mouse. |
+| `footerPadTouch` | `120` | The empty space below the last section when `pointerMode` is `"touch"`, so the last buttons clear the screen edge. |
+| `confirmWidth` | `360` | The width of the confirm dialog card. |
+| `tabHeight` | `56` | The minimum height of a tab button when `pointerMode` is `"touch"`. With a mouse, tab buttons keep their text height. |
+| `tabGap` | `4` | The gap between tab buttons with a mouse. |
+| `tabGapTouch` | `8` | The gap between tab buttons, and the horizontal padding inside a tab button, when `pointerMode` is `"touch"`. |
+| `tabPad` | `8` | The space below the tab strip with a mouse. |
+| `tabPadTouch` | `12` | The space below the tab strip, and the vertical padding inside a tab button, when `pointerMode` is `"touch"`. |
+| `dockPad` | `8` | The space below the Dock picker with a mouse. |
+| `dockPadTouch` | `24` | The space below the Dock picker when `pointerMode` is `"touch"`. |
+| `headPad` | `16` | The space between the panel's header controls and the first section. |
+| `confirmGap` | `8` | The gap between the Cancel and Confirm buttons of the confirm dialog. |
+| `sectionHeaderPadX` | `10` | The padding at the left and right edges of a collapsible section header. |
+| `sectionHeaderPadY` | `4` | The padding above and below the title and mark of a collapsible section header. |
+| `sectionHeaderGap` | `12` | The gap between a collapsible section header's title and its plus or minus mark. |
+| `panelPad` | `nil` | The padding inside the panel on all four sides. When it is not set, the theme's panel padding is used. Once a host sets `panelPad`, a later `Init` cannot unset it, because a key set to `nil` is absent from the table and the merge keeps the earlier value. |
+
+```lua
+-- Widen the gap between sections and keep every other gap at its default:
+ModMenu.Init({ spacing = { gapSection = 24 } })
 ```
 
 `ModMenu.GetInstanceId()` / `ModMenu.GetInstanceSerial()` — debug helpers for logs / Live View.
@@ -820,7 +851,7 @@ Heavy work on the click stack can hitch or crash — delay off the open path whe
 10. **Logging** — quiet by default. Failures still print (`CreateShell failed`, `KEY CONFLICT`, `OPEN blocked`). `Init({ debug = true })` restores open/close, collapse, register, scrollbar, and click-path traces (`press-edge` / `latch-hover` / `latch-miss`). Click traces include `hover` / `pressed` / `capture` / `downVia` / `ptr`. On a handheld, `downVia=capture` is the touch signature — see **Ally / handheld**.
 11. **Hot-reload** — `ModRef` shared vars (`NextInstanceId`, key claims, open count) are **not** cleared on Ctrl+R.
 12. **Collapse** — opt-in (`collapsible = true`). Accordion header: title on the left, `+` (closed) / `-` (open) on the right. Toggle show/hides the section body (same as dropdowns; no content rebuild). Session-only per section `id` (survives close/open; not written to disk). Re-Register keeps the current open/closed state. Nested groups use `type = "fold"` inside `items` — same session memory per `sectionId.foldId` (see **Item types**).
-13. **Tabs** — opt-in (`Init({ tabs = { ... } })`). Strip under title / dock. Only the active tab's sections are constructed; switching rebuilds that body (not a hidden full tree). `Register({ tab = "Give" })`; omit `tab` = first name. `Get` / `Set` still work for hidden tabs. Session remembers the last tab (not disk). Keyboard Q/E is not in v1. `pointerMode = "touch"` makes the strip 56px tall with extra gap under Dock (desktop unchanged).
+13. **Tabs** — opt-in (`Init({ tabs = { ... } })`). Strip under title / dock. Only the active tab's sections are constructed; switching rebuilds that body (not a hidden full tree). `Register({ tab = "Give" })`; omit `tab` = first name. `Get` / `Set` still work for hidden tabs. Session remembers the last tab (not disk). Keyboard Q/E is not in v1. `pointerMode = "touch"` makes the strip `spacing.tabHeight` tall (default 56) with `spacing.dockPadTouch` of space under Dock (desktop unchanged).
 
 ### Known limits
 
@@ -840,7 +871,7 @@ ModMenu.Init({
 })
 ```
 
-Touch mode: checkboxes are ON/OFF buttons (`press-edge`); delayed LMB latch ignored; fonts and `widthFrac` × `touchFontScale` (default 1.75); ScrollBox thumb is 28px and always shown so it is hittable (content-drag is a later pass — buttons capture the pointer). The title-row **Close** button is on for every pointer mode (`showClose = false` to hide). The tab strip uses 56px-tall buttons and extra gap under Dock so a finger aiming for Cheats / Give does not hit the Dock button. Desktop tabs stay compact.
+Touch mode: checkboxes are ON/OFF buttons (`press-edge`); delayed LMB latch ignored; fonts and `widthFrac` × `touchFontScale` (default 1.75); ScrollBox thumb is 28px and always shown so it is hittable (content-drag is a later pass — buttons capture the pointer). The title-row **Close** button is on for every pointer mode (`showClose = false` to hide). The tab strip uses buttons that are `spacing.tabHeight` tall (default 56) and `spacing.dockPadTouch` of space under Dock so a finger aiming for Cheats / Give does not hit the Dock button. Desktop tabs stay compact.
 
 ---
 

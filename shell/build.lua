@@ -27,6 +27,16 @@ local CreateTextButton = Umg.CreateTextButton
 
 local M = {}
 
+--- Returns the panel's inner padding: spacing.panelPad on all four sides when the host set it,
+--- otherwise the theme's padding, so that Init without panelPad keeps the theme's layout.
+function M.PanelPadding(config)
+    local pad = config.spacing and config.spacing.panelPad
+    if pad ~= nil then
+        return { Left = pad, Top = pad, Right = pad, Bottom = pad }
+    end
+    return Theme.PadPanel(config)
+end
+
 function M.BuildContent(S)
     if not IsValid(S.contentBox) then
         return
@@ -94,7 +104,7 @@ function M.BuildContent(S)
 
     Tabs.BuildStrip(S, contentBox, suffix)
 
-    AddSpacer(contentBox, "ModMenu_HeadPad_" .. suffix, 16)
+    AddSpacer(contentBox, "ModMenu_HeadPad_" .. suffix, config.spacing.headPad)
 
     if #S.sections == 0 then
         local empty = Construct("/Script/UMG.TextBlock", contentBox, "ModMenu_Empty_" .. suffix)
@@ -142,7 +152,7 @@ function M.BuildContent(S)
             SetLabelText(secTitle, section.title or section.id)
             contentBox:AddChildToVerticalBox(secTitle)
         end
-        AddSpacer(itemParent, string.format("ModMenu_SecPad_%s_%s", section.id, suffix), 8)
+        AddSpacer(itemParent, string.format("ModMenu_SecPad_%s_%s", section.id, suffix), config.spacing.gapItem)
 
         -- Always build children. Collapsed sections hide the body (dropdown-style)
         -- so toggling does not rebuild and flicker under a still-down click.
@@ -162,15 +172,15 @@ function M.BuildContent(S)
         end
 
         if sIndex < #visible then
-            AddSpacer(contentBox, "ModMenu_Between_" .. section.id .. "_" .. suffix, 18)
+            AddSpacer(contentBox, "ModMenu_Between_" .. section.id .. "_" .. suffix, config.spacing.gapSection)
         end
     end
 
-    -- Touch: last Combat buttons sat on the 1080p clip edge. Mouse does not
-    -- need that extra well — those clicks were landing (God hid the HP change).
-    local foot = 8
+    -- In touch mode the last buttons of a long section sat on the clip edge of a 1080p screen, so the footer is taller there.
+    -- A mouse does not need the extra space, because its clicks on those buttons were already landing.
+    local foot = config.spacing.footerPad
     if config.pointerMode == "touch" then
-        foot = 120
+        foot = config.spacing.footerPadTouch
     end
     AddSpacer(contentBox, "ModMenu_Foot_" .. suffix, foot)
 end
@@ -246,7 +256,7 @@ function M.Create(S)
     S.panelBorder = fill
     pcall(function()
         fill:SetBrushColor(colors.panelBg)
-        fill:SetPadding(Theme.PadPanel(config))
+        fill:SetPadding(M.PanelPadding(config))
     end)
 
     -- Always wrap in a 1px outline. Light uses panelBg so the edge is invisible.

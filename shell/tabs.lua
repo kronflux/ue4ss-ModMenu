@@ -81,11 +81,6 @@ function M.SectionVisible(S, section)
     return section ~= nil and section.tab == S.activeTab
 end
 
--- Finger-sized tab targets (desktop stays compact, text-height buttons).
-local TOUCH_TAB_MIN_H = 56
-local TOUCH_TAB_GAP = 8
-local TOUCH_TAB_PAD = 12
-
 --- Horizontal tab buttons under title / dock. Fill-width so three names share the row.
 function M.BuildStrip(S, contentBox, suffix)
     M.Ensure(S)
@@ -94,6 +89,12 @@ function M.BuildStrip(S, contentBox, suffix)
     end
     local colors = Theme.Of(S.config)
     local touch = S.config.pointerMode == "touch"
+    -- Tab gaps and paddings come from this instance's spacing, with a touch variant for finger-sized targets.
+    -- Desktop buttons keep their text height, so tabHeight applies in touch mode only.
+    local spacing = S.config.spacing
+    local tabHeight = spacing.tabHeight
+    local tabGap = touch and spacing.tabGapTouch or spacing.tabGap
+    local tabPad = touch and spacing.tabPadTouch or spacing.tabPad
     local row = Construct("/Script/UMG.HorizontalBox", contentBox, "ModMenu_Tabs_" .. suffix)
     contentBox:AddChildToVerticalBox(row)
 
@@ -106,7 +107,7 @@ function M.BuildStrip(S, contentBox, suffix)
         if touch then
             size = Construct("/Script/UMG.SizeBox", row, "ModMenu_TabSize" .. tostring(i) .. "_" .. suffix)
             pcall(function()
-                size:SetMinDesiredHeight(TOUCH_TAB_MIN_H)
+                size:SetMinDesiredHeight(tabHeight)
             end)
             host = size
         end
@@ -131,14 +132,14 @@ function M.BuildStrip(S, contentBox, suffix)
                 end
             end)
             pcall(function()
-                btn:SetPadding({ Left = 8, Top = 12, Right = 8, Bottom = 12 })
+                btn:SetPadding({ Left = tabGap, Top = tabPad, Right = tabGap, Bottom = tabPad })
             end)
         end
         local slot = row:AddChildToHorizontalBox(size or btn)
         pcall(function()
             slot:SetSize({ SizeRule = 1, Value = 1.0 })
             slot:SetPadding({
-                Left = (i == 1) and 0 or (touch and TOUCH_TAB_GAP or 4),
+                Left = (i == 1) and 0 or tabGap,
                 Top = 0,
                 Right = 0,
                 Bottom = 0,
@@ -153,7 +154,7 @@ function M.BuildStrip(S, contentBox, suffix)
         })
     end
 
-    AddSpacer(contentBox, "ModMenu_TabPad_" .. suffix, touch and TOUCH_TAB_PAD or 8)
+    AddSpacer(contentBox, "ModMenu_TabPad_" .. suffix, tabPad)
 end
 
 function M.QueueSelect(S, tabId)
