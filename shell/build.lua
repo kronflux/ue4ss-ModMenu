@@ -16,6 +16,7 @@ local Collapse = require("ModMenu.shell.collapse")
 local Tabs = require("ModMenu.shell.tabs")
 local Confirm = require("ModMenu.shell.confirm")
 local Tooltip = require("ModMenu.core.tooltip")
+local Persist = require("ModMenu.core.persist")
 
 local Log = Util.Log
 local Debug = Util.Debug
@@ -224,6 +225,8 @@ end
 --- ClientRestart always destroys the shell. Do not ApplyGameOnly / hide
 --- the cursor unless this instance had actually taken input.
 function M.Destroy(S, stopPoll)
+    -- The poll tick and the close timer that flush autosave stop with the shell, so a pending write is made now.
+    Persist.Flush(true)
     if stopPoll then
         stopPoll()
     end

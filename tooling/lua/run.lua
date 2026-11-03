@@ -157,6 +157,8 @@ local specs = {
     "widgets_slider_spec.lua",
     "widgets_radio_spec.lua",
     "widgets_keybind_spec.lua",
+    "persist_spec.lua",
+    "persist_shell_spec.lua",
 }
 
 -- Specs reach the encoder through this global so they can check its JSON output directly.

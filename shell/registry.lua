@@ -7,6 +7,7 @@ local Umg = require("ModMenu.core.umg")
 local Input = require("ModMenu.core.input")
 local Options = require("ModMenu.core.options")
 local Tooltip = require("ModMenu.core.tooltip")
+local Persist = require("ModMenu.core.persist")
 local Widgets = require("ModMenu.widgets.init")
 local Session = require("ModMenu.shell.session")
 local Build = require("ModMenu.shell.build")
@@ -132,6 +133,13 @@ local function ApplyLive(S, vkey, value)
     end
 end
 
+--- Set each listed value key to nil, for the values a saved snapshot records as cleared.
+local function ClearKeys(S, keys)
+    for _, key in ipairs(keys or {}) do
+        S.values[key] = nil
+    end
+end
+
 function M.Register(S, section)
     ValidateSection(section)
 
@@ -145,6 +153,10 @@ function M.Register(S, section)
         tab = Tabs.ResolveSectionTab(S, section),
     }
 
+    -- The saved snapshot goes in before the seeds, which keep a value already present, so it
+    -- overrides the author defaults. A section gets its part only on its first Register.
+    local cleared = Persist.ApplySection(S, copy)
+
     Collapse.Seed(S, copy)
 
     -- Seed defaults into values store.
@@ -154,6 +166,8 @@ function M.Register(S, section)
             widget.seed(copy.id, item, S.values)
         end
     end
+    -- A seed writes the default over a nil value, so a value the player cleared is cleared again here.
+    ClearKeys(S, cleared)
 
     local existing = S.sectionIndexById[copy.id]
     local oldTab = existing and S.sections[existing].tab
@@ -226,6 +240,25 @@ function M.Set(S, sectionId, itemId, value)
     end
     S.values[vkey] = value
     ApplyLive(S, vkey, value)
+    Session.NoteChange(S)
+end
+
+--- Write a saved snapshot over the sections registered so far, then seed them again.
+--- The seeds keep the snapshot's values and coerce them as they coerce a value set before
+--- Register, so a saved number outside its range comes back inside it.
+---@param snapshot any
+function M.ApplySnapshot(S, snapshot)
+    local cleared = Persist.Apply(snapshot, S)
+    for _, section in ipairs(S.sections) do
+        for _, item in ipairs(section.items) do
+            local widget = Widgets.get(item.type)
+            if widget and widget.seed then
+                widget.seed(section.id, item, S.values)
+            end
+        end
+    end
+    -- A seed writes the default over a nil value, so a value the snapshot records as cleared is cleared again here.
+    ClearKeys(S, cleared)
 end
 
 function M.SetLabel(S, sectionId, itemId, text)

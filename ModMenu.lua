@@ -47,6 +47,8 @@
   Tabs: Init({ tabs = { "Cheats", "Give" } }) + Register({ tab = "Cheats", ... }).
   Confirm: button { confirm = { title, message } } or ModMenu.Confirm({ onConfirm = fn }).
   Persistence: optional ModMenu.ConfigManager (Init / Get / Set). Host-owned; not auto-wired.
+  Autosave: Init({ autosave = true }) saves dock, tab, collapse state and values under the
+  reserved ConfigManager key __modmenu, 300 ms after the last change.
 
   Internals: core/ helpers + widgets/ registry (see README.md).
 ]]
@@ -103,9 +105,27 @@ InputMode.Bind({
     end,
 })
 
+--- Views of the values and fold tables that report each change to autosave.
+--- Widgets write these tables directly when the player uses them, so a write through the view is
+--- how autosave learns of a change without a check on every tick. Reads go to the real tables.
+--- The views are handed out only while autosave is on, so a host without it gets the plain tables.
+local function ChangeView(target)
+    return setmetatable({}, {
+        __index = target,
+        __newindex = function(_, key, value)
+            if target[key] ~= value then
+                target[key] = value
+                Session.NoteChange(S)
+            end
+        end,
+    })
+end
+local valuesView = ChangeView(S.values)
+local foldView = ChangeView(S.foldCollapsedByKey)
+
 S.makeWidgetCtx = function()
     return {
-        values = S.values,
+        values = S.persistOn and valuesView or S.values,
         liveControls = S.liveControls,
         -- The keybind widget checks conflicts against this shell's registered sections, including ones on a tab that is not built.
         sections = S.sections,
@@ -119,7 +139,7 @@ S.makeWidgetCtx = function()
         EnsureMenuVisible = function()
             Session.EnsureVisible(S)
         end,
-        foldCollapsedByKey = S.foldCollapsedByKey,
+        foldCollapsedByKey = S.persistOn and foldView or S.foldCollapsedByKey,
         ShowConfirm = function(item)
             Confirm.FromButton(S, item)
         end,
@@ -164,7 +184,21 @@ end
 --- Initialize / configure this mod's shell. Safe to call multiple times.
 ---@param opts table|nil
 function ModMenu.Init(opts)
+    if opts ~= nil and opts.autosave ~= nil and type(opts.autosave) ~= "boolean" then
+        error("ModMenu.Init: autosave must be a boolean")
+    end
+    -- A later Init writes its own dock and tabs, so the dock and tab of a loaded snapshot are taken first.
+    local kept = Lifecycle.KeepShell(S)
     Config.ApplyInit(config, opts, { instanceUnlocked = Instance.GetTag() == nil })
+    -- Autosave is applied after the Init options, so a saved dock and tab override the author's.
+    -- An Init without autosave leaves the current setting as it is.
+    if opts ~= nil and opts.autosave == true then
+        Lifecycle.SetPersist(S, ConfigStore)
+    elseif opts ~= nil and opts.autosave == false then
+        Lifecycle.SetPersist(S, nil)
+    end
+    -- The loaded dock and tab are put back when they are still valid, so a later Init keeps the player's layout.
+    Lifecycle.RestoreShell(S, kept)
     Util.SetDebug(config.debug == true)
     Instance.Ensure(config)
     Umg.SetDefaults({ fontItem = config.fontItem, colors = config.colors })
@@ -244,6 +278,8 @@ function ModMenu.Register(section)
     if not initialized then
         ModMenu.Init({})
     end
+    -- With autosave on, the snapshot is read here once the host has initialized ConfigManager.
+    Lifecycle.LoadPersist(S)
     Registry.Register(S, section)
 end
 

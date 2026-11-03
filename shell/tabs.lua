@@ -6,7 +6,7 @@
 
   Only the active tab's sections are built. Switching queues a rebuild off
   the poll tick (same hitch rule as collapse: never rebuild under a still-down click).
-  Last tab is session-only (survives close/open; not written to disk).
+  The last tab survives close and open. It is written to disk only when Init sets autosave = true.
 ]]
 
 local Util = require("ModMenu.core.util")
@@ -14,6 +14,7 @@ local Umg = require("ModMenu.core.umg")
 local Input = require("ModMenu.core.input")
 local InputMode = require("ModMenu.core.inputmode")
 local Theme = require("ModMenu.core.theme")
+local Session = require("ModMenu.shell.session")
 
 local Debug = Util.Debug
 local Construct = Umg.Construct
@@ -184,6 +185,7 @@ function M.Apply(S, tabId)
     end
     S.activeTab = tabId
     Debug("Tab -> " .. tabId)
+    Session.NoteChange(S)
     if not S.menuOpen then
         if Util.IsValid(S.menuRoot) then
             S.contentDirty = true

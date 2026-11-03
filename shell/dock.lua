@@ -10,6 +10,7 @@ local Umg = require("ModMenu.core.umg")
 local Config = require("ModMenu.core.config")
 local DockMath = require("ModMenu.core.dockmath")
 local Widgets = require("ModMenu.widgets.init")
+local Session = require("ModMenu.shell.session")
 
 local Dropdown = Widgets.get("dropdown")
 local Debug = Util.Debug
@@ -100,6 +101,7 @@ function M.Set(S, side)
     for _, fn in ipairs(S.onDockCallbacks or {}) do
         Util.SafeCall(fn, S.config.dock)
     end
+    Session.NoteChange(S)
 end
 
 return M

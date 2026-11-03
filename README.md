@@ -218,6 +218,7 @@ Configure and bind this mod’s shell. Safe to call more than once (updates conf
 | `showClose` | `true` | Title-row **Close** button (same path as the toggle key). Default on so you can dismiss with the mouse. Pass `false` to hide. |
 | `spacing` | see **Spacing** | Optional table of layout gaps and paddings in pixels. Keys you omit keep their defaults. See **Spacing** below. |
 | `tooltipDelayMs` | `400` | How long, in milliseconds, the pointer rests on an item before its `tooltip` shows. A value that is not a finite number of zero or more raises an error. See **Tooltips** under **Item types**. |
+| `autosave` | `false` | Opt-in. `true` saves the dock edge, the active tab, the collapse state of sections and folds, and item values in `ModMenu.ConfigManager` under the reserved key `__modmenu`, and restores them on the next launch. A value that is not a boolean raises an error. See **Autosave** under **Persistence**. |
 
 Also installs viewport hooks and the input backend (`core/input.lua`): toggle + LMB click latch. Default `ue4ss` uses `RegisterKeyBind`. Pass `inputBackend = "engine"` on games where those binds never fire (e.g. Code Vein 2); that polls Unreal `IsInputKeyDown` for the toggle key and left mouse.
 
@@ -319,9 +320,9 @@ Add or **replace** a section by `section.id`. If the menu is open, content rebui
 }
 ```
 
-Default is **not** collapsible — existing sections stay always-open. Session remembers open/closed per `id` (re-Register does not reset it; not saved to disk). Nest groups **inside** a section with `type = "fold"` (see **Item types**).
+Default is **not** collapsible — existing sections stay always-open. Session remembers open/closed per `id` (re-Register does not reset it; saved to disk only with `Init({ autosave = true })`). Nest groups **inside** a section with `type = "fold"` (see **Item types**).
 
-Omit `Init tabs` and the menu stays a single scroll (Mortal Shell 2 and other hosts unchanged). With tabs, only the **active** tab's sections are built — switching rebuilds content (values from `Get` / `Set` still live for hidden tabs). Last tab is session-only (survives close/open; not written to disk).
+Omit `Init tabs` and the menu stays a single scroll (Mortal Shell 2 and other hosts unchanged). With tabs, only the **active** tab's sections are built — switching rebuilds content (values from `Get` / `Set` still live for hidden tabs). Last tab is session-only (survives close/open; written to disk only with `Init({ autosave = true })`).
 
 ```lua
 ModMenu.Init({
@@ -449,7 +450,7 @@ ModMenu.GetTab()           -- nil when tabs are off
 
 `OnOpen` runs each time the menu finishes opening (after the shell is visible). Register as many callbacks as you need (e.g. one per feature).
 
-`OnDockChange` runs after the header picker or `SetDock` applies an edge. ModMenu does not write disk; hosts that want memory across launches save `side` and pass it back on `Init({ dock = ... })`.
+`OnDockChange` runs after the header picker or `SetDock` applies an edge. Without `Init({ autosave = true })` ModMenu does not write disk, so hosts that want memory across launches save `side` and pass it back on `Init({ dock = ... })`. With autosave on, ModMenu saves the dock itself (see **Autosave**).
 
 ### Persistence
 
@@ -472,7 +473,47 @@ ModMenu.OnDockChange(function(side)
 end)
 ```
 
-`Init` the store **before** `ModMenu.Init` when launch options (dock, toggle key) come from disk. The store's functions are `Init`, `Get`, `Set`, `Save`, `File`, `LoadFailed` and `Overwrite`. Implementation is `store/` (`init`, `json`, `paths`). Path is `Mods/<id>/config.json`. Hosts own what is written; ModMenu does not auto-save.
+`Init` the store **before** `ModMenu.Init` when launch options (dock, toggle key) come from disk. The store's functions are `Init`, `Get`, `Set`, `Save`, `File`, `LoadFailed` and `Overwrite`. Implementation is `store/` (`init`, `json`, `paths`). Path is `Mods/<id>/config.json`. Hosts own what is written. ModMenu writes nothing unless `Init` sets `autosave = true`, and then it writes only its own key.
+
+#### Autosave
+
+`ModMenu.Init({ autosave = true })` saves the menu state in the same store, under the key `__modmenu`. That key is reserved for ModMenu, so a host must not use it for its own data. Every other key in `config.json` stays as the host wrote it, because ModMenu writes only with `ConfigManager.Set("__modmenu", snapshot)`.
+
+```lua
+ConfigManager.Init({ id = "YourHostMod" })
+ModMenu.Init({ title = "My Mod Menu", autosave = true })
+```
+
+The snapshot holds six things.
+
+- The dock edge.
+- The active tab, when `Init` sets `tabs`.
+- The collapse state of each collapsible section, in `collapsed`.
+- The collapse state of each fold, in `folds`.
+- The value of each `checkbox`, `dropdown`, `number`, `textinput`, `slider`, `radio` and `keybind` item. Buttons, labels and separators hold no value and are not saved.
+- The key of each `checkbox`, `dropdown`, `radio` and `textinput` value that was cleared with `ModMenu.Set(sectionId, itemId, nil)`, in `cleared`. A cleared value stays cleared after a restart rather than coming back as the default.
+
+```json
+{
+  "x": "a host key, left as it is",
+  "__modmenu": {
+    "dock": "left",
+    "tab": "Give",
+    "collapsed": { "MyMod": false },
+    "folds": { "MyMod.advanced": true },
+    "values": { "MyMod.enabled": true, "MyMod.count": 3 },
+    "cleared": { "MyMod.name": true }
+  }
+}
+```
+
+A key in `collapsed` is the section id, and a key in `folds` is `<sectionId>.<foldId>`. They are kept apart because a section id such as `MyMod.advanced` would otherwise share a key with the fold `advanced` of section `MyMod`. A value key is `<sectionId>.<itemId>`, the same key `ModMenu.Get` uses. The saved state of a section that is not registered in a session is written back unchanged, so a section registered only some of the time keeps its state.
+
+The snapshot is read once, as soon as the store is initialized, and is applied before the menu is first built. A saved value therefore replaces the item's `default`, a saved dock replaces `Init({ dock })`, and a saved tab replaces the first tab. A section gets its saved state on its first `Register`, so a later `Register` of the same section keeps what the player changed. A saved value for an item that no longer exists is ignored, as are a dock that is not one of the four edges and a tab that `Init` does not list. A saved value of the wrong type for its item is ignored too, so a `checkbox` takes only a boolean, a `number` or `slider` only a number, and a `dropdown`, `textinput`, `radio` or `keybind` only a string. A later `Init` call keeps the loaded dock and tab, and the tab is kept only when that `Init` lists it. Numbers, sliders, radios and keybinds pass their saved value through the same checks as a value set before `Register`, so a saved number outside a new range comes back inside it. `onChange` does not run for a restored value, so a host that acts on a value reads it with `ModMenu.Get` after `Register`.
+
+A write happens 300 ms after the last change, so dragging a slider or typing writes once rather than on every step. While the menu is open the poll loop makes the write, and after it closes a delayed call does. Changes made through `ModMenu.Set`, `SetDock` and `SetTab` are saved as well. Nothing is written before the snapshot was read, so an early `Set` cannot replace the saved state with the defaults. If the store's file failed to parse, `Set` writes nothing, as described above, and the state is kept in memory until the host calls `Overwrite`.
+
+`ConfigManager.Init` may run before or after `ModMenu.Init`. When it runs later, the snapshot is read on the next `Register` or `Open`. A host that never initializes the store gets no autosave, and nothing is read or written. A store that raises an error on a write logs `autosave failed` and the menu keeps working. `Init({ autosave = false })` turns autosave off again and drops a write that was still waiting, and an `Init` that omits `autosave` keeps the current setting. When the shell is torn down, as on a client restart, a waiting write is made at once.
 
 The store never opens `config.json` for writing, because opening it would empty it before the new text is on disk. A save writes the whole file to `config.json.tmp` and renames it over `config.json`. Where that rename fails because the file exists, as it can on Windows, the old file is first moved to `config.json.prev` and is removed once the new file is in place. A crash at any point therefore leaves a whole config on disk.
 
@@ -759,7 +800,7 @@ A labelled track with a draggable knob over a numeric range. The current value i
 
 Press the track and drag to move the knob, or click a point on the track to jump there. The value snaps to `step` while the knob moves. `min` and `max` are always reachable, even when the range is not a whole number of steps. By default `onChange` fires once, on release, and only when the value changed. With `live = true` it fires on every new step during the drag. In a `row`, the track is 160 pixels wide unless the item sets `fill = true`. In touch mode the track and the knob are larger. The track uses `buttonBg`, the part left of the knob uses `buttonBgPrimary`, the knob uses `textPrimary`, and the value text uses `textMuted`.
 
-`Register` raises an error when `min` or `max` is missing or not a number, when `min` is not less than `max`, when `step` is not a positive number, or when `default` is not numeric. `Set` turns its value into a number the same way a drag does: a numeric string is accepted, and the value is snapped, rounded for an `integer` item, and clamped. Once the menu has built the item, a value that is not numeric is ignored and the stored value is kept. `Set(sectionId, itemId, nil)` resets the item to its `default`. A `Set` made before the section is registered is coerced when `Register` runs. `Set` never fires `onChange`.
+`Register` raises an error when `min` or `max` is missing or not a number, when `min` is not less than `max`, when `step` is not a positive number, or when `default` is not numeric. `Set` turns its value into a number the same way a drag does: a numeric string is accepted, and the value is snapped, rounded for an `integer` item, and clamped. Once the section is registered, whether or not the menu has built the item, a value that is not numeric is ignored and the stored value is kept. `Set(sectionId, itemId, nil)` resets the item to its `default`. A `Set` made before the section is registered is coerced when `Register` runs. `Set` never fires `onChange`.
 
 ### `radio`
 
@@ -779,7 +820,7 @@ A group of buttons with one chosen option. Options take the same shape as a `dro
 
 Each option is a button. The chosen one uses the active button fill (`buttonBgActive`), and the others take the default button fill with the same hover and pressed colours as a plain button. Pressing the chosen option again changes nothing and fires no `onChange`.
 
-`Register` raises an error when `options` is missing or empty, or when `default` is not one of the option values. Without a `default`, the group starts with nothing chosen. `Set` with a value that is not one of the options raises `radio <id>: value must be one of <values>` once the menu has built the item. `Set(sectionId, itemId, nil)` clears the choice. A `Set` made before the section is registered is checked when `Register` runs, and a value that is not an option is replaced by the default there. `Set` never fires `onChange`.
+`Register` raises an error when `options` is missing or empty, or when `default` is not one of the option values. Without a `default`, the group starts with nothing chosen. `Set` with a value that is not one of the options raises `radio <id>: value must be one of <values>` once the section is registered, and the stored value is kept. `Set(sectionId, itemId, nil)` clears the choice. A `Set` made before the section is registered is checked when `Register` runs, and a value that is not an option is replaced by the default there. `Set` never fires `onChange`.
 
 ### `keybind`
 
@@ -801,7 +842,9 @@ A button that shows a key binding and captures a new one when clicked. The value
 
 Click the button and it shows `Press a key`. The next letter, digit, function key (`F1` to `F12`) or arrow key that goes down becomes the binding. With `allowModifiers = true`, the held modifiers (`LeftControl`, `RightControl`, `LeftAlt`, `RightAlt`, `LeftShift`, `RightShift`) are written in front of it in that order. A modifier alone is never a binding. Escape or a second click cancels the capture and keeps the old binding. Only one keybind captures at a time. While capturing, the menu reads key state with the player controller's `IsInputKeyDown` every 50 ms, whichever `inputBackend` the host chose. A key already held when the capture starts is not captured.
 
-A binding already held by another `keybind` item in any registered section calls `onConflict(otherId, value, otherSectionId)`. The new binding is stored only when that call returns `true`, and an item without `onConflict` refuses it. Two bindings with the same key and modifiers conflict whatever order the modifiers are written in.
+A binding already held by another `keybind` item in any section registered on the same menu calls `onConflict(otherId, value, otherSectionId)`. Items of another mod's menu never conflict. The new binding is stored only when that call returns `true`, and an item without `onConflict` refuses it. Two bindings with the same key and modifiers conflict whatever order the modifiers are written in.
+
+Capture never binds the menu's toggle key, because that key opens and closes the menu. Closing the menu ends any capture, so the first key pressed after the next `Open` is not taken as a binding.
 
 The menu stores the binding but does not act on it. The host reads it with `Get` and checks the key itself. `Register` raises an error when `default` is not a string or is not a key name with known modifiers, when `allowModifiers` is not a boolean, or when `onConflict` or `onChange` is not a function. `Set` stores its value as given, ends any capture, never checks for a conflict and never fires `onChange`. Once the menu has built the item, `Set(sectionId, itemId, nil)` resets it to its `default`. A `Set` made before the section is registered that is not a key name is replaced by the default when `Register` runs.
 
@@ -853,7 +896,7 @@ Allowed children: `button` | `checkbox` | `dropdown` | `keybind` | `label` | `nu
 
 `id` is required. `Get` / `Set` / `SetLabel` / `SetButtonLabel` / `SetButtonEnabled` / `SetOptions` resolve fold children, including a control nested in a `row` inside a fold.
 
-Open/closed is session-only per `sectionId.foldId` (same idea as section collapse: survives close/open and `ClientRestart`; not written to disk). Re-Register keeps the current state.
+Open/closed is session-only per `sectionId.foldId` (same idea as section collapse: survives close/open and `ClientRestart`; written to disk only with `Init({ autosave = true })`). Re-Register keeps the current state.
 
 ```lua
 ModMenu.Register({
@@ -926,7 +969,7 @@ Heavy work on the click stack can hitch or crash — delay off the open path whe
 1. **Per-mod shell** — each Lua mod has its own ModMenu state (`require` is not shared across mods). Multiple mods may each `Init` an independent panel. UObject roots are named `ModMenu_Root_<instanceId>_<n>` using a `ModRef` serial (`ModMenu.NextInstanceId`) so they never collide under `GameInstance`.
 2. **Toggle keys** — prefer a unique `key` / `keyHint` per mod. Claims are stored as `ModMenu.KeyClaim.<keyHint>`; clashes log **KEY CONFLICT**. On the `ue4ss` backend, UE4SS may fire every binder on that key (both menus toggle — useful for same-author dual docks, confusing for unrelated mods). On `engine`, each shell polls independently.
 3. **Input** — while open, uses GameAndUI + mouse cursor. Buttons / dock / dropdowns fire from `UButton:IsPressed()` (rising edge, 16ms poll) plus the LMB latch + `IsHovered()` fallback (touch also keeps the last hovered widget briefly and retries an unclaimed latch). Desktop checkboxes poll persistent `IsChecked()`. `pointerMode = "touch"` renders checkboxes as ON/OFF buttons so a finger tap uses the same press-edge path. The toggle key uses `Init inputBackend`: `ue4ss` (`RegisterKeyBind`) or `engine` (poll `IsInputKeyDown`). PlayerController often does **not** see LMB while Slate owns the mouse, so engine-backend menus must not rely on the LMB latch alone. Closing one menu does not force GameOnly while another ModMenu is still open (`ModMenu.OpenCount`). `ClientRestart` / `DestroyShell` do not touch input unless this instance had the menu open. On close, `GameOnly` is applied only if the game had no cursor when we opened (mouse-look); hub/inventory cursors are left alone. Camera look is **not** locked unless `Init({ ignoreLook = true })`. When the engine cursor is suppressed, opt in with `cursorMode = "modmenu"` for a HitTestInvisible overlay pointer (`core/cursor.lua`); optionally pass `cursorHideClasses` to collapse game cursor widgets while open (class defaults are skipped; prior visibility is restored on close). Overlay mode does not treat a hidden engine cursor as stolen (that would re-apply GameAndUI every tick and break checkboxes / text fields). A later `Init` that changes `cursorMode` / `cursorScale` / `cursorHideClasses` rebuilds the overlay if it already exists.
-4. **Dock** — author `Init({ dock })` is the starting edge. Header dropdown offers Left / Right / Top / Bottom (`SetDock` accepts any of the four). Same rectangle rotated 90° (`widthFrac` stays thickness). No free drag. Session only unless the host persists (`OnDockChange` + saved `Init` dock).
+4. **Dock** — author `Init({ dock })` is the starting edge. Header dropdown offers Left / Right / Top / Bottom (`SetDock` accepts any of the four). Same rectangle rotated 90° (`widthFrac` stays thickness). No free drag. Session only unless `Init({ autosave = true })` is set or the host persists (`OnDockChange` + saved `Init` dock).
 5. **Scroll** — the docked panel is a fixed viewport; section content lives in a ScrollBox (mouse wheel). Use `labelWidth` on `number` / `textinput` so amount rows line up like a table.
 6. **FNames** — shell names include `instanceId`; content rebuilds bump an internal generation after `ClearChildren`. Collapse / fold expand/collapse show/hide a body and do not rebuild. Prefer `SetOptions` on searchable lists over constant full rebuilds. Menu close/open keeps the UMG tree (no rebuild) so large sections (Give, keybinds) do not respawn on every toggle. `Register` / non-searchable `SetOptions` rebuild **while the menu is open**, and mark the tree dirty if they run while it is closed so the next `Open` rebuilds. `ClientRestart` destroys the shell and restores it if it was open.
 7. **Large lists** — keep `maxVisible` bounded; filter narrows the working set. Building thousands of UButtons at once is risky.
@@ -934,7 +977,7 @@ Heavy work on the click stack can hitch or crash — delay off the open path whe
 9. **Callbacks** — errors inside `onClick` / `onChange` are caught and logged as `[ModMenu] callback error: ...`.
 10. **Logging** — quiet by default. Failures still print (`CreateShell failed`, `KEY CONFLICT`, `OPEN blocked`). `Init({ debug = true })` restores open/close, collapse, register, scrollbar, and click-path traces (`press-edge` / `latch-hover` / `latch-miss`). Click traces include `hover` / `pressed` / `capture` / `downVia` / `ptr`. On a handheld, `downVia=capture` is the touch signature — see **Ally / handheld**.
 11. **Hot-reload** — `ModRef` shared vars (`NextInstanceId`, key claims, open count) are **not** cleared on Ctrl+R.
-12. **Collapse** — opt-in (`collapsible = true`). Accordion header: title on the left, `+` (closed) / `-` (open) on the right. Toggle show/hides the section body (same as dropdowns; no content rebuild). Session-only per section `id` (survives close/open; not written to disk). Re-Register keeps the current open/closed state. Nested groups use `type = "fold"` inside `items` — same session memory per `sectionId.foldId` (see **Item types**).
+12. **Collapse** — opt-in (`collapsible = true`). Accordion header: title on the left, `+` (closed) / `-` (open) on the right. Toggle show/hides the section body (same as dropdowns; no content rebuild). Session-only per section `id` (survives close/open; written to disk only with `Init({ autosave = true })`). Re-Register keeps the current open/closed state. Nested groups use `type = "fold"` inside `items` — same session memory per `sectionId.foldId` (see **Item types**).
 13. **Tabs** — opt-in (`Init({ tabs = { ... } })`). Strip under title / dock. Only the active tab's sections are constructed; switching rebuilds that body (not a hidden full tree). `Register({ tab = "Give" })`; omit `tab` = first name. `Get` / `Set` still work for hidden tabs. Session remembers the last tab (not disk). Keyboard Q/E is not in v1. `pointerMode = "touch"` makes the strip `spacing.tabHeight` tall (default 56) with `spacing.dockPadTouch` of space under Dock (desktop unchanged).
 
 ### Known limits

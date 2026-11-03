@@ -2,7 +2,8 @@
   ModMenu.shell.collapse — collapsible section headers.
 
   Opt-in via Register({ collapsible = true, collapsed = true? }).
-  Session remembers open/closed per section id (not saved to disk).
+  The session remembers open or closed per section id. It is saved to disk only when Init sets
+  autosave = true.
 
   Same pattern as dropdowns: keep the header widget, show/hide a body box.
   Do not rebuild the tree on toggle — that destroyed the header under a
@@ -142,6 +143,7 @@ function M.Apply(S, sectionId, source)
     local collapsed = not M.IsCollapsed(S, section)
     S.collapsedById[sectionId] = collapsed
     section.collapsed = collapsed
+    Session.NoteChange(S)
 
     local ctrl = FindHeader(S, sectionId)
     SetBodyVisible(ctrl, collapsed)

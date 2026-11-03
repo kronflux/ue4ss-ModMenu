@@ -65,7 +65,25 @@ function M.New(opts)
         cursorHotspotX = nil,
         cursorHotspotY = nil,
         cursorConfigSig = nil, ---@type string|nil last applied cursorMode|scale|hideClasses
+        -- Autosave under __modmenu (core/persist.lua), on only when Init sets autosave = true.
+        persistOn = false,
+        persistLoaded = false, --- true once the snapshot was read, and only then are changes written
+        persistStore = nil, ---@type table|nil the ConfigManager store
+        persistSnapshot = nil, ---@type table|nil the snapshot read at load, kept for sections registered later
+        persistApplied = {}, ---@type table<string, boolean> sections that already got their snapshot part
+        persistSnapshotFn = nil, ---@type function|nil
+        persistTimerFn = nil, ---@type function|nil strong ref for ExecuteInGameThreadWithDelay
+        persistTimerArmed = false,
+        onStateChange = nil, ---@type function|nil set while autosave is on
     }
+end
+
+--- Tell autosave that the dock, the tab, a collapse state or a value changed.
+--- It does nothing unless Init turned autosave on.
+function M.NoteChange(S)
+    if type(S.onStateChange) == "function" then
+        S.onStateChange()
+    end
 end
 
 function M.ClearLive(S)

@@ -17,6 +17,9 @@ local Build = require("ModMenu.shell.build")
 local Confirm = require("ModMenu.shell.confirm")
 local Theme = require("ModMenu.core.theme")
 local Tooltip = require("ModMenu.core.tooltip")
+local Persist = require("ModMenu.core.persist")
+local Dock = require("ModMenu.shell.dock")
+local Registry = require("ModMenu.shell.registry")
 
 local Log = Util.Log
 local Debug = Util.Debug
@@ -41,6 +44,8 @@ local function PollControls(S)
     -- The tooltip is polled before the confirm check, so an open confirm dialog hides it.
     -- os.clock is the clock the shell already uses for debounce, and on Windows it counts wall time.
     Tooltip.Poll(S, os.clock() * 1000)
+    -- Autosave writes only once its debounce has ended, so on most ticks this is one comparison.
+    Persist.Flush()
 
     if Confirm.Poll(S) then
         return
@@ -162,6 +167,9 @@ function M.Open(S, opts)
             return
         end
     end
+    -- A host that initializes ConfigManager after ModMenu.Init and Register still gets its
+    -- snapshot applied before the first build.
+    M.LoadPersist(S)
     if not Build.Ensure(S) then
         return
     end
@@ -221,6 +229,10 @@ function M.Close(S)
         S.menuRoot:SetVisibility(Session.VIS_COLLAPSED)
     end
     S.menuOpen = false
+    -- The poll tick has stopped, so a write still in its debounce moves to the timer.
+    if Persist.Pending() then
+        M.ArmPersistTimer(S)
+    end
     local remaining = Instance.NoteClosed()
     InputMode.SetActive(false, remaining)
     Debug(string.format("CLOSED tag=%s openRemaining=%s", tostring(Instance.GetTag()), tostring(remaining)))
@@ -261,6 +273,120 @@ function M.OnConfigChanged(S)
         Input.ClearClickState()
     else
         S.contentDirty = true
+    end
+end
+
+--- Write a pending snapshot while the menu is closed, when no poll tick runs.
+--- One delayed call is armed at a time. If a later change moved the write later, the call arms
+--- itself again. While the menu is open the poll tick writes instead.
+function M.ArmPersistTimer(S)
+    if S.persistTimerArmed then
+        return
+    end
+    if S.persistTimerFn == nil then
+        S.persistTimerFn = Util.PinFn(function()
+            S.persistTimerArmed = false
+            if S.menuOpen then
+                return
+            end
+            Persist.Flush()
+            if Persist.Pending() then
+                M.ArmPersistTimer(S)
+            end
+        end)
+    end
+    S.persistTimerArmed = true
+    ExecuteInGameThreadWithDelay(Persist.DEBOUNCE_MS, S.persistTimerFn)
+end
+
+--- Queue an autosave write after a change. Nothing is written before the snapshot was read,
+--- because a write then would replace the saved state with the author defaults.
+function M.PersistChanged(S)
+    if not S.persistOn or not S.persistLoaded then
+        return
+    end
+    Persist.Schedule(S.persistStore, S.persistSnapshotFn, Persist.DEBOUNCE_MS)
+    if not S.menuOpen then
+        M.ArmPersistTimer(S)
+    end
+end
+
+--- Read the snapshot from the store once, as soon as the host has initialized the store.
+--- Until then it is tried again on each Register and Open.
+function M.LoadPersist(S)
+    if not S.persistOn or S.persistLoaded then
+        return
+    end
+    local store = S.persistStore
+    if store == nil or store.File() == nil then
+        return
+    end
+    local ok, snapshot = pcall(store.Get, Persist.KEY)
+    S.persistLoaded = true
+    if not ok then
+        Log("autosave could not read " .. Persist.KEY .. ": " .. tostring(snapshot))
+        return
+    end
+    Registry.ApplySnapshot(S, snapshot)
+    Debug("autosave loaded " .. Persist.KEY .. (type(snapshot) == "table" and "" or " (none saved yet)"))
+    if IsValid(S.menuRoot) then
+        -- The shell was built before the store was ready, so it is laid out again from the snapshot.
+        Dock.ApplyPercentLayout(S.panelSlot, S.config)
+        Dock.SyncChrome(S)
+        Tabs.Ensure(S)
+        S.contentDirty = true
+    end
+end
+
+--- Turn autosave on with the ConfigManager store, or off. Off is what a host gets without
+--- Init({ autosave = true }), so nothing is read or written then.
+---@param store table|nil the store, nil to turn autosave off
+function M.SetPersist(S, store)
+    if store == nil then
+        S.persistOn = false
+        S.onStateChange = nil
+        -- A write queued before autosave was turned off is dropped, so nothing is written once it is off.
+        Persist.Cancel()
+        return
+    end
+    S.persistOn = true
+    S.persistStore = store
+    if S.persistSnapshotFn == nil then
+        S.persistSnapshotFn = function()
+            return Persist.Snapshot(S)
+        end
+    end
+    S.onStateChange = function()
+        M.PersistChanged(S)
+    end
+    M.LoadPersist(S)
+end
+
+--- Take the dock and the tab to keep across a later Init, or nil when no snapshot is loaded.
+--- Init runs before this when the snapshot is not loaded yet, so only a later Init gets a kept table.
+---@return { dock: string|nil, tab: string|nil }|nil
+function M.KeepShell(S)
+    if not S.persistOn or not S.persistLoaded or type(S.persistSnapshot) ~= "table" then
+        return nil
+    end
+    return {
+        dock = S.config.dock,
+        tab = S.activeTab or S.persistSnapshot.tab,
+    }
+end
+
+--- Put back the dock and the tab that KeepShell took, after a later Init wrote its own config.
+--- The tab is restored only when the new config lists it, and nothing is restored when autosave is off.
+---@param kept { dock: string|nil, tab: string|nil }|nil
+function M.RestoreShell(S, kept)
+    if kept == nil or not S.persistOn then
+        return
+    end
+    if kept.dock ~= nil then
+        S.config.dock = kept.dock
+    end
+    if Tabs.Has(S, kept.tab) then
+        S.activeTab = kept.tab
     end
 end
 
