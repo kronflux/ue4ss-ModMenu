@@ -25,10 +25,13 @@ local ALLOWED = {
     button = true,
     checkbox = true,
     dropdown = true,
+    keybind = true,
     label = true,
     number = true,
+    radio = true,
     row = true,
     separator = true,
+    slider = true,
     textinput = true,
 }
 

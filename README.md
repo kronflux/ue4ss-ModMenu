@@ -564,13 +564,11 @@ Dropdown also exposes helpers used by the registry (`refreshLive`, `collapseAll`
 
 `store/*.lua` and `widgets/*.lua` are auto-bundled — do not add a `MODULES` row for a new store helper or widget. New `core/` or `shell/` files still need one.
 
-Natural follow-ons (not required for hosts): `slider` / stepper polish — same contract as above.
-
 ---
 
 ## Item types
 
-Supported: `checkbox` | `button` | `dropdown` | `label` | `separator` | `number` | `textinput` | `row` | `fold`  
+Supported: `checkbox` | `button` | `dropdown` | `label` | `separator` | `number` | `textinput` | `slider` | `radio` | `keybind` | `row` | `fold`  
 (Implemented in `widgets/<type>.lua`.)
 
 ### Tooltips
@@ -811,7 +809,7 @@ The menu stores the binding but does not act on it. The host reads it with `Get`
 
 Horizontal group. Children share one line (Unity-style Count + field + button).
 
-Allowed children: `button` | `checkbox` | `label` | `number` | `textinput`  
+Allowed children: `button` | `checkbox` | `label` | `number` | `slider` | `textinput`  
 (Not: nested `row`, `dropdown`, `separator`, `fold`. Put a `row` *inside* a `fold` instead.)
 
 ```lua
@@ -850,7 +848,7 @@ Nested collapsible group **inside** a section (keybind categories, extra tools, 
 
 Default is **collapsed** (`collapsed` omitted or `true`). Pass `collapsed = false` to start open.
 
-Allowed children: `button` | `checkbox` | `dropdown` | `label` | `number` | `row` | `separator` | `textinput`  
+Allowed children: `button` | `checkbox` | `dropdown` | `keybind` | `label` | `number` | `radio` | `row` | `separator` | `slider` | `textinput`  
 (Not: nested `fold`. Put folds in a collapsible **section** instead.)
 
 `id` is required. `Get` / `Set` / `SetLabel` / `SetButtonLabel` / `SetButtonEnabled` / `SetOptions` resolve fold children, including a control nested in a `row` inside a fold.

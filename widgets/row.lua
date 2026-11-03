@@ -2,8 +2,8 @@
   ModMenu widget: row (horizontal group of child items)
 
   Children share one HorizontalBox. Supported child types:
-    button | checkbox | label | number | textinput
-  Nested row / dropdown / separator are rejected at validate time.
+    button | checkbox | label | number | slider | textinput
+  Nested row / dropdown / radio / keybind / separator are rejected at validate time.
 ]]
 
 local Widgets ---@type table|nil delayed require to avoid init cycle
@@ -11,11 +11,14 @@ local Widgets ---@type table|nil delayed require to avoid init cycle
 local Row = {}
 Row.type = "row"
 
+-- A slider fits a row because it builds at a fixed width when the layout is horizontal.
+-- A radio group and a keybind button do not, because their width depends on the option or key text.
 local ALLOWED = {
     button = true,
     checkbox = true,
     label = true,
     number = true,
+    slider = true,
     textinput = true,
 }
 
@@ -44,7 +47,7 @@ function Row.validate(item, sectionId, index)
         local t = child.type
         if not ALLOWED[t] then
             error(childPrefix .. " unsupported row child type '" .. tostring(t)
-                .. "' (button|checkbox|label|number|textinput)")
+                .. "' (button|checkbox|label|number|slider|textinput)")
         end
         local widget = reg.get(t)
         if not widget then

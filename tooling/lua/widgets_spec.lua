@@ -8,6 +8,24 @@ if okWidgets then
     assert_true("widgets.init registers slider", Widgets.has("slider"))
     assert_true("widgets.init registers radio", Widgets.has("radio"))
     assert_true("widgets.init registers keybind", Widgets.has("keybind"))
+
+    -- The builder's row and fold child lists carry the new types, so the Lua lists must accept the same children.
+    local Row = Widgets.get("row")
+    local Fold = Widgets.get("fold")
+    local slider = { type = "slider", id = "s", label = "S", min = 0, max = 10 }
+    local radio = { type = "radio", id = "r", label = "R", options = { "a", "b" } }
+    local keybind = { type = "keybind", id = "k", label = "K" }
+    assert_true("row accepts a slider child", pcall(Row.validate, { type = "row", items = { slider } }, "sec", 1))
+    local okRowRadio, errRowRadio = pcall(Row.validate, { type = "row", items = { radio } }, "sec", 1)
+    assert_true("row rejects a radio child", okRowRadio == false)
+    assert_true(
+        "row rejection names the allowed list",
+        string.find(tostring(errRowRadio), "slider", 1, true) ~= nil
+    )
+    assert_true(
+        "fold accepts slider, radio and keybind children",
+        pcall(Fold.validate, { type = "fold", id = "f", label = "F", items = { slider, radio, keybind } }, "sec", 1)
+    )
 end
 
 local Tooltip = require("ModMenu.core.tooltip")
