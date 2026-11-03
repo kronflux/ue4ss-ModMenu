@@ -84,6 +84,11 @@ local function IsKeyDown(pc, fkey)
     return false
 end
 
+-- The keybind widget reads keys with these two helpers through its ctx, so the module exports them
+-- rather than the widget keeping its own copies.
+M.MakeFKey = MakeFKey
+M.IsKeyDown = IsKeyDown
+
 local function KeyWentDown(pc, fkey, prevDown)
     local down = IsKeyDown(pc, fkey)
     return (down and not prevDown), down

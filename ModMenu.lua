@@ -107,6 +107,8 @@ S.makeWidgetCtx = function()
     return {
         values = S.values,
         liveControls = S.liveControls,
+        -- The keybind widget checks conflicts against this shell's registered sections, including ones on a tab that is not built.
+        sections = S.sections,
         config = S.config,
         umg = Umg,
         Input = Input,

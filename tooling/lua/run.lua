@@ -154,6 +154,7 @@ local specs = {
     "widgets_number_spec.lua",
     "theme_spec.lua",
     "widgets_spec.lua",
+    "widgets_keybind_spec.lua",
 }
 
 -- Specs reach the encoder through this global so they can check its JSON output directly.

@@ -215,6 +215,8 @@ function M.Close(S)
     Cursor.Hide(S)
     Input.ClearClickState()
     Dropdown.collapseAll(S.liveControls, nil)
+    -- Poll stops while the menu is closed, so a keybind capture ends here rather than taking the first key after the next Open.
+    Widgets.get("keybind")._stopCapture(S.makeWidgetCtx())
     if IsValid(S.menuRoot) then
         S.menuRoot:SetVisibility(Session.VIS_COLLAPSED)
     end

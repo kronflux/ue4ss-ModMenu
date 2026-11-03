@@ -739,6 +739,30 @@ Labeled string field.
 
 `Get` / button `onClick` always see the latest parsed value. Only `onChange` waits for typing to pause.
 
+### `keybind`
+
+A button that shows a key binding and captures a new one when clicked. The value is an Unreal FKey name string (`Get` / `Set`), such as `"F7"`, or `"LeftControl+F7"` when modifiers are held. An empty string means no binding, and the button shows `None`.
+
+```lua
+{
+  type = "keybind",
+  id = "dash",
+  label = "Dash",
+  default = "F7",          -- optional; "" or unset means no binding
+  allowModifiers = true,   -- optional; store held Control, Alt and Shift in front of the key
+  onConflict = function(otherId, value, otherSectionId)
+    return false           -- true keeps both bindings; false or no onConflict refuses the new one
+  end,
+  onChange = function(value) end,
+}
+```
+
+Click the button and it shows `Press a key`. The next letter, digit, function key (`F1` to `F12`) or arrow key that goes down becomes the binding. With `allowModifiers = true`, the held modifiers (`LeftControl`, `RightControl`, `LeftAlt`, `RightAlt`, `LeftShift`, `RightShift`) are written in front of it in that order. A modifier alone is never a binding. Escape or a second click cancels the capture and keeps the old binding. Only one keybind captures at a time. While capturing, the menu reads key state with the player controller's `IsInputKeyDown` every 50 ms, whichever `inputBackend` the host chose. A key already held when the capture starts is not captured.
+
+A binding already held by another `keybind` item in any registered section calls `onConflict(otherId, value, otherSectionId)`. The new binding is stored only when that call returns `true`, and an item without `onConflict` refuses it. Two bindings with the same key and modifiers conflict whatever order the modifiers are written in.
+
+The menu stores the binding but does not act on it. The host reads it with `Get` and checks the key itself. `Register` raises an error when `default` is not a string or is not a key name with known modifiers, when `allowModifiers` is not a boolean, or when `onConflict` or `onChange` is not a function. `Set` stores its value as given, ends any capture, never checks for a conflict and never fires `onChange`. Once the menu has built the item, `Set(sectionId, itemId, nil)` resets it to its `default`. A `Set` made before the section is registered that is not a key name is replaced by the default when `Register` runs.
+
 ### `row`
 
 Horizontal group. Children share one line (Unity-style Count + field + button).
