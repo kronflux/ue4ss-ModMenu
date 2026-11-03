@@ -398,4 +398,17 @@ function M.CreateTextButton(outer, namePrefix, caption, bgColor, textColor, font
     return button, label
 end
 
+--- A text button inside a Border. The Border is the visible fill, because a Button's own brushes
+--- cannot be recoloured per state from Lua; widgets/button.lua makes the Button itself transparent
+--- and repaints the Border. Returns fill, button, label, and the caller adds `fill` to a parent.
+function M.CreateFilledButton(outer, namePrefix, caption)
+    local fill = M.Construct("/Script/UMG.Border", outer, namePrefix .. "_Fill")
+    local button, label = M.CreateTextButton(fill, namePrefix, caption)
+    pcall(function()
+        fill:SetPadding({ Left = 0, Top = 0, Right = 0, Bottom = 0 })
+        fill:SetContent(button)
+    end)
+    return fill, button, label
+end
+
 return M

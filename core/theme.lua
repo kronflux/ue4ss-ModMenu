@@ -34,6 +34,21 @@ local KEYS = {
     "buttonTextActive",
     "buttonBgDisabled",
     "buttonTextDisabled",
+    -- Optional hover and pressed fills. No preset sets them, so ButtonStates derives them from the fill unless a host overrides one.
+    "buttonHover",
+    "buttonPressed",
+    "buttonPrimaryHover",
+    "buttonPrimaryPressed",
+    "buttonSecondaryHover",
+    "buttonSecondaryPressed",
+    "buttonSuccessHover",
+    "buttonSuccessPressed",
+    "buttonDangerHover",
+    "buttonDangerPressed",
+    "buttonWarningHover",
+    "buttonWarningPressed",
+    "buttonInfoHover",
+    "buttonInfoPressed",
     "sectionHeaderBg",
     "sectionMark",
     "fieldBg",
@@ -202,6 +217,69 @@ end
 
 function M.Resolve(name, overrides)
     return M.Merge(PRESETS[M.Normalize(name)], overrides)
+end
+
+local function Clamp01(n)
+    if n < 0 then
+        return 0
+    end
+    if n > 1 then
+        return 1
+    end
+    return n
+end
+
+local function ShadeChannel(c, fraction)
+    if fraction >= 0 then
+        return Clamp01(c + (1 - c) * fraction)
+    end
+    return Clamp01(c * (1 + fraction))
+end
+
+--- Return a new colour with R, G and B moved toward white for a positive fraction and toward black for a negative one.
+--- Alpha is kept, and the input table is not changed.
+---@param color table
+---@param fraction number
+---@return table
+function M.Shade(color, fraction)
+    local c = CopyColor(color) or C(0, 0, 0, 1)
+    local f = tonumber(fraction) or 0
+    return {
+        R = ShadeChannel(c.R, f),
+        G = ShadeChannel(c.G, f),
+        B = ShadeChannel(c.B, f),
+        A = c.A,
+    }
+end
+
+-- The fill key and the state key prefix for each button variant. The fill keys match VARIANT_CHROME in widgets/button.lua.
+local BUTTON_STATE_KEYS = {
+    default = { fill = "buttonBg", prefix = "button" },
+    primary = { fill = "buttonBgPrimary", prefix = "buttonPrimary" },
+    secondary = { fill = "buttonBgSecondary", prefix = "buttonSecondary" },
+    success = { fill = "buttonBgSuccess", prefix = "buttonSuccess" },
+    danger = { fill = "buttonBgDanger", prefix = "buttonDanger" },
+    warning = { fill = "buttonBgWarning", prefix = "buttonWarning" },
+    info = { fill = "buttonBgInfo", prefix = "buttonInfo" },
+}
+
+-- A quarter of the way toward white or black, so the hover and pressed fills stay distinct from
+-- the dark resting fills every preset uses.
+local STATE_SHADE = 0.25
+
+--- Return the hover and pressed fills for a button variant.
+--- An explicit token such as buttonPrimaryHover wins; otherwise the variant's fill is lightened for hover and darkened for pressed.
+--- The fill falls back to buttonBg the same way the button widget does, so an unset variant fill still derives a state colour.
+---@param colors table
+---@param variant string|nil
+---@return table
+function M.ButtonStates(colors, variant)
+    colors = colors or {}
+    local keys = BUTTON_STATE_KEYS[variant or "default"] or BUTTON_STATE_KEYS.default
+    local fill = colors[keys.fill] or colors.buttonBg
+    local hover = CopyColor(colors[keys.prefix .. "Hover"]) or M.Shade(fill, STATE_SHADE)
+    local pressed = CopyColor(colors[keys.prefix .. "Pressed"]) or M.Shade(fill, -STATE_SHADE)
+    return { hover = hover, pressed = pressed }
 end
 
 function M.Of(config)

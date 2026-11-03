@@ -612,7 +612,9 @@ Use `SetButtonLabel` / `SetButtonEnabled` / `SetButtonVariant` / `SetButtonActiv
 | `warning` | Caution / “Award ALL” (yellow) |
 | `info` | Informational (cyan) |
 
-`active = true` is **selected/on**, not a variant. Hover/pressed restyle is not implemented (constructed UButtons are flat). No outline / link variants (UMG fill only).
+`active = true` is **selected/on**, not a variant. No outline / link variants (UMG fill only).
+
+An enabled button that is not active lightens its fill while the pointer is over it and darkens it while it is pressed. The menu polls `IsHovered` and `IsPressed` on the button and repaints only when that state changes. Disabled and active buttons keep their own fill. The state colours come from the theme; see **Theming & polish**.
 
 ### `checkbox`
 
@@ -895,6 +897,27 @@ ModMenu.Init({
 | `dark` | Charcoal panel, thin edge, dark fields, teal (`textAccent`) + gold (`textStatus`) |
 
 `textAccent` / `textStatus` remain for tabs/status. Button variants use their own `buttonBg*` / `buttonText*` tokens (Bootstrap-like primary/danger/warning). Confirm uses `overlayDim` + `confirmCardBg` + `confirmDivider`. The card is content-sized (not panel-tall).
+
+Button hover and pressed fills are optional tokens that no preset sets. When a token is not set, the hover fill is the variant's fill moved 12% toward white and the pressed fill is the same fill moved 12% toward black. Set a token in `colors` to choose the colour yourself.
+
+| Variant | Fill | Hover token | Pressed token |
+|---------|------|-------------|---------------|
+| `default` | `buttonBg` | `buttonHover` | `buttonPressed` |
+| `primary` | `buttonBgPrimary` | `buttonPrimaryHover` | `buttonPrimaryPressed` |
+| `secondary` | `buttonBgSecondary` | `buttonSecondaryHover` | `buttonSecondaryPressed` |
+| `success` | `buttonBgSuccess` | `buttonSuccessHover` | `buttonSuccessPressed` |
+| `danger` | `buttonBgDanger` | `buttonDangerHover` | `buttonDangerPressed` |
+| `warning` | `buttonBgWarning` | `buttonWarningHover` | `buttonWarningPressed` |
+| `info` | `buttonBgInfo` | `buttonInfoHover` | `buttonInfoPressed` |
+
+```lua
+ModMenu.Init({
+    theme = "dark",
+    colors = {
+        buttonPrimaryHover = { R = 0.20, G = 0.48, B = 0.92, A = 1.0 },
+    },
+})
+```
 
 North-star look is the README hero shots (`ModMenuHero.png` / `ModMenuHero2.png`). Constructed UMG is flat colors, not bevels. 2-column grids and hover glow are optional leftovers in `vision.md`.
 
