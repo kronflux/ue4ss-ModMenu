@@ -29,7 +29,10 @@ export {
   DOCK_SIDES,
   FOLD_CHILD_TYPES,
   ITEM_TYPES,
+  LABEL_ALIGNS,
+  LABEL_STYLES,
   ROW_CHILD_TYPES,
+  SPACING_KEYS,
   THEMES,
 } from "./types";
 export { countItems, isValidDocument, validateDocument } from "./validate";

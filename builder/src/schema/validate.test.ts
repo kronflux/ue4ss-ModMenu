@@ -276,3 +276,28 @@ describe("validateDocument for enabled, visible and the presentation fields", ()
     expect(messages(doc)).toEqual([]);
   });
 });
+describe("validateDocument for the Init options the library reads", () => {
+  function withInit(patch: Record<string, unknown>) {
+    const doc = emptyDocument();
+    Object.assign(doc.init, patch);
+    return messages(doc);
+  }
+
+  it("accepts every Init option set to a valid value", () => {
+    expect(withInit({ tooltipDelayMs: 0, showClose: false, cursorScale: 1.5, spacing: { gapItem: 0, panelPad: 12 } })).toEqual([]);
+  });
+
+  it("reports each bad Init option with the library's wording", () => {
+    expect(withInit({ tooltipDelayMs: -1 })).toEqual(["init.tooltipDelayMs: must be a number of zero or more"]);
+    expect(withInit({ cursorScale: 0.5 })).toEqual(["init.cursorScale: must be a number >= 1"]);
+    expect(withInit({ showClose: "no" })).toEqual(["init.showClose: must be a boolean"]);
+    expect(withInit({ spacing: 3 })).toEqual(["init.spacing: must be an object of numbers"]);
+    expect(withInit({ spacing: { gapItem: -2 } })).toEqual(["init.spacing.gapItem: must be a number of zero or more"]);
+    expect(withInit({ spacing: { nope: 2 } })).toEqual(["init.spacing.nope: is not a known spacing key"]);
+  });
+
+  it("reports a checkbox showState that is not a boolean", () => {
+    const doc = widgetDoc([{ type: "checkbox", id: "c", label: "C", showState: "no" }]);
+    expect(messages(doc)).toContain("Register(Main) items[0]: showState must be a boolean");
+  });
+});

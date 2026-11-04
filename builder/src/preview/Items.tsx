@@ -72,9 +72,7 @@ function MmCheckbox({
           actions.toggleCheck(valueKey);
         }}
       />
-      <span>
-        {item.label}: {on ? "ON" : "OFF"}
-      </span>
+      <span>{item.showState === false ? item.label : `${item.label}: ${on ? "ON" : "OFF"}`}</span>
     </label>
   );
 }
@@ -104,18 +102,33 @@ function MmField({
   );
 }
 
+// The prefix and suffix sit inside the field, as the runtime draws them. The step buttons follow the field.
 function MmNumber({ item, fill }: { item: NumberItem; fill?: boolean }) {
   const width = item.fieldWidth ?? (fill === false ? 72 : 96);
   return (
-    <MmField label={item.label} labelWidth={item.labelWidth} fieldWidth={width} fill={fill !== false}>
-      <input
-        className="mm-edit"
-        type="text"
-        defaultValue={item.default ?? 0}
-        placeholder={item.placeholder}
-        readOnly
-      />
-    </MmField>
+    <div className="mm-number">
+      <MmField label={item.label} labelWidth={item.labelWidth} fieldWidth={width} fill={fill !== false}>
+        {item.prefix && <span className="mm-note">{item.prefix}</span>}
+        <input
+          className="mm-edit"
+          type="text"
+          defaultValue={item.default ?? 0}
+          placeholder={item.placeholder}
+          readOnly
+        />
+        {item.suffix && <span className="mm-note">{item.suffix}</span>}
+      </MmField>
+      {item.step !== undefined && (
+        <>
+          <button type="button" className="mm-btn mm-btn-inline mm-step" style={buttonChrome({})}>
+            -
+          </button>
+          <button type="button" className="mm-btn mm-btn-inline mm-step" style={buttonChrome({})}>
+            +
+          </button>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -196,8 +209,10 @@ function MmSlider({ item, fill }: { item: SliderItem; fill?: boolean }) {
   return (
     <div className={`mm-slider${fill === false ? " mm-slider-inline" : ""}`}>
       <div className="mm-slider-head">
-        <span className="mm-slider-label">{item.label}</span>
-        <span className="mm-slider-value">{sliderText(value, item)}</span>
+        <span className="mm-slider-label" style={item.labelWidth ? { width: item.labelWidth, flex: "0 0 auto" } : undefined}>
+          {item.label}
+        </span>
+        {item.showValue !== false && <span className="mm-slider-value">{sliderText(value, item)}</span>}
       </div>
       <div className="mm-slider-track">
         <span className="mm-slider-fill" style={{ flexGrow: fraction }} />
@@ -315,17 +330,26 @@ type PreviewItemProps = {
 
 // A tooltip shows as the browser's own title text. The wrapper uses display: contents, so it adds
 // no box and the row and fold layouts stay as they are without a tooltip.
+// A hidden item draws nothing. A disabled item draws dim and takes no pointer input. The runtime passes both
+// flags from a row or fold to its children, and here a hidden parent drops its children and a disabled parent
+// dims them through the CSS of its own wrapper.
 export function PreviewItem(props: PreviewItemProps) {
-  const body = <PreviewItemBody {...props} />;
-  const tooltip = props.item.tooltip;
-  if (tooltip === undefined || tooltip === "") {
-    return body;
+  if (props.item.visible === false) {
+    return null;
   }
-  return (
-    <span className="mm-tip" title={tooltip}>
-      {body}
-    </span>
-  );
+  let body: ReactNode = <PreviewItemBody {...props} />;
+  const tooltip = props.item.tooltip;
+  if (tooltip !== undefined && tooltip !== "") {
+    body = (
+      <span className="mm-tip" title={tooltip}>
+        {body}
+      </span>
+    );
+  }
+  if (props.item.enabled === false) {
+    body = <div className="mm-disabled">{body}</div>;
+  }
+  return body;
 }
 
 function PreviewItemBody({ item, sectionId, actions, index, layout = "vertical" }: PreviewItemProps) {
@@ -337,7 +361,14 @@ function PreviewItemBody({ item, sectionId, actions, index, layout = "vertical" 
     if (item.label.trim() === "") {
       return null;
     }
-    return <p className="mm-label">{item.label}</p>;
+    return (
+      <p
+        className={`mm-label${item.style && item.style !== "normal" ? ` mm-label-${item.style}` : ""}`}
+        style={{ textAlign: item.align, whiteSpace: item.wrap === false || horizontal ? "nowrap" : undefined }}
+      >
+        {item.label}
+      </p>
+    );
   }
   if (item.type === "button") {
     return (

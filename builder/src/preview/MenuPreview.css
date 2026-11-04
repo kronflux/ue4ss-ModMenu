@@ -489,3 +489,60 @@
 .mm-scroll::-webkit-scrollbar-thumb {
   background: var(--mm-button-bg);
 }
+
+/* Label styles. Heading is the section size in the accent colour, and warning is the status colour. */
+.mm-label-heading {
+  font-size: var(--mm-font-section);
+  color: var(--mm-text-accent);
+}
+
+.mm-label-warning {
+  color: var(--mm-text-status);
+}
+
+/* The one-line description under a section title, darker than muted text as the runtime draws it. */
+.mm-section-desc {
+  margin: 0 0 6px;
+  font-size: var(--mm-font-hint);
+  color: var(--mm-text-muted);
+  opacity: 0.65;
+}
+
+/* A short text inside a number field, before or after the entry. */
+.mm-field-box:has(.mm-note) {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.mm-note {
+  flex: 0 0 auto;
+  font-size: var(--mm-font-item);
+  color: var(--mm-field-hint);
+}
+
+.mm-number {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mm-step {
+  flex: 0 0 auto;
+  padding: 2px 10px;
+}
+
+/* A disabled item is dim and takes no pointer input. A disabled item inside a disabled parent is not dimmed twice. */
+.mm-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.mm-disabled .mm-disabled {
+  opacity: 1;
+}
+
+.mm-row > .mm-disabled {
+  display: flex;
+  align-items: center;
+}

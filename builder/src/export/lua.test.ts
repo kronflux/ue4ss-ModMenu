@@ -6,6 +6,12 @@ import { hostFolderName, printLua } from "./lua";
 import { hostZip } from "./hostZip";
 
 describe("printLua", () => {
+  // The export of the shipped fixture is pinned in a file, so a change to any emitter that alters an existing
+  // document fails here. The file was captured before milestone C task 6 and must not change with it (AC-15).
+  it("exports the Host fixture exactly as it did before the new fields", async () => {
+    await expect(printLua(hostFixture)).toMatchFileSnapshot("./__fixture-export.txt");
+  });
+
   it("emits Init + Register for the Host fixture", () => {
     const lua = printLua(hostFixture);
     expect(lua).toContain('local ModMenu = require("ModMenu.ModMenu")');
@@ -123,5 +129,99 @@ describe("hostZip", () => {
     expect(asText).toContain("ModMenu.bundle.lua");
     expect(MODMENU_BUNDLE).toContain("package.preload");
     expect(MODMENU_BUNDLE).toContain("ModMenu.core.util");
+  });
+});
+
+// A document with every optional field set exports each of them, and an unset field exports nothing.
+describe("printLua for every setting the library reads", () => {
+  function fullDocument() {
+    const doc = emptyDocument();
+    Object.assign(doc.init, {
+      tooltipDelayMs: 250,
+      showClose: false,
+      cursorScale: 2,
+      spacing: { gapItem: 4, panelPad: 10 },
+    });
+    Object.assign(doc.sections[0], { description: "A line", prefix: "[x]", collapsible: true });
+    doc.sections[0].items = [
+      { type: "label", label: "L", align: "center", wrap: false, style: "heading", enabled: false, visible: false },
+      { type: "checkbox", id: "c", label: "C", showState: false, visible: false },
+      { type: "number", id: "n", label: "N", step: 5, prefix: "$", suffix: "ms", debounceMs: 100, enabled: false },
+      { type: "textinput", id: "t", label: "T", debounceMs: 0, maxLength: 8 },
+      { type: "slider", id: "s", label: "S", min: 0, max: 10, showValue: false, labelWidth: 80 },
+      { type: "separator", visible: false },
+      { type: "row", enabled: false, items: [{ type: "button", id: "b", label: "B", visible: false }] },
+      { type: "fold", id: "f", label: "F", visible: false, items: [{ type: "label", label: "in" }] },
+    ] as unknown as Item[];
+    return doc;
+  }
+
+  const expected = [
+    "tooltipDelayMs = 250,",
+    "showClose = false,",
+    "cursorScale = 2,",
+    "spacing = {",
+    "gapItem = 4,",
+    "panelPad = 10,",
+    'description = "A line",',
+    'prefix = "[x]",',
+    'align = "center",',
+    "wrap = false,",
+    'style = "heading",',
+    "showState = false,",
+    "step = 5,",
+    'prefix = "$",',
+    'suffix = "ms",',
+    "debounceMs = 100,",
+    "debounceMs = 0,",
+    "maxLength = 8,",
+    "showValue = false,",
+    "labelWidth = 80,",
+    '{ type = "separator", visible = false },',
+  ];
+
+  for (const line of expected) {
+    it(`writes ${line}`, () => {
+      expect(printLua(fullDocument())).toContain(line);
+    });
+  }
+
+  it("writes enabled = false and visible = false on a label, a row, a fold and a number", () => {
+    const lua = printLua(fullDocument());
+    expect(lua.match(/enabled = false,/g)?.length).toBe(3);
+    expect(lua.match(/visible = false,/g)?.length).toBe(4);
+  });
+
+  it("writes nothing for a field left unset", () => {
+    const lua = printLua(emptyDocument());
+    for (const word of ["tooltipDelayMs", "showClose", "cursorScale", "spacing", "description", "enabled", "visible"]) {
+      expect(lua).not.toContain(word);
+    }
+  });
+
+  it("writes no field whose number holds text, so an imported document cannot put code into the Lua", () => {
+    const doc = emptyDocument();
+    const code = "1, onChange = os.execute('x')";
+    Object.assign(doc.init, { tooltipDelayMs: code, cursorScale: code, spacing: { gapItem: code, tabPad: 6 } });
+    doc.sections[0].items = [
+      { type: "number", id: "n", label: "N", default: code, min: code, step: code, fieldWidth: code },
+      { type: "textinput", id: "t", label: "T", maxLength: code },
+      { type: "slider", id: "s", label: "S", min: 0, max: code, default: code },
+      { type: "dropdown", id: "d", label: "D", options: ["a"], maxVisible: code },
+    ] as unknown as Item[];
+    const lua = printLua(doc);
+    expect(lua).not.toContain("os.execute");
+    expect(lua).toContain("tabPad = 6,");
+  });
+});
+describe("printLua keeps the order of an existing button", () => {
+  it("writes variant, then enabled, then active", () => {
+    const doc = emptyDocument();
+    doc.sections[0].items = [
+      { type: "button", id: "b", label: "B", variant: "danger", enabled: false, active: true },
+    ] as unknown as Item[];
+    const lua = printLua(doc);
+    expect(lua.indexOf('variant = "danger"')).toBeLessThan(lua.indexOf("enabled = false"));
+    expect(lua.indexOf("enabled = false")).toBeLessThan(lua.indexOf("active = true"));
   });
 });

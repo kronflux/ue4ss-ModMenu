@@ -228,7 +228,7 @@ export function MenuPreview({
           {visible.map((section, sIndex) => {
             const isCollapsible = section.collapsible === true;
             const isCollapsed = isCollapsible && (collapsed[section.id] ?? section.collapsed === true);
-            const title = section.title || section.id;
+            const title = `${section.prefix ? `${section.prefix} ` : ""}${section.title || section.id}`;
             return (
               <section key={section.id} className="mm-section">
                 {isCollapsible ? (
@@ -245,6 +245,7 @@ export function MenuPreview({
                 ) : (
                   <h3 className="mm-section-title">{title}</h3>
                 )}
+                {section.description && <p className="mm-section-desc">{section.description}</p>}
                 {!isCollapsed && (
                   <div className="mm-section-body">
                     {section.items.map((item, index) => (

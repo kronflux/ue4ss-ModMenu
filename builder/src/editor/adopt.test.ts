@@ -25,6 +25,36 @@ describe("adoptJson", () => {
     );
   });
 
+  it("keeps the Init tooltip delay, Close switch, cursor scale and spacing", () => {
+    const doc = {
+      ...hostFixture,
+      init: {
+        ...hostFixture.init,
+        tooltipDelayMs: 250,
+        showClose: false,
+        cursorScale: 2,
+        spacing: { gapItem: 4, panelPad: 10 },
+      },
+    };
+    const result = okDoc(printJson(doc));
+    expect(result.document.init).toEqual(doc.init);
+  });
+
+  it("drops Init settings of the wrong type and spacing keys the library does not read", () => {
+    const text = JSON.stringify({
+      ...hostFixture,
+      init: {
+        ...hostFixture.init,
+        tooltipDelayMs: "250",
+        showClose: "no",
+        cursorScale: null,
+        spacing: { gapItem: "4", bogus: 3, tabPad: 6 },
+      },
+    });
+    const result = okDoc(text);
+    expect(result.document.init).toEqual({ ...hostFixture.init, spacing: { tabPad: 6 } });
+  });
+
   it("rejects empty object", () => {
     const result = adoptJson("{}");
     expect(result.ok).toBe(false);

@@ -1,6 +1,7 @@
 import {
   DOCUMENT_VERSION,
   DOCK_SIDES,
+  SPACING_KEYS,
   THEMES,
   emptyDocument,
   validateDocument,
@@ -45,7 +46,33 @@ function adoptInit(raw: Record<string, unknown>): InitSpec {
       init.tabs = tabs;
     }
   }
+  // A value of the right type is kept even when it is out of range, so validation can report it.
+  if (isFiniteNumber(raw.tooltipDelayMs)) {
+    init.tooltipDelayMs = raw.tooltipDelayMs;
+  }
+  if (typeof raw.showClose === "boolean") {
+    init.showClose = raw.showClose;
+  }
+  if (isFiniteNumber(raw.cursorScale)) {
+    init.cursorScale = raw.cursorScale;
+  }
+  if (isRecord(raw.spacing)) {
+    const spacing: NonNullable<InitSpec["spacing"]> = {};
+    for (const key of SPACING_KEYS) {
+      const value = raw.spacing[key];
+      if (isFiniteNumber(value)) {
+        spacing[key] = value;
+      }
+    }
+    if (Object.keys(spacing).length > 0) {
+      init.spacing = spacing;
+    }
+  }
   return init;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
 }
 
 function itemsAreRecords(items: unknown): boolean {

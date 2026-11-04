@@ -13,6 +13,7 @@ import type {
   SliderItem,
   TextInputItem,
 } from "../schema";
+import { SPACING_KEYS } from "../schema";
 import { ensureIds } from "../editor/model";
 
 function luaString(value: string): string {
@@ -103,17 +104,40 @@ function emitFieldLines(lines: string[], pad: string, fields: Array<[string, str
   }
 }
 
+// enabled and visible are common to every item. A true value is the library's default, so only false is written.
+function stateFields(item: Item): Array<[string, string | undefined]> {
+  return [
+    ["enabled", item.enabled === false ? "false" : undefined],
+    ["visible", item.visible === false ? "false" : undefined],
+  ];
+}
+
+// An imported document can hold text where the schema names a number, and the export writes the
+// value into the Lua as code. Only a finite number is written, so text never becomes Lua.
+function numberField(value: unknown): string | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? String(value) : undefined;
+}
+
 function emitItem(item: Item, sectionId: string, level: number): string {
   const pad = indent(level);
   const inner = indent(level + 1);
   const tooltip = item.tooltip !== undefined ? luaString(item.tooltip) : undefined;
   if (item.type === "separator") {
-    return tooltip !== undefined ? `${pad}{ type = "separator", tooltip = ${tooltip} },` : `${pad}{ type = "separator" },`;
+    const parts = [`type = "separator"`];
+    if (tooltip !== undefined) {
+      parts.push(`tooltip = ${tooltip}`);
+    }
+    for (const [key, value] of stateFields(item)) {
+      if (value !== undefined) {
+        parts.push(`${key} = ${value}`);
+      }
+    }
+    return `${pad}{ ${parts.join(", ")} },`;
   }
   if (item.type === "row") {
     const children = item.items.map((child) => emitItem(child, sectionId, level + 2)).join("\n");
     const lines = [`${pad}{`, `${inner}type = "row",`];
-    emitFieldLines(lines, inner, [["tooltip", tooltip]]);
+    emitFieldLines(lines, inner, [["tooltip", tooltip], ...stateFields(item)]);
     lines.push(`${inner}items = {`, children, `${inner}},`, `${pad}},`);
     return lines.join("\n");
   }
@@ -126,7 +150,7 @@ function emitItem(item: Item, sectionId: string, level: number): string {
       `${inner}id = ${luaString(fold.id)},`,
       `${inner}label = ${luaString(fold.label)},`,
     ];
-    emitFieldLines(lines, inner, [["tooltip", tooltip]]);
+    emitFieldLines(lines, inner, [["tooltip", tooltip], ...stateFields(item)]);
     if (fold.collapsed !== undefined) {
       lines.push(`${inner}collapsed = ${fold.collapsed ? "true" : "false"},`);
     }
@@ -141,9 +165,17 @@ function emitItem(item: Item, sectionId: string, level: number): string {
   if ("label" in item) {
     lines.push(`${inner}label = ${luaString(item.label)},`);
   }
-  emitFieldLines(lines, inner, [["tooltip", tooltip]]);
+  // A button writes enabled after its variant, where it always did, so a saved document exports the same text.
+  const common = item.type === "button" ? stateFields(item).filter(([key]) => key !== "enabled") : stateFields(item);
+  emitFieldLines(lines, inner, [["tooltip", tooltip], ...common]);
 
-  if (item.type === "button") {
+  if (item.type === "label") {
+    emitFieldLines(lines, inner, [
+      ["align", item.align !== undefined ? luaString(item.align) : undefined],
+      ["wrap", item.wrap === false ? "false" : undefined],
+      ["style", item.style !== undefined && item.style !== "normal" ? luaString(item.style) : undefined],
+    ]);
+  } else if (item.type === "button") {
     const button = item as ButtonItem;
     emitFieldLines(lines, inner, [
       ["variant", button.variant && button.variant !== "default" ? luaString(button.variant) : undefined],
@@ -160,6 +192,7 @@ function emitItem(item: Item, sectionId: string, level: number): string {
     if (item.default !== undefined) {
       lines.push(`${inner}default = ${item.default ? "true" : "false"},`);
     }
+    emitFieldLines(lines, inner, [["showState", item.showState === false ? "false" : undefined]]);
     for (const stub of stubOnChange(sectionId, item.id, "on")) {
       lines.push(`${inner}${stub}`);
     }
@@ -172,8 +205,8 @@ function emitItem(item: Item, sectionId: string, level: number): string {
     emitFieldLines(lines, inner, [
       ["searchable", drop.searchable === true ? "true" : undefined],
       ["placeholder", drop.placeholder ? luaString(drop.placeholder) : undefined],
-      ["maxVisible", drop.maxVisible !== undefined ? String(drop.maxVisible) : undefined],
-      ["listMaxHeight", drop.listMaxHeight !== undefined ? String(drop.listMaxHeight) : undefined],
+      ["maxVisible", numberField(drop.maxVisible)],
+      ["listMaxHeight", numberField(drop.listMaxHeight)],
       ["allowEmpty", drop.allowEmpty === true ? "true" : undefined],
     ]);
     for (const stub of stubOnChange(sectionId, drop.id, "value")) {
@@ -182,13 +215,17 @@ function emitItem(item: Item, sectionId: string, level: number): string {
   } else if (item.type === "number") {
     const num = item as NumberItem;
     emitFieldLines(lines, inner, [
-      ["default", num.default !== undefined ? String(num.default) : undefined],
-      ["min", num.min !== undefined ? String(num.min) : undefined],
-      ["max", num.max !== undefined ? String(num.max) : undefined],
+      ["default", numberField(num.default)],
+      ["min", numberField(num.min)],
+      ["max", numberField(num.max)],
       ["integer", num.integer === true ? "true" : undefined],
       ["placeholder", num.placeholder ? luaString(num.placeholder) : undefined],
-      ["fieldWidth", num.fieldWidth !== undefined ? String(num.fieldWidth) : undefined],
-      ["labelWidth", num.labelWidth !== undefined ? String(num.labelWidth) : undefined],
+      ["fieldWidth", numberField(num.fieldWidth)],
+      ["labelWidth", numberField(num.labelWidth)],
+      ["debounceMs", numberField(num.debounceMs)],
+      ["step", numberField(num.step)],
+      ["prefix", num.prefix ? luaString(num.prefix) : undefined],
+      ["suffix", num.suffix ? luaString(num.suffix) : undefined],
     ]);
     for (const stub of stubOnChange(sectionId, num.id, "n")) {
       lines.push(`${inner}${stub}`);
@@ -198,9 +235,10 @@ function emitItem(item: Item, sectionId: string, level: number): string {
     emitFieldLines(lines, inner, [
       ["default", text.default !== undefined ? luaString(text.default) : undefined],
       ["placeholder", text.placeholder ? luaString(text.placeholder) : undefined],
-      ["maxLength", text.maxLength !== undefined ? String(text.maxLength) : undefined],
-      ["fieldWidth", text.fieldWidth !== undefined ? String(text.fieldWidth) : undefined],
-      ["labelWidth", text.labelWidth !== undefined ? String(text.labelWidth) : undefined],
+      ["maxLength", numberField(text.maxLength)],
+      ["fieldWidth", numberField(text.fieldWidth)],
+      ["labelWidth", numberField(text.labelWidth)],
+      ["debounceMs", numberField(text.debounceMs)],
     ]);
     for (const stub of stubOnChange(sectionId, text.id, "text")) {
       lines.push(`${inner}${stub}`);
@@ -208,13 +246,15 @@ function emitItem(item: Item, sectionId: string, level: number): string {
   } else if (item.type === "slider") {
     const slider = item as SliderItem;
     emitFieldLines(lines, inner, [
-      ["default", slider.default !== undefined ? String(slider.default) : undefined],
-      ["min", String(slider.min)],
-      ["max", String(slider.max)],
-      ["step", slider.step !== undefined ? String(slider.step) : undefined],
+      ["default", numberField(slider.default)],
+      ["min", numberField(slider.min)],
+      ["max", numberField(slider.max)],
+      ["step", numberField(slider.step)],
       ["integer", slider.integer === true ? "true" : undefined],
       ["format", slider.format !== undefined ? luaString(slider.format) : undefined],
       ["live", slider.live === true ? "true" : undefined],
+      ["showValue", slider.showValue === false ? "false" : undefined],
+      ["labelWidth", numberField(slider.labelWidth)],
     ]);
     for (const stub of stubOnChange(sectionId, slider.id, "value")) {
       lines.push(`${inner}${stub}`);
@@ -262,6 +302,12 @@ function emitSection(section: Section): string {
   }
   if (section.collapsed === true) {
     lines.push(`    collapsed = true,`);
+  }
+  if (section.description) {
+    lines.push(`    description = ${luaString(section.description)},`);
+  }
+  if (section.prefix) {
+    lines.push(`    prefix = ${luaString(section.prefix)},`);
   }
   lines.push(`    items = {`, items, `    },`, `})`, ``);
   return lines.join("\n");
@@ -324,6 +370,31 @@ export function printLua(document: MenuDocument): string {
   if (init.tabs && init.tabs.length > 0) {
     const tabs = init.tabs.map((name) => luaString(name)).join(", ");
     lines.push(`    tabs = { ${tabs} },`);
+  }
+  const tooltipDelayMs = numberField(init.tooltipDelayMs);
+  if (tooltipDelayMs !== undefined) {
+    lines.push(`    tooltipDelayMs = ${tooltipDelayMs},`);
+  }
+  if (init.showClose === false) {
+    lines.push(`    showClose = false,`);
+  }
+  const cursorScale = numberField(init.cursorScale);
+  if (cursorScale !== undefined) {
+    lines.push(`    cursorScale = ${cursorScale},`);
+  }
+  if (init.spacing !== undefined) {
+    const spacing = init.spacing;
+    const tokens = SPACING_KEYS.flatMap((key) => {
+      const value = numberField(spacing[key]);
+      return value !== undefined ? [[key, value] as const] : [];
+    });
+    if (tokens.length > 0) {
+      lines.push(`    spacing = {`);
+      for (const [key, value] of tokens) {
+        lines.push(`        ${key} = ${value},`);
+      }
+      lines.push(`    },`);
+    }
   }
   lines.push(`})`, ``, ...emitLoadBanner(doc), ``);
   for (const section of doc.sections) {

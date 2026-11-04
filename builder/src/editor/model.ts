@@ -3,12 +3,10 @@ import {
   ROW_CHILD_TYPES,
 } from "../schema";
 import type {
-  DockSide,
   Item,
   ItemType,
   MenuDocument,
   Section,
-  ThemeName,
 } from "../schema";
 
 export type AcceptParent = "section" | "fold" | "row";
@@ -565,7 +563,7 @@ export function getItem(doc: MenuDocument, sel: Extract<NodeRef, { kind: "item" 
 
 export function patchInit(
   doc: MenuDocument,
-  patch: Partial<{ title: string; instanceId: string; keyHint: string; dock: DockSide; theme: ThemeName }>,
+  patch: Partial<MenuDocument["init"]>,
 ): MenuDocument {
   return draft(doc, (copy) => {
     Object.assign(copy.init, patch);

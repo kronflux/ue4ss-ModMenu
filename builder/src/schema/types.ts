@@ -71,6 +71,7 @@ export type CheckboxItem = ItemCommon & {
   id: string;
   label: string;
   default?: boolean;
+  showState?: boolean;
 };
 
 export type DropdownItem = ItemCommon & {
@@ -201,6 +202,19 @@ export type Section = {
   items: Item[];
 };
 
+// The eight layout tokens milestone A moved out of the shell. A value is a number of zero or more pixels.
+export const SPACING_KEYS = [
+  "gapItem",
+  "gapSection",
+  "footerPad",
+  "confirmWidth",
+  "tabHeight",
+  "tabPad",
+  "dockPad",
+  "panelPad",
+] as const;
+export type SpacingKey = (typeof SPACING_KEYS)[number];
+
 export type InitSpec = {
   title: string;
   instanceId: string;
@@ -208,6 +222,10 @@ export type InitSpec = {
   dock: DockSide;
   theme: ThemeName;
   tabs?: string[];
+  tooltipDelayMs?: number;
+  showClose?: boolean;
+  cursorScale?: number;
+  spacing?: Partial<Record<SpacingKey, number>>;
 };
 
 export type MenuDocument = {

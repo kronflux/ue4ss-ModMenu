@@ -7,6 +7,7 @@ import {
   LABEL_ALIGNS,
   LABEL_STYLES,
   ROW_CHILD_TYPES,
+  SPACING_KEYS,
   THEMES,
 } from "./types";
 import { parseKeybind } from "./keys";
@@ -318,6 +319,7 @@ function validateItem(path: string, item: unknown, issues: Issue[]) {
     if (item.default !== undefined && typeof item.default !== "boolean") {
       issues.push(issue(path, "default must be a boolean"));
     }
+    checkBoolean(path, "showState", item.showState, issues);
     return;
   }
   if (typeName === "dropdown") {
@@ -423,6 +425,29 @@ function validateInit(init: unknown, issues: Issue[]): string[] | undefined {
   }
   if (typeof spec.theme !== "string" || !THEMES.has(spec.theme)) {
     issues.push(issue("init.theme", 'must be "light" | "dark"'));
+  }
+  // The rules and messages follow core/config.lua, which raises them from ModMenu.Init.
+  if (spec.tooltipDelayMs !== undefined && (typeof spec.tooltipDelayMs !== "number" || spec.tooltipDelayMs < 0)) {
+    issues.push(issue("init.tooltipDelayMs", "must be a number of zero or more"));
+  }
+  if (spec.cursorScale !== undefined && (typeof spec.cursorScale !== "number" || spec.cursorScale < 1)) {
+    issues.push(issue("init.cursorScale", "must be a number >= 1"));
+  }
+  if (spec.showClose !== undefined && typeof spec.showClose !== "boolean") {
+    issues.push(issue("init.showClose", "must be a boolean"));
+  }
+  if (spec.spacing !== undefined) {
+    if (!isRecord(spec.spacing)) {
+      issues.push(issue("init.spacing", "must be an object of numbers"));
+    } else {
+      for (const [key, value] of Object.entries(spec.spacing)) {
+        if (!(SPACING_KEYS as readonly string[]).includes(key)) {
+          issues.push(issue(`init.spacing.${key}`, "is not a known spacing key"));
+        } else if (typeof value !== "number" || value < 0) {
+          issues.push(issue(`init.spacing.${key}`, "must be a number of zero or more"));
+        }
+      }
+    }
   }
   if (spec.tabs === undefined) {
     return undefined;

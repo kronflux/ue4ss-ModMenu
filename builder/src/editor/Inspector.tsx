@@ -16,7 +16,17 @@ import type {
   TextInputItem,
   ThemeName,
 } from "../schema";
-import { BUTTON_VARIANTS, DOCK_SIDES, KEY_GROUPS, THEMES, isToggleKey, validateDocument } from "../schema";
+import {
+  BUTTON_VARIANTS,
+  DOCK_SIDES,
+  KEY_GROUPS,
+  LABEL_ALIGNS,
+  LABEL_STYLES,
+  SPACING_KEYS,
+  THEMES,
+  isToggleKey,
+  validateDocument,
+} from "../schema";
 import type { NodeRef } from "./model";
 import { canMove, getItem, idCollision } from "./model";
 import { formatOptions, parseOptions } from "./optionsText";
@@ -75,6 +85,41 @@ function Toggle({
       {label}
     </label>
   );
+}
+
+// A number field that writes undefined when it is emptied, so an unset setting exports nothing.
+function OptNumber({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number | undefined;
+  onChange: (value: number | undefined) => void;
+}) {
+  return (
+    <Text
+      label={label}
+      value={value === undefined ? "" : String(value)}
+      onChange={(text) => {
+        const n = Number(text);
+        onChange(text.trim() === "" || Number.isNaN(n) ? undefined : n);
+      }}
+    />
+  );
+}
+
+// A true value is the library's default, so the field writes undefined for true and false for false.
+function OptToggle({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: boolean | undefined;
+  onChange: (value: boolean | undefined) => void;
+}) {
+  return <Toggle label={label} checked={value !== false} onChange={(on) => onChange(on ? undefined : false)} />;
 }
 
 function InitFields({
@@ -136,6 +181,24 @@ function InitFields({
           ))}
         </select>
       </Field>
+      <OptNumber label="Tooltip delay (ms, blank for 400)" value={init.tooltipDelayMs} onChange={(tooltipDelayMs) => onPatchInit({ tooltipDelayMs })} />
+      <OptToggle label="Show the Close button" value={init.showClose} onChange={(showClose) => onPatchInit({ showClose })} />
+      <OptNumber label="Cursor scale (1 or more, blank for 1)" value={init.cursorScale} onChange={(cursorScale) => onPatchInit({ cursorScale })} />
+      <p className="ed-muted">Spacing in pixels. A blank field keeps the library's value.</p>
+      {SPACING_KEYS.map((key) => (
+        <OptNumber
+          key={key}
+          label={key}
+          value={init.spacing?.[key]}
+          onChange={(value) => {
+            const next = { ...init.spacing, [key]: value };
+            if (value === undefined) {
+              delete next[key];
+            }
+            onPatchInit({ spacing: Object.keys(next).length > 0 ? next : undefined });
+          }}
+        />
+      ))}
     </>
   );
 }
@@ -163,6 +226,8 @@ function SectionFields({
     <>
       <Text label="Id" value={section.id} onChange={(id) => onPatch({ id })} />
       <Text label="Title" value={section.title ?? ""} onChange={(title) => onPatch({ title })} />
+      <Text label="Prefix (drawn before the title)" value={section.prefix ?? ""} onChange={(prefix) => onPatch({ prefix: prefix || undefined })} />
+      <Text label="Description (one line under the title)" value={section.description ?? ""} onChange={(description) => onPatch({ description: description || undefined })} />
       {tabs && tabs.length > 0 && (
         <Field label="Tab">
           <select
@@ -248,6 +313,25 @@ function ItemFields({
       <>
         <Text label="Label" value={item.label} onChange={(label) => onPatch({ label })} />
         <IdField item={item} section={section} path={path} onPatch={onPatch} />
+        <Field label="Style">
+          <select value={item.style ?? "normal"} onChange={(event) => onPatch({ style: event.target.value === "normal" ? undefined : event.target.value })}>
+            {[...LABEL_STYLES].map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Align">
+          <select value={item.align ?? "left"} onChange={(event) => onPatch({ align: event.target.value === "left" ? undefined : event.target.value })}>
+            {[...LABEL_ALIGNS].map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <OptToggle label="Wrap long text" value={item.wrap} onChange={(wrap) => onPatch({ wrap })} />
       </>
     );
   }
@@ -281,7 +365,7 @@ function ItemFields({
             ))}
           </select>
         </Field>
-        <Toggle label="Enabled" checked={button.enabled !== false} onChange={(enabled) => onPatch({ enabled })} />
+
         <Toggle label="Active" checked={button.active === true} onChange={(active) => onPatch({ active })} />
         <Toggle
           label="Confirm first"
@@ -315,6 +399,27 @@ function ItemFields({
               value={button.confirm.confirmLabel ?? "Confirm"}
               onChange={(confirmLabel) => onPatch({ confirm: { ...button.confirm, confirmLabel } })}
             />
+            <Text
+              label="Cancel label (blank for Cancel)"
+              value={button.confirm.cancelLabel ?? ""}
+              onChange={(cancelLabel) => onPatch({ confirm: { ...button.confirm, cancelLabel: cancelLabel || undefined } })}
+            />
+            <Field label="Confirm button colour">
+              <select
+                value={button.confirm.variant ?? "default"}
+                onChange={(event) =>
+                  onPatch({
+                    confirm: { ...button.confirm, variant: event.target.value === "default" ? undefined : (event.target.value as ButtonVariant) },
+                  })
+                }
+              >
+                {VARIANTS.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </Field>
           </>
         )}
       </>
@@ -327,6 +432,7 @@ function ItemFields({
         <IdField item={box} section={section} path={path} onPatch={onPatch} />
         <Text label="Label" value={box.label} onChange={(label) => onPatch({ label })} />
         <Toggle label="Default on" checked={box.default === true} onChange={(value) => onPatch({ default: value })} />
+        <OptToggle label="Show ON or OFF after the label" value={box.showState} onChange={(showState) => onPatch({ showState })} />
       </>
     );
   }
@@ -353,6 +459,9 @@ function ItemFields({
           onChange={(placeholder) => onPatch({ placeholder: placeholder || undefined })}
         />
         <Toggle label="Searchable" checked={drop.searchable === true} onChange={(searchable) => onPatch({ searchable })} />
+        <OptNumber label="Rows shown at once (blank for all)" value={drop.maxVisible} onChange={(maxVisible) => onPatch({ maxVisible })} />
+        <OptNumber label="List height limit (px, blank for the default)" value={drop.listMaxHeight} onChange={(listMaxHeight) => onPatch({ listMaxHeight })} />
+        <Toggle label="Allow no selection" checked={drop.allowEmpty === true} onChange={(allowEmpty) => onPatch({ allowEmpty: allowEmpty || undefined })} />
       </>
     );
   }
@@ -378,6 +487,12 @@ function ItemFields({
           onChange={(value) => onPatch({ max: value === "" ? undefined : Number(value) })}
         />
         <Toggle label="Integer" checked={num.integer === true} onChange={(integer) => onPatch({ integer })} />
+        <OptNumber label="Step (adds minus and plus buttons)" value={num.step} onChange={(step) => onPatch({ step })} />
+        <Text label="Prefix (inside the field, before the entry)" value={num.prefix ?? ""} onChange={(prefix) => onPatch({ prefix: prefix || undefined })} />
+        <Text label="Suffix (inside the field, after the entry)" value={num.suffix ?? ""} onChange={(suffix) => onPatch({ suffix: suffix || undefined })} />
+        <OptNumber label="Field width (px)" value={num.fieldWidth} onChange={(fieldWidth) => onPatch({ fieldWidth })} />
+        <OptNumber label="Label width (px)" value={num.labelWidth} onChange={(labelWidth) => onPatch({ labelWidth })} />
+        <OptNumber label="Change delay (ms, blank for 250)" value={num.debounceMs} onChange={(debounceMs) => onPatch({ debounceMs })} />
       </>
     );
   }
@@ -393,6 +508,10 @@ function ItemFields({
           value={text.placeholder ?? ""}
           onChange={(placeholder) => onPatch({ placeholder: placeholder || undefined })}
         />
+        <OptNumber label="Longest text (characters)" value={text.maxLength} onChange={(maxLength) => onPatch({ maxLength })} />
+        <OptNumber label="Field width (px)" value={text.fieldWidth} onChange={(fieldWidth) => onPatch({ fieldWidth })} />
+        <OptNumber label="Label width (px)" value={text.labelWidth} onChange={(labelWidth) => onPatch({ labelWidth })} />
+        <OptNumber label="Change delay (ms, blank for 250)" value={text.debounceMs} onChange={(debounceMs) => onPatch({ debounceMs })} />
       </>
     );
   }
@@ -424,6 +543,8 @@ function ItemFields({
         />
         <Toggle label="Integer" checked={slider.integer === true} onChange={(integer) => onPatch({ integer })} />
         <Toggle label="Live (apply while dragging)" checked={slider.live === true} onChange={(live) => onPatch({ live })} />
+        <OptToggle label="Show the value" value={slider.showValue} onChange={(showValue) => onPatch({ showValue })} />
+        <OptNumber label="Label width (px)" value={slider.labelWidth} onChange={(labelWidth) => onPatch({ labelWidth })} />
       </>
     );
   }
@@ -478,6 +599,16 @@ function TooltipField({ item, onPatch }: { item: Item; onPatch: (patch: Record<s
   }
   const tooltip = "tooltip" in item && typeof item.tooltip === "string" ? item.tooltip : "";
   return <Text label="Tooltip" value={tooltip} onChange={(value) => onPatch({ tooltip: value || undefined })} />;
+}
+
+// Every item can be disabled or hidden, so these two sit beside the type fields too.
+function StateFields({ item, onPatch }: { item: Item; onPatch: (patch: Record<string, unknown>) => void }) {
+  return (
+    <>
+      <OptToggle label="Enabled" value={item.enabled} onChange={(enabled) => onPatch({ enabled })} />
+      <OptToggle label="Visible" value={item.visible} onChange={(visible) => onPatch({ visible })} />
+    </>
+  );
 }
 
 export function Inspector({
@@ -538,6 +669,7 @@ export function Inspector({
           <>
             <ItemFields item={item} section={section} path={selection.path} onPatch={(patch) => onPatchItem(selection, patch)} />
             <TooltipField item={item} onPatch={(patch) => onPatchItem(selection, patch)} />
+            <StateFields item={item} onPatch={(patch) => onPatchItem(selection, patch)} />
           </>
         );
       })()}
