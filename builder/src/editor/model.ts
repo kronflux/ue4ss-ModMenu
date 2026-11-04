@@ -344,6 +344,10 @@ export function createItem(type: ItemType, section: Section): Item {
     const label = "Tags";
     return { type: "multiselect", id: take("multiselect", label), label, options: ["A", "B", "C"], default: ["A"], columns: 1 };
   }
+  if (type === "colorpicker") {
+    const label = "Color";
+    return { type: "colorpicker", id: take("colorpicker", label), label, default: { R: 1, G: 1, B: 1, A: 1 }, alpha: true };
+  }
   if (type === "row") {
     return {
       type: "row",

@@ -268,6 +268,16 @@ function M.Set(S, sectionId, itemId, value)
         end
         value = widget._normalize(value == nil and multiselectItem.default or value, multiselectItem)
     end
+    -- A colour is clamped to 0..1 per channel, and alpha is held at 1 when the item has none. A value that
+    -- is not a table is ignored, and nil resets the item to its default, as a number's nil does.
+    local colorItem = FindTypedItem(S, sectionId, itemId, "colorpicker")
+    if colorItem then
+        local widget = Widgets.get("colorpicker")
+        if value ~= nil and type(value) ~= "table" then
+            return
+        end
+        value = widget._coerce(value == nil and widget._default(colorItem) or value, colorItem)
+    end
     S.values[vkey] = value
     ApplyLive(S, vkey, value)
     Session.NoteChange(S)

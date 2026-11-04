@@ -28,6 +28,7 @@ M._clock = os.clock
 --- Buttons, labels and separators hold no value, and rows and folds only contain other items.
 M.VALUE_TYPES = {
     checkbox = true,
+    colorpicker = true,
     dropdown = true,
     keybind = true,
     multiselect = true,
@@ -41,9 +42,10 @@ M.VALUE_TYPES = {
 --- The Lua type a saved value must have for each value-bearing item type.
 --- A saved value of another type is ignored on load, so a hand-edited or stale file cannot put a
 --- string into a checkbox or a boolean into a number. "strings" is an array of strings, which is
---- the one value that is a table.
+--- the one value that is a table. "color" is a table of the four numbers R, G, B and A.
 local VALUE_KIND = {
     checkbox = "boolean",
+    colorpicker = "color",
     dropdown = "string",
     keybind = "string",
     multiselect = "strings",
@@ -69,8 +71,8 @@ local SIDES = { left = true, right = true, top = true, bottom = true }
 local pending = nil
 
 --- True for a value the snapshot keeps: a boolean, a string, or a finite number.
---- Tables are left out here, because JSON cannot hold every table. The one table a value-bearing
---- item stores is a multiselect's array of strings, which StringArray checks.
+--- Tables are left out here, because JSON cannot hold every table. The tables a value-bearing
+--- item stores are a multiselect's array of strings, which StringArray checks, and a colour, which Color checks.
 local function IsScalar(value)
     local t = type(value)
     if t == "boolean" or t == "string" then
@@ -100,6 +102,24 @@ local function StringArray(value)
         copy[i] = value[i]
     end
     return copy
+end
+
+--- Return a table of the four channels R, G, B and A when value has all four as finite numbers, otherwise nil.
+--- Other keys are left out, and each channel is clamped to 0..1, so the snapshot and the restore agree
+--- on one shape. The result is a new table, so the snapshot does not share one with the live value.
+local function Color(value)
+    if type(value) ~= "table" then
+        return nil
+    end
+    local color = {}
+    for _, channel in ipairs({ "R", "G", "B", "A" }) do
+        local n = value[channel]
+        if not IsScalar(n) or type(n) ~= "number" then
+            return nil
+        end
+        color[channel] = math.min(1, math.max(0, n))
+    end
+    return color
 end
 
 --- True when every entry of a string array is the value of one of the item's options.
@@ -204,6 +224,8 @@ function M.Snapshot(state)
                 local value = values[key]
                 if VALUE_KIND[item.type] == "strings" then
                     snapshot.values[key] = StringArray(value)
+                elseif VALUE_KIND[item.type] == "color" then
+                    snapshot.values[key] = Color(value)
                 elseif IsScalar(value) then
                     snapshot.values[key] = value
                 else
@@ -264,6 +286,11 @@ function M.ApplySection(state, section)
                 local entries = StringArray(value)
                 if entries ~= nil and AllAreOptions(entries, item) then
                     state.values[key] = entries
+                end
+            elseif VALUE_KIND[item.type] == "color" then
+                local color = Color(value)
+                if color ~= nil then
+                    state.values[key] = color
                 end
             elseif IsScalar(value) and type(value) == VALUE_KIND[item.type] then
                 state.values[key] = value

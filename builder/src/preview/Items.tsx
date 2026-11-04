@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import type {
   ButtonItem,
   CheckboxItem,
+  ColorpickerItem,
   DropdownItem,
   FoldItem,
   Item,
@@ -314,6 +315,38 @@ function MmMultiselect({ item }: { item: MultiselectItem }) {
   );
 }
 
+// The runtime draws a caption, a swatch and one slider per channel, each with its number to two decimals.
+// A missing default is opaque white, and alpha false hides the A slider, as widgets/colorpicker.lua does.
+const COLOR_TINTS: Record<string, string> = { R: "#e64040", G: "#4dcc4d", B: "#4d80ff" };
+
+function MmColorpicker({ item }: { item: ColorpickerItem }) {
+  const color = item.default ?? { R: 1, G: 1, B: 1, A: 1 };
+  const keys = item.alpha === false ? (["R", "G", "B"] as const) : (["R", "G", "B", "A"] as const);
+  const alpha = item.alpha === false ? 1 : color.A;
+  const channel = (key: "R" | "G" | "B" | "A") => Math.min(1, Math.max(0, key === "A" ? alpha : color[key]));
+  const swatch = `rgba(${Math.round(channel("R") * 255)}, ${Math.round(channel("G") * 255)}, ${Math.round(channel("B") * 255)}, ${channel("A")})`;
+  return (
+    <div className="mm-color">
+      <span className="mm-color-label">{item.label}</span>
+      <div className="mm-color-swatch" style={{ background: swatch }} />
+      {keys.map((key) => {
+        const value = channel(key);
+        return (
+          <div key={key} className="mm-color-row">
+            <span className="mm-color-key">{key}</span>
+            <div className="mm-slider-track mm-color-track">
+              <span className="mm-slider-fill" style={{ flexGrow: value, background: COLOR_TINTS[key] }} />
+              <span className="mm-slider-knob" />
+              <span className="mm-slider-rest" style={{ flexGrow: 1 - value }} />
+            </div>
+            <span className="mm-color-value">{value.toFixed(2)}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // The runtime button reads "Label: F7", or "Label: None" without a binding, as Caption in widgets/keybind.lua writes it.
 function MmKeybind({ item }: { item: KeybindItem }) {
   const bound = item.default !== undefined && item.default !== "";
@@ -478,6 +511,9 @@ function PreviewItemBody({ item, sectionId, actions, index, layout = "vertical" 
   }
   if (item.type === "multiselect") {
     return <MmMultiselect item={item} />;
+  }
+  if (item.type === "colorpicker") {
+    return <MmColorpicker item={item} />;
   }
   if (item.type === "keybind") {
     return <MmKeybind item={item} />;

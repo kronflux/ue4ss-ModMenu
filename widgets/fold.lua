@@ -24,6 +24,7 @@ local MARK_EXPANDED = "-"
 local ALLOWED = {
     button = true,
     checkbox = true,
+    colorpicker = true,
     dropdown = true,
     keybind = true,
     label = true,

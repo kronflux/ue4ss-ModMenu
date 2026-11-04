@@ -3,6 +3,8 @@ import type {
   ButtonItem,
   ButtonVariant,
   CheckboxItem,
+  ColorpickerItem,
+  ColorValue,
   DockSide,
   DropdownItem,
   FoldItem,
@@ -619,6 +621,31 @@ function ItemFields({
         </Field>
         <Text label="Default" value={radio.default ?? ""} onChange={(value) => onPatch({ default: value || undefined })} />
         <Toggle label="Inline (options on one line)" checked={radio.inline === true} onChange={(inline) => onPatch({ inline })} />
+      </>
+    );
+  }
+  if (item.type === "colorpicker") {
+    const picker = item as ColorpickerItem;
+    const color: ColorValue = picker.default ?? { R: 1, G: 1, B: 1, A: 1 };
+    const keys = picker.alpha === false ? (["R", "G", "B"] as const) : (["R", "G", "B", "A"] as const);
+    return (
+      <>
+        <IdField item={picker} section={section} path={path} onPatch={onPatch} />
+        <Text label="Label" value={picker.label} onChange={(label) => onPatch({ label })} />
+        <p className="ed-muted">Default colour</p>
+        {keys.map((key) => (
+          <Field key={key} label={`${key} ${color[key].toFixed(2)}`}>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={color[key]}
+              onChange={(event) => onPatch({ default: { ...color, [key]: Number(event.target.value) } })}
+            />
+          </Field>
+        ))}
+        <OptToggle label="Alpha slider" value={picker.alpha} onChange={(alpha) => onPatch({ alpha })} />
       </>
     );
   }

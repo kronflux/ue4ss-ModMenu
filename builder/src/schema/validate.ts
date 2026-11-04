@@ -13,6 +13,7 @@ import {
 import { parseKeybind } from "./keys";
 import type {
   ButtonItem,
+  ColorpickerItem,
   ConfirmSpec,
   DropdownOption,
   FoldItem,
@@ -333,6 +334,31 @@ function validateMultiselect(path: string, item: MultiselectItem, issues: Issue[
   }
 }
 
+// The rules and messages follow Colorpicker.validate in widgets/colorpicker.lua. A default must hold all
+// four channels, and then each channel must be a number from 0 to 1, so the message names the channel.
+const COLOR_CHANNELS = ["R", "G", "B", "A"] as const;
+
+function validateColorpicker(path: string, item: ColorpickerItem, issues: Issue[]) {
+  requireId(path, item.id, issues);
+  requireLabel(path, item.label, issues);
+  const color: unknown = item.default;
+  if (color !== undefined) {
+    const channels = typeof color === "object" && color !== null ? (color as Record<string, unknown>) : undefined;
+    if (channels === undefined || COLOR_CHANNELS.some((key) => channels[key] === undefined)) {
+      issues.push(issue(path, "default must be a table with R, G, B and A"));
+    } else {
+      for (const key of COLOR_CHANNELS) {
+        const value = channels[key];
+        if (typeof value !== "number" || Number.isNaN(value) || value < 0 || value > 1) {
+          issues.push(issue(path, `default.${key} must be a number from 0 to 1`));
+          break;
+        }
+      }
+    }
+  }
+  checkBoolean(path, "alpha", item.alpha, issues);
+}
+
 // The rules and messages follow Keybind.validate in widgets/keybind.lua. An empty default means no binding.
 function validateKeybind(path: string, item: KeybindItem, issues: Issue[]) {
   requireId(path, item.id, issues);
@@ -442,6 +468,10 @@ function validateItem(path: string, item: unknown, issues: Issue[]) {
   }
   if (typeName === "multiselect") {
     validateMultiselect(path, item as MultiselectItem, issues);
+    return;
+  }
+  if (typeName === "colorpicker") {
+    validateColorpicker(path, item as ColorpickerItem, issues);
     return;
   }
   if (typeName === "row") {

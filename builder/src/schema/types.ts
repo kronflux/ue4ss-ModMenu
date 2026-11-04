@@ -29,6 +29,7 @@ export type ItemType =
   | "stepper"
   | "progress"
   | "multiselect"
+  | "colorpicker"
   | "row"
   | "fold";
 
@@ -196,6 +197,19 @@ export type MultiselectItem = ItemCommon & {
   columns?: number;
 };
 
+// A colour picker is a caption, a swatch and one slider per channel, each from 0 to 1. The default is a
+// colour with all four channels, and the value is a table { R, G, B, A }. Alpha is on unless it is false,
+// and then the A slider is hidden and A stays 1. It has several rows, so it is allowed in a fold but not in a row.
+export type ColorValue = { R: number; G: number; B: number; A: number };
+
+export type ColorpickerItem = ItemCommon & {
+  type: "colorpicker";
+  id: string;
+  label: string;
+  default?: ColorValue;
+  alpha?: boolean;
+};
+
 export type RowChild =
   | ButtonItem
   | CheckboxItem
@@ -211,6 +225,7 @@ export type RowItem = ItemCommon & { type: "row"; items: RowChild[] };
 export type FoldChild =
   | ButtonItem
   | CheckboxItem
+  | ColorpickerItem
   | DropdownItem
   | KeybindItem
   | LabelItem
@@ -246,6 +261,7 @@ export type Item =
   | StepperItem
   | ProgressItem
   | MultiselectItem
+  | ColorpickerItem
   | RowItem
   | FoldItem;
 
@@ -312,6 +328,7 @@ export const ROW_CHILD_TYPES: ReadonlySet<ItemType> = new Set([
 export const FOLD_CHILD_TYPES: ReadonlySet<ItemType> = new Set([
   "button",
   "checkbox",
+  "colorpicker",
   "dropdown",
   "keybind",
   "label",
@@ -355,6 +372,7 @@ export const ITEM_TYPES: ReadonlySet<string> = new Set([
   "stepper",
   "progress",
   "multiselect",
+  "colorpicker",
   "row",
   "fold",
 ]);

@@ -170,6 +170,16 @@ export function fullDocument(): MenuDocument {
             visible: true,
           },
           {
+            type: "colorpicker",
+            id: "col",
+            label: "Colorpicker",
+            default: { R: 0.25, G: 0.5, B: 0.75, A: 0.5 },
+            alpha: false,
+            tooltip: "Colorpicker tip",
+            enabled: false,
+            visible: true,
+          },
+          {
             type: "row",
             enabled: false,
             visible: true,
@@ -202,6 +212,7 @@ export function fullDocument(): MenuDocument {
               { type: "stepper", id: "foldStp", label: "Fold stepper", max: 3, tooltip: "Fold stepper tip" },
               { type: "progress", id: "foldPrg", label: "Fold progress", default: 0.25, tooltip: "Fold progress tip" },
               { type: "multiselect", id: "foldMul", label: "Fold multiselect", options: ["p", "q"], default: ["q"], columns: 4 },
+              { type: "colorpicker", id: "foldCol", label: "Fold colorpicker", default: { R: 1, G: 0, B: 0, A: 1 } },
               { type: "separator" },
               {
                 type: "row",

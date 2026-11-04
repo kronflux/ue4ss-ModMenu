@@ -240,6 +240,19 @@ ModMenu.Register({
             end,
         },
         {
+            type = "colorpicker",
+            id = "col",
+            label = "Colorpicker",
+            tooltip = "Colorpicker tip",
+            enabled = false,
+            default = { R = 0.25, G = 0.5, B = 0.75, A = 0.5 },
+            alpha = false,
+            onChange = function(color)
+                -- TODO: game call
+                -- local value = ModMenu.Get("All", "col")
+            end,
+        },
+        {
             type = "row",
             tooltip = "Row tip",
             enabled = false,
@@ -422,6 +435,16 @@ ModMenu.Register({
                     onChange = function(values)
                         -- TODO: game call
                         -- local value = ModMenu.Get("All", "foldMul")
+                    end,
+                },
+                {
+                    type = "colorpicker",
+                    id = "foldCol",
+                    label = "Fold colorpicker",
+                    default = { R = 1, G = 0, B = 0, A = 1 },
+                    onChange = function(color)
+                        -- TODO: game call
+                        -- local value = ModMenu.Get("All", "foldCol")
                     end,
                 },
                 { type = "separator" },

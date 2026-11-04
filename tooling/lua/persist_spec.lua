@@ -325,3 +325,51 @@ multiState.values["Sec.tags"] = "a"
 assert_eq("Snapshot drops a multiselect value that is not an array", Persist.Snapshot(multiState).values["Sec.tags"], nil)
 multiState.values["Sec.tags"] = { "a", {} }
 assert_eq("Snapshot drops a multiselect array holding a non-scalar", Persist.Snapshot(multiState).values["Sec.tags"], nil)
+
+-- A colorpicker value is a table of four numbers, R, G, B and A. It is saved as that table, and
+-- restored only when all four channels are finite numbers, clamped to 0..1.
+local function ColorState()
+    local state = NewState("right", "A")
+    state.sections = {
+        {
+            id = "Sec",
+            items = {
+                { type = "fold", id = "more", label = "More", items = {
+                    { type = "colorpicker", id = "tint", label = "Tint" },
+                } },
+            },
+        },
+    }
+    return state
+end
+local colorState = ColorState()
+colorState.values["Sec.tint"] = { R = 0.25, G = 0.5, B = 0.75, A = 1 }
+local colorSnap = Persist.Snapshot(colorState)
+assert_eq("Snapshot stores a colorpicker table", colorSnap.values["Sec.tint"], { R = 0.25, G = 0.5, B = 0.75, A = 1 })
+assert_true("a snapshot with a colour is JSON-safe", Json.IsSafe(colorSnap))
+local colorBack = ColorState()
+Persist.Apply(Json.DecodeObject(Json.Encode(colorSnap)), colorBack)
+assert_eq("a colour survives a JSON round trip", colorBack.values["Sec.tint"], { R = 0.25, G = 0.5, B = 0.75, A = 1 })
+local colorClamp = ColorState()
+Persist.Apply({ values = { ["Sec.tint"] = { R = 2, G = -1, B = 0.5, A = 0.5 } } }, colorClamp)
+assert_eq("Apply clamps a colour channel into 0..1", colorClamp.values["Sec.tint"], { R = 1, G = 0, B = 0.5, A = 0.5 })
+local colorMissing = ColorState()
+Persist.Apply({ values = { ["Sec.tint"] = { R = 1, G = 1, B = 1 } } }, colorMissing)
+assert_eq("Apply ignores a colour with a missing channel", colorMissing.values["Sec.tint"], nil)
+local colorText = ColorState()
+Persist.Apply({ values = { ["Sec.tint"] = { R = 1, G = "1", B = 1, A = 1 } } }, colorText)
+assert_eq("Apply ignores a colour with a channel that is not a number", colorText.values["Sec.tint"], nil)
+local colorNotTable = ColorState()
+Persist.Apply({ values = { ["Sec.tint"] = "red" } }, colorNotTable)
+assert_eq("Apply ignores a colour that is not a table", colorNotTable.values["Sec.tint"], nil)
+local colorArray = ColorState()
+Persist.Apply({ values = { ["Sec.tint"] = { 1, 1, 1, 1 } } }, colorArray)
+assert_eq("Apply ignores a colour written as an array", colorArray.values["Sec.tint"], nil)
+colorState.values["Sec.tint"] = "red"
+assert_eq("Snapshot drops a colour that is not a table", Persist.Snapshot(colorState).values["Sec.tint"], nil)
+colorState.values["Sec.tint"] = { R = 1, G = 1, B = 1 }
+assert_eq("Snapshot drops a colour with a missing channel", Persist.Snapshot(colorState).values["Sec.tint"], nil)
+colorState.values["Sec.tint"] = { R = 1, G = 1, B = 1, A = 0 / 0 }
+assert_eq("Snapshot drops a colour with a channel that is not finite", Persist.Snapshot(colorState).values["Sec.tint"], nil)
+colorState.values["Sec.tint"] = { R = 0.1, G = 0.2, B = 0.3, A = 0.4, extra = true }
+assert_eq("Snapshot keeps only the four channels", Persist.Snapshot(colorState).values["Sec.tint"], { R = 0.1, G = 0.2, B = 0.3, A = 0.4 })

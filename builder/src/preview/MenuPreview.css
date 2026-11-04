@@ -502,6 +502,43 @@
   gap: 4px;
 }
 
+/* The colour picker matches widgets/colorpicker.lua: a caption, a 24 px swatch, then one row per
+   channel with a 16 px key, a track and a 40 px readout, 4 px apart. */
+.mm-color {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--mm-font-item);
+}
+
+.mm-color-label {
+  color: var(--mm-text-primary);
+}
+
+.mm-color-swatch {
+  height: 24px;
+}
+
+.mm-color-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mm-color-key {
+  flex: 0 0 16px;
+  color: var(--mm-text-muted);
+}
+
+.mm-color-track {
+  flex: 1;
+}
+
+.mm-color-value {
+  flex: 0 0 40px;
+  color: var(--mm-text-muted);
+}
+
 .mm-key-chip {
   display: inline-block;
   margin-left: 4px;

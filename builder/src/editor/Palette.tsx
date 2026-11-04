@@ -22,6 +22,7 @@ const WIDGETS: { id: ItemType; label: string }[] = [
   { id: "stepper", label: "Stepper" },
   { id: "progress", label: "Progress" },
   { id: "multiselect", label: "Multiselect" },
+  { id: "colorpicker", label: "Colorpicker" },
   { id: "row", label: "Row" },
   { id: "fold", label: "Fold" },
 ];

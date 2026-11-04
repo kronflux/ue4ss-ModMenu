@@ -158,6 +158,7 @@ local specs = {
     "widgets_stepper_spec.lua",
     "widgets_progress_spec.lua",
     "widgets_multiselect_spec.lua",
+    "widgets_colorpicker_spec.lua",
     "widgets_radio_spec.lua",
     "widgets_button_spec.lua",
     "input_click_spec.lua",

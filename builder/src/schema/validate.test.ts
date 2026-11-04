@@ -410,6 +410,50 @@ describe("validateDocument for the multiselect", () => {
   });
 });
 
+// The messages follow Colorpicker.validate in widgets/colorpicker.lua. A colorpicker is fold only.
+describe("validateDocument for the colorpicker", () => {
+  const colorpicker = { type: "colorpicker", id: "tint", label: "Tint", default: { R: 1, G: 0.5, B: 0, A: 1 }, alpha: true };
+  const inFold = (item: unknown) => widgetDoc([{ type: "fold", id: "f", label: "F", items: [item] }]);
+
+  it("accepts a full colorpicker and a bare one inside a fold", () => {
+    expect(messages(inFold(colorpicker))).toEqual([]);
+    expect(messages(inFold({ type: "colorpicker", id: "bare", label: "Bare" }))).toEqual([]);
+    expect(messages(inFold({ ...colorpicker, alpha: false }))).toEqual([]);
+  });
+
+  const cases: Array<[string, unknown, string]> = [
+    ["a default that is not a table", { ...colorpicker, default: "red" }, "default must be a table with R, G, B and A"],
+    ["a default that is an array", { ...colorpicker, default: [1, 1, 1, 1] }, "default must be a table with R, G, B and A"],
+    ["a default with a missing channel", { ...colorpicker, default: { R: 1, G: 1, B: 1 } }, "default must be a table with R, G, B and A"],
+    ["a red channel above one", { ...colorpicker, default: { R: 1.5, G: 1, B: 1, A: 1 } }, "default.R must be a number from 0 to 1"],
+    ["a green channel that is text", { ...colorpicker, default: { R: 1, G: "1", B: 1, A: 1 } }, "default.G must be a number from 0 to 1"],
+    ["a blue channel below zero", { ...colorpicker, default: { R: 1, G: 1, B: -0.5, A: 1 } }, "default.B must be a number from 0 to 1"],
+    ["an alpha channel above one", { ...colorpicker, default: { R: 1, G: 1, B: 1, A: 2 } }, "default.A must be a number from 0 to 1"],
+    ["alpha that is not a boolean", { ...colorpicker, alpha: "yes" }, "alpha must be a boolean"],
+    ["enabled", { ...colorpicker, enabled: "no" }, "enabled must be a boolean"],
+  ];
+  for (const [name, item, message] of cases) {
+    it(`reports ${name}`, () => {
+      expect(messages(inFold(item))).toEqual([`Register(Main) items[0].items[0]: ${message}`]);
+    });
+  }
+
+  it("requires an id and a label", () => {
+    expect(messages(inFold({ type: "colorpicker" }))).toEqual([
+      "Register(Main) items[0].items[0]: requires .id",
+      "Register(Main) items[0].items[0]: requires .label",
+    ]);
+  });
+
+  it("rejects a colorpicker in a row, naming the allowed list, and accepts one at the top of a section", () => {
+    const doc = widgetDoc([{ type: "row", items: [colorpicker] }]);
+    expect(messages(doc)).toEqual([
+      "Register(Main) items[0].items[0]: unsupported row child type 'colorpicker' (button|checkbox|label|number|progress|slider|stepper|textinput)",
+    ]);
+    expect(messages(widgetDoc([colorpicker]))).toEqual([]);
+  });
+});
+
 describe("validateDocument for the Init options the library reads", () => {
   function withInit(patch: Record<string, unknown>) {
     const doc = emptyDocument();

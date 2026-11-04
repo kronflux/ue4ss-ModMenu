@@ -1,5 +1,6 @@
 import type {
   ButtonItem,
+  ColorpickerItem,
   ConfirmSpec,
   DropdownItem,
   DropdownOption,
@@ -124,6 +125,8 @@ function stateFields(item: Item): Array<[string, string | undefined]> {
 function numberField(value: unknown): string | undefined {
   return typeof value === "number" && Number.isFinite(value) ? String(value) : undefined;
 }
+
+const COLOR_CHANNELS = ["R", "G", "B", "A"] as const;
 
 function emitItem(item: Item, sectionId: string, level: number): string {
   const pad = indent(level);
@@ -307,6 +310,19 @@ function emitItem(item: Item, sectionId: string, level: number): string {
       ["columns", numberField(multi.columns)],
     ]);
     for (const stub of stubOnChange(sectionId, multi.id, "values")) {
+      lines.push(`${inner}${stub}`);
+    }
+  } else if (item.type === "colorpicker") {
+    // Alpha is on in the library unless it is false, so only false is written, as showValue is for a slider.
+    const picker = item as ColorpickerItem;
+    // The default is written only when all four channels are numbers, as numberField writes a number.
+    const channels = picker.default !== undefined ? COLOR_CHANNELS.map((key) => numberField(picker.default?.[key])) : [];
+    const color = channels.length === 4 && channels.every((value) => value !== undefined) ? channels : undefined;
+    emitFieldLines(lines, inner, [
+      ["default", color !== undefined ? `{ R = ${color[0]}, G = ${color[1]}, B = ${color[2]}, A = ${color[3]} }` : undefined],
+      ["alpha", picker.alpha === false ? "false" : undefined],
+    ]);
+    for (const stub of stubOnChange(sectionId, picker.id, "color")) {
       lines.push(`${inner}${stub}`);
     }
   } else if (item.type === "keybind") {

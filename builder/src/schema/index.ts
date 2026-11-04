@@ -3,6 +3,8 @@ export type {
   ButtonItem,
   ButtonVariant,
   CheckboxItem,
+  ColorpickerItem,
+  ColorValue,
   ConfirmSpec,
   DockSide,
   DropdownItem,

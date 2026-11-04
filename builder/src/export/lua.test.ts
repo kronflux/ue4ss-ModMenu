@@ -182,6 +182,33 @@ describe("printLua for slider, radio, keybind and tooltip", () => {
     expect(lua).toContain('default = { "1" },');
   });
 
+  it("exports a colorpicker with its default colour, alpha and an onChange stub", () => {
+    const lua = widgetLua([
+      { type: "colorpicker", id: "tint", label: "Tint", default: { R: 1, G: 0.5, B: 0, A: 0.25 }, alpha: false },
+    ]);
+    expect(lua).toContain('type = "colorpicker",');
+    expect(lua).toContain('id = "tint",');
+    expect(lua).toContain("default = { R = 1, G = 0.5, B = 0, A = 0.25 },");
+    expect(lua).toContain("alpha = false,");
+    expect(lua).toContain("onChange = function(color)");
+  });
+
+  it("writes only the colorpicker fields that are set, and leaves out alpha when it is on", () => {
+    const bare = widgetLua([{ type: "colorpicker", id: "bare", label: "Bare" }]);
+    expect(bare).toContain('type = "colorpicker",');
+    expect(bare).not.toContain("default =");
+    expect(bare).not.toContain("alpha =");
+    const on = widgetLua([{ type: "colorpicker", id: "on", label: "On", alpha: true }]);
+    expect(on).not.toContain("alpha =");
+  });
+
+  it("writes no colorpicker default whose channel holds text", () => {
+    const code = "0 }, onChange = os.execute('x'), y = {";
+    const lua = widgetLua([{ type: "colorpicker", id: "bad", label: "Bad", default: { R: code, G: 0, B: 0, A: 1 } }]);
+    expect(lua).not.toContain("os.execute");
+    expect(lua).not.toContain("default =");
+  });
+
   it("exports tooltip on a plain item, a separator and a fold child", () => {
     const lua = widgetLua([
       { type: "button", id: "go", label: "Go", tooltip: 'Runs "it"' },
