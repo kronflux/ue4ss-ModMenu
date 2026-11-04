@@ -551,7 +551,7 @@ dotnet run --project tooling/CLI -- test
 dotnet run --project tooling/CLI -- detect
 ```
 
-Lua specs live in `tooling/lua/` (store / ConfigManager shims, json, paths, dock math, options). Headless Studio window tests lock the picker, remembered last game, Refresh rebind, the **Run Lua tests** log, and the last-run pass/fail banner. In-game **Launch and test** also persists dock through `ModMenu.ConfigManager` on Harness A and B (each writes its own `config.json`).
+Lua specs live in `tooling/lua/` (store / ConfigManager shims, json, paths, dock math, options). `builder_export_spec.lua` runs the Lua the builder writes, from `tooling/lua/fixtures/`, through `Config.ApplyInit` and `Registry.Register`, so a field the builder writes that the library rejects fails there; `npx vitest run -u` in `builder/` rewrites those two fixture files. Headless Studio window tests lock the picker, remembered last game, Refresh rebind, the **Run Lua tests** log, and the last-run pass/fail banner. In-game **Launch and test** also persists dock through `ModMenu.ConfigManager` on Harness A and B (each writes its own `config.json`).
 
 ### Studio
 

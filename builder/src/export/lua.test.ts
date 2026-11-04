@@ -1,6 +1,7 @@
 import { MODMENU_BUNDLE } from "virtual:modmenu-runtime";
 import { describe, expect, it } from "vitest";
-import { emptyDocument, hostFixture } from "../schema";
+import { emptyDocument, hostFixture, validateDocument } from "../schema";
+import { fullDocument } from "../schema/fullFixture";
 import type { Item } from "../schema";
 import { hostFolderName, printLua } from "./lua";
 import { hostZip } from "./hostZip";
@@ -223,5 +224,20 @@ describe("printLua keeps the order of an existing button", () => {
     const lua = printLua(doc);
     expect(lua.indexOf('variant = "danger"')).toBeLessThan(lua.indexOf("enabled = false"));
     expect(lua.indexOf("enabled = false")).toBeLessThan(lua.indexOf("active = true"));
+  });
+});
+// The Lua suite loads these two files and runs them through the library's own checks, so they are written
+// from the builder here and a change to either export shows up as a changed file in the diff.
+describe("printLua output for the library's own checks", () => {
+  it("the full document is valid for the builder", () => {
+    expect(validateDocument(fullDocument())).toEqual([]);
+  });
+
+  it("exports the full document to the Lua suite's fixture", async () => {
+    await expect(printLua(fullDocument())).toMatchFileSnapshot("../../../tooling/lua/fixtures/builder_full_export.lua");
+  });
+
+  it("exports the Host fixture to the Lua suite's fixture", async () => {
+    await expect(printLua(hostFixture)).toMatchFileSnapshot("../../../tooling/lua/fixtures/builder_host_export.lua");
   });
 });
