@@ -218,7 +218,7 @@ describe("validateDocument for slider, radio, keybind and tooltip", () => {
   it("accepts a slider in a row and rejects a radio there, naming the allowed list", () => {
     const doc = widgetDoc([{ type: "row", items: [slider, radio] }]);
     expect(messages(doc)).toEqual([
-      "Register(Main) items[0].items[1]: unsupported row child type 'radio' (button|checkbox|label|number|slider|textinput)",
+      "Register(Main) items[0].items[1]: unsupported row child type 'radio' (button|checkbox|label|number|slider|stepper|textinput)",
     ]);
   });
 
@@ -276,6 +276,49 @@ describe("validateDocument for enabled, visible and the presentation fields", ()
     expect(messages(doc)).toEqual([]);
   });
 });
+
+// The messages follow Stepper.validate in widgets/stepper.lua.
+describe("validateDocument for the stepper", () => {
+  const stepper = { type: "stepper", id: "count", label: "Count", min: 0, max: 10, step: 2, default: 4, integer: true, format: "%d" };
+
+  it("accepts a full stepper and one with no range", () => {
+    expect(messages(widgetDoc([stepper, { type: "stepper", id: "bare", label: "Bare" }]))).toEqual([]);
+  });
+
+  const cases: Array<[string, unknown, string]> = [
+    ["min", { ...stepper, min: "a" }, "min must be a number"],
+    ["max", { ...stepper, max: "a" }, "max must be a number"],
+    ["an equal min and max", { ...stepper, min: 3, max: 3 }, "min must be less than max"],
+    ["an inverted range", { ...stepper, min: 9, max: 1 }, "min must be less than max"],
+    ["a zero step", { ...stepper, step: 0 }, "step must be a positive number"],
+    ["a text step", { ...stepper, step: "a" }, "step must be a positive number"],
+    ["a default that is not numeric", { ...stepper, default: "loud" }, "default must be numeric"],
+    ["integer", { ...stepper, integer: 1 }, "integer must be a boolean"],
+    ["format", { ...stepper, format: 3 }, "format must be a string"],
+    ["enabled", { ...stepper, enabled: "no" }, "enabled must be a boolean"],
+  ];
+  for (const [name, item, message] of cases) {
+    it(`reports ${name}`, () => {
+      expect(messages(widgetDoc([item]))).toEqual([`Register(Main) items[0]: ${message}`]);
+    });
+  }
+
+  it("requires an id and a label", () => {
+    expect(messages(widgetDoc([{ type: "stepper" }]))).toEqual([
+      "Register(Main) items[0]: requires .id",
+      "Register(Main) items[0]: requires .label",
+    ]);
+  });
+
+  it("accepts a stepper in a row and in a fold", () => {
+    const doc = widgetDoc([
+      { type: "row", items: [stepper] },
+      { type: "fold", id: "f", label: "F", items: [{ ...stepper, id: "inFold" }] },
+    ]);
+    expect(messages(doc)).toEqual([]);
+  });
+});
+
 describe("validateDocument for the Init options the library reads", () => {
   function withInit(patch: Record<string, unknown>) {
     const doc = emptyDocument();

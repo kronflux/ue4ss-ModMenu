@@ -26,6 +26,7 @@ import type {
   RowItem,
   Section,
   SliderItem,
+  StepperItem,
   TextInputItem,
 } from "./types";
 
@@ -210,6 +211,32 @@ function validateSlider(path: string, item: SliderItem, issues: Issue[]) {
   }
 }
 
+// The rules and messages follow Stepper.validate in widgets/stepper.lua. Unlike a slider, a stepper
+// may leave min and max out, and the range is checked only when both are set.
+function validateStepper(path: string, item: StepperItem, issues: Issue[]) {
+  requireId(path, item.id, issues);
+  requireLabel(path, item.label, issues);
+  if (item.min !== undefined && typeof item.min !== "number") {
+    issues.push(issue(path, "min must be a number"));
+  }
+  if (item.max !== undefined && typeof item.max !== "number") {
+    issues.push(issue(path, "max must be a number"));
+  }
+  if (typeof item.min === "number" && typeof item.max === "number" && item.min >= item.max) {
+    issues.push(issue(path, "min must be less than max"));
+  }
+  if (item.step !== undefined && (typeof item.step !== "number" || item.step <= 0)) {
+    issues.push(issue(path, "step must be a positive number"));
+  }
+  if (item.default !== undefined && typeof item.default !== "number") {
+    issues.push(issue(path, "default must be numeric"));
+  }
+  checkBoolean(path, "integer", item.integer, issues);
+  if (item.format !== undefined && typeof item.format !== "string") {
+    issues.push(issue(path, "format must be a string"));
+  }
+}
+
 // This returns the option values the same way core/options.lua normalizes them: a string is its
 // own value, and a table's value falls back to its label. A bad option is reported and skipped.
 function radioValues(path: string, options: unknown[], issues: Issue[]): string[] {
@@ -349,6 +376,10 @@ function validateItem(path: string, item: unknown, issues: Issue[]) {
     validateKeybind(path, item as KeybindItem, issues);
     return;
   }
+  if (typeName === "stepper") {
+    validateStepper(path, item as StepperItem, issues);
+    return;
+  }
   if (typeName === "row") {
     validateRow(path, item as RowItem, issues);
     return;
@@ -372,7 +403,7 @@ function validateRow(path: string, item: RowItem, issues: Issue[]) {
     }
     const t = child.type;
     if (typeof t !== "string" || !ROW_CHILD_TYPES.has(t as never)) {
-      issues.push(issue(childPath, `unsupported row child type '${String(t)}' (button|checkbox|label|number|slider|textinput)`));
+      issues.push(issue(childPath, `unsupported row child type '${String(t)}' (button|checkbox|label|number|slider|stepper|textinput)`));
       continue;
     }
     validateItem(childPath, child, issues);

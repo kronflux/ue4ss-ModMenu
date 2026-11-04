@@ -19,6 +19,7 @@ const WIDGETS: { id: ItemType; label: string }[] = [
   { id: "slider", label: "Slider" },
   { id: "radio", label: "Radio" },
   { id: "keybind", label: "Keybind" },
+  { id: "stepper", label: "Stepper" },
   { id: "row", label: "Row" },
   { id: "fold", label: "Fold" },
 ];

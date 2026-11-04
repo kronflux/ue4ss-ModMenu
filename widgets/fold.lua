@@ -32,6 +32,7 @@ local ALLOWED = {
     row = true,
     separator = true,
     slider = true,
+    stepper = true,
     textinput = true,
 }
 

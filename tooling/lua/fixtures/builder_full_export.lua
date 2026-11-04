@@ -195,6 +195,22 @@ ModMenu.Register({
             end,
         },
         {
+            type = "stepper",
+            id = "stp",
+            label = "Stepper",
+            enabled = false,
+            default = 4,
+            min = 0,
+            max = 10,
+            step = 2,
+            integer = true,
+            format = "%d pcs",
+            onChange = function(value)
+                -- TODO: game call
+                -- local value = ModMenu.Get("All", "stp")
+            end,
+        },
+        {
             type = "row",
             tooltip = "Row tip",
             enabled = false,
@@ -241,6 +257,18 @@ ModMenu.Register({
                     onChange = function(value)
                         -- TODO: game call
                         -- local value = ModMenu.Get("All", "rowSld")
+                    end,
+                },
+                {
+                    type = "stepper",
+                    id = "rowStp",
+                    label = "Row stepper",
+                    min = 0,
+                    max = 5,
+                    step = 0.5,
+                    onChange = function(value)
+                        -- TODO: game call
+                        -- local value = ModMenu.Get("All", "rowStp")
                     end,
                 },
                 {
@@ -325,6 +353,17 @@ ModMenu.Register({
                     onChange = function(value)
                         -- TODO: game call
                         -- local value = ModMenu.Get("All", "foldSld")
+                    end,
+                },
+                {
+                    type = "stepper",
+                    id = "foldStp",
+                    label = "Fold stepper",
+                    tooltip = "Fold stepper tip",
+                    max = 3,
+                    onChange = function(value)
+                        -- TODO: game call
+                        -- local value = ModMenu.Get("All", "foldStp")
                     end,
                 },
                 { type = "separator" },

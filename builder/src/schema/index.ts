@@ -21,6 +21,7 @@ export type {
   Section,
   SeparatorItem,
   SliderItem,
+  StepperItem,
   TextInputItem,
   ThemeName,
 } from "./types";

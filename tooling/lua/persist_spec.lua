@@ -268,3 +268,15 @@ hiddenState.sections = {
 }
 hiddenState.values["Sec.speed"] = 7
 assert_eq("Snapshot stores the value of a hidden item", Persist.Snapshot(hiddenState).values["Sec.speed"], 7)
+
+-- A stepper value is a number, so it is saved and restored like a slider value, and a value of another type is ignored.
+local stepperState = NewState("right", "A")
+stepperState.sections = {
+    { id = "Sec", items = { { type = "stepper", id = "count", label = "Count", min = 0, max = 10 } } },
+}
+stepperState.values["Sec.count"] = 6
+assert_eq("Snapshot stores a stepper value", Persist.Snapshot(stepperState).values["Sec.count"], 6)
+Persist.Apply({ values = { ["Sec.count"] = 9 } }, stepperState)
+assert_eq("Apply restores a stepper value", stepperState.values["Sec.count"], 9)
+Persist.Apply({ values = { ["Sec.count"] = "3" } }, stepperState)
+assert_eq("Apply ignores a stepper value that is not a number", stepperState.values["Sec.count"], 9)

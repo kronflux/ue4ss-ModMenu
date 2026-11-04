@@ -332,6 +332,10 @@ export function createItem(type: ItemType, section: Section): Item {
     const label = "Hotkey";
     return { type: "keybind", id: take("keybind", label), label, default: "" };
   }
+  if (type === "stepper") {
+    const label = "Quantity";
+    return { type: "stepper", id: take("stepper", label), label, min: 0, max: 10, default: 1, step: 1, integer: true };
+  }
   if (type === "row") {
     return {
       type: "row",

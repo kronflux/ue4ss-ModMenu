@@ -11,6 +11,7 @@ import type {
   RadioItem,
   Section,
   SliderItem,
+  StepperItem,
   TextInputItem,
 } from "../schema";
 import { SPACING_KEYS } from "../schema";
@@ -257,6 +258,19 @@ function emitItem(item: Item, sectionId: string, level: number): string {
       ["labelWidth", numberField(slider.labelWidth)],
     ]);
     for (const stub of stubOnChange(sectionId, slider.id, "value")) {
+      lines.push(`${inner}${stub}`);
+    }
+  } else if (item.type === "stepper") {
+    const stepper = item as StepperItem;
+    emitFieldLines(lines, inner, [
+      ["default", numberField(stepper.default)],
+      ["min", numberField(stepper.min)],
+      ["max", numberField(stepper.max)],
+      ["step", numberField(stepper.step)],
+      ["integer", stepper.integer === true ? "true" : undefined],
+      ["format", stepper.format !== undefined ? luaString(stepper.format) : undefined],
+    ]);
+    for (const stub of stubOnChange(sectionId, stepper.id, "value")) {
       lines.push(`${inner}${stub}`);
     }
   } else if (item.type === "radio") {

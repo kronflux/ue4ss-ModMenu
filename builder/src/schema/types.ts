@@ -26,6 +26,7 @@ export type ItemType =
   | "slider"
   | "radio"
   | "keybind"
+  | "stepper"
   | "row"
   | "fold";
 
@@ -152,7 +153,22 @@ export type KeybindItem = ItemCommon & {
   allowModifiers?: boolean;
 };
 
-export type RowChild = ButtonItem | CheckboxItem | LabelItem | NumberItem | SliderItem | TextInputItem;
+// A stepper is a minus button, a readout and a plus button. One click moves the value one step
+// (default 1) inside min and max, and holding a button repeats. Without a format the readout uses
+// %d for an integer item and %g otherwise. The format goes through Lua's string.format.
+export type StepperItem = ItemCommon & {
+  type: "stepper";
+  id: string;
+  label: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  default?: number;
+  integer?: boolean;
+  format?: string;
+};
+
+export type RowChild = ButtonItem | CheckboxItem | LabelItem | NumberItem | SliderItem | StepperItem | TextInputItem;
 
 export type RowItem = ItemCommon & { type: "row"; items: RowChild[] };
 
@@ -167,6 +183,7 @@ export type FoldChild =
   | RowItem
   | SeparatorItem
   | SliderItem
+  | StepperItem
   | TextInputItem;
 
 export type FoldItem = ItemCommon & {
@@ -188,6 +205,7 @@ export type Item =
   | SliderItem
   | RadioItem
   | KeybindItem
+  | StepperItem
   | RowItem
   | FoldItem;
 
@@ -245,6 +263,7 @@ export const ROW_CHILD_TYPES: ReadonlySet<ItemType> = new Set([
   "label",
   "number",
   "slider",
+  "stepper",
   "textinput",
 ]);
 
@@ -260,6 +279,7 @@ export const FOLD_CHILD_TYPES: ReadonlySet<ItemType> = new Set([
   "row",
   "separator",
   "slider",
+  "stepper",
   "textinput",
 ]);
 
@@ -289,6 +309,7 @@ export const ITEM_TYPES: ReadonlySet<string> = new Set([
   "slider",
   "radio",
   "keybind",
+  "stepper",
   "row",
   "fold",
 ]);

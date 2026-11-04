@@ -32,6 +32,7 @@ M.VALUE_TYPES = {
     number = true,
     radio = true,
     slider = true,
+    stepper = true,
     textinput = true,
 }
 
@@ -45,11 +46,12 @@ local VALUE_KIND = {
     number = "number",
     radio = "string",
     slider = "number",
+    stepper = "number",
     textinput = "string",
 }
 
 --- Item types for which a nil value is a state of its own, kept as cleared in the snapshot.
---- A number, a slider and a keybind treat nil as their default, so they are never saved as cleared.
+--- A number, a slider, a stepper and a keybind treat nil as their default, so they are never saved as cleared.
 local CLEARABLE = {
     checkbox = true,
     dropdown = true,

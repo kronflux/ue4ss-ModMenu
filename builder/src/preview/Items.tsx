@@ -10,6 +10,7 @@ import type {
   RadioItem,
   RowItem,
   SliderItem,
+  StepperItem,
   TextInputItem,
 } from "../schema";
 import { buttonChrome } from "./chrome";
@@ -223,6 +224,23 @@ function MmSlider({ item, fill }: { item: SliderItem; fill?: boolean }) {
   );
 }
 
+// The readout shows the value the runtime seeds a stepper with: the default or else min or zero, kept inside the range.
+// The text goes through the slider's formatter, which handles the same format strings and the same fallback.
+function MmStepper({ item }: { item: StepperItem }) {
+  const low = item.min ?? Number.NEGATIVE_INFINITY;
+  const high = item.max ?? Number.POSITIVE_INFINITY;
+  const value = Math.min(high, Math.max(low, item.default ?? item.min ?? 0));
+  const shaped = { ...item, min: item.min ?? 0, max: item.max ?? 0 } as unknown as SliderItem;
+  return (
+    <div className="mm-stepper">
+      <span className="mm-stepper-label">{item.label}</span>
+      <span className="mm-stepper-btn">-</span>
+      <span className="mm-stepper-readout">{sliderText(value, shaped)}</span>
+      <span className="mm-stepper-btn">+</span>
+    </div>
+  );
+}
+
 function MmRadio({ item, inline }: { item: RadioItem; inline: boolean }) {
   const list = normalizeOptions(item.options);
   const chosen = item.default ?? null;
@@ -397,6 +415,9 @@ function PreviewItemBody({ item, sectionId, actions, index, layout = "vertical" 
   }
   if (item.type === "slider") {
     return <MmSlider item={item} fill={!horizontal} />;
+  }
+  if (item.type === "stepper") {
+    return <MmStepper item={item} />;
   }
   if (item.type === "radio") {
     return <MmRadio item={item} inline={item.inline === true} />;

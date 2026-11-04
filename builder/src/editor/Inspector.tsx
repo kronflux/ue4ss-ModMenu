@@ -13,6 +13,7 @@ import type {
   RadioItem,
   Section,
   SliderItem,
+  StepperItem,
   TextInputItem,
   ThemeName,
 } from "../schema";
@@ -306,7 +307,7 @@ function ItemFields({
     return <p className="ed-muted">No fields.</p>;
   }
   if (item.type === "row") {
-    return <p className="ed-muted">Row children are in the outline. Add button, checkbox, label, number, slider, or text.</p>;
+    return <p className="ed-muted">Row children are in the outline. Add button, checkbox, label, number, slider, stepper, or text.</p>;
   }
   if (item.type === "label") {
     return (
@@ -545,6 +546,25 @@ function ItemFields({
         <Toggle label="Live (apply while dragging)" checked={slider.live === true} onChange={(live) => onPatch({ live })} />
         <OptToggle label="Show the value" value={slider.showValue} onChange={(showValue) => onPatch({ showValue })} />
         <OptNumber label="Label width (px)" value={slider.labelWidth} onChange={(labelWidth) => onPatch({ labelWidth })} />
+      </>
+    );
+  }
+  if (item.type === "stepper") {
+    const stepper = item as StepperItem;
+    return (
+      <>
+        <IdField item={stepper} section={section} path={path} onPatch={onPatch} />
+        <Text label="Label" value={stepper.label} onChange={(label) => onPatch({ label })} />
+        <OptNumber label="Min (blank for none)" value={stepper.min} onChange={(min) => onPatch({ min })} />
+        <OptNumber label="Max (blank for none)" value={stepper.max} onChange={(max) => onPatch({ max })} />
+        <OptNumber label="Step (blank for 1)" value={stepper.step} onChange={(step) => onPatch({ step })} />
+        <OptNumber label="Default" value={stepper.default} onChange={(value) => onPatch({ default: value })} />
+        <Text
+          label="Format (string.format pattern, blank for the default)"
+          value={stepper.format ?? ""}
+          onChange={(format) => onPatch({ format: format || undefined })}
+        />
+        <Toggle label="Integer" checked={stepper.integer === true} onChange={(integer) => onPatch({ integer })} />
       </>
     );
   }

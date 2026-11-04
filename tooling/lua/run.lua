@@ -155,6 +155,7 @@ local specs = {
     "theme_spec.lua",
     "widgets_spec.lua",
     "widgets_slider_spec.lua",
+    "widgets_stepper_spec.lua",
     "widgets_radio_spec.lua",
     "widgets_button_spec.lua",
     "input_click_spec.lua",

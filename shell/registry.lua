@@ -242,6 +242,14 @@ function M.Set(S, sectionId, itemId, value)
             return
         end
     end
+    -- A stepper value is snapped to its step and clamped here too, for the same reason.
+    local stepperItem = FindTypedItem(S, sectionId, itemId, "stepper")
+    if stepperItem then
+        value = Widgets.get("stepper")._coerce(value, stepperItem)
+        if value == nil then
+            return
+        end
+    end
     S.values[vkey] = value
     ApplyLive(S, vkey, value)
     Session.NoteChange(S)

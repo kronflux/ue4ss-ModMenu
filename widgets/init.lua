@@ -38,6 +38,7 @@ register(require("ModMenu.widgets.textinput"))
 register(require("ModMenu.widgets.slider"))
 register(require("ModMenu.widgets.radio"))
 register(require("ModMenu.widgets.keybind"))
+register(require("ModMenu.widgets.stepper"))
 register(require("ModMenu.widgets.row"))
 register(require("ModMenu.widgets.fold"))
 

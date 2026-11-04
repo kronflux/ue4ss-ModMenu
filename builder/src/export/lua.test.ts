@@ -103,6 +103,29 @@ describe("printLua for slider, radio, keybind and tooltip", () => {
     expect(lua).toContain("onChange = function(binding)");
   });
 
+  it("exports a stepper with its range, step, flags and an onChange stub", () => {
+    const lua = widgetLua([
+      { type: "stepper", id: "count", label: "Count", min: 0, max: 10, step: 2, default: 4, integer: true, format: "%d x" },
+    ]);
+    expect(lua).toContain('type = "stepper",');
+    expect(lua).toContain('id = "count",');
+    expect(lua).toContain("default = 4,");
+    expect(lua).toContain("min = 0,");
+    expect(lua).toContain("max = 10,");
+    expect(lua).toContain("step = 2,");
+    expect(lua).toContain("integer = true,");
+    expect(lua).toContain('format = "%d x",');
+    expect(lua).toContain("onChange = function(value)");
+  });
+
+  it("writes only the stepper fields that are set", () => {
+    const lua = widgetLua([{ type: "stepper", id: "bare", label: "Bare" }]);
+    expect(lua).toContain('type = "stepper",');
+    for (const field of ["default =", "min =", "max =", "step =", "integer =", "format ="]) {
+      expect(lua).not.toContain(field);
+    }
+  });
+
   it("exports tooltip on a plain item, a separator and a fold child", () => {
     const lua = widgetLua([
       { type: "button", id: "go", label: "Go", tooltip: 'Runs "it"' },
