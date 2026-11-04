@@ -153,6 +153,35 @@ describe("printLua for slider, radio, keybind and tooltip", () => {
     expect(lua).not.toContain("variant =");
   });
 
+  it("exports a multiselect with its options, default array, columns and an onChange stub", () => {
+    const lua = widgetLua([
+      { type: "multiselect", id: "tags", label: "Tags", options: ["a", { label: "Bee", value: "b" }, "c"], default: ["a", "c"], columns: 2 },
+    ]);
+    expect(lua).toContain('type = "multiselect",');
+    expect(lua).toContain('id = "tags",');
+    expect(lua).toContain('{ label = "Bee", value = "b" },');
+    expect(lua).toContain('default = { "a", "c" },');
+    expect(lua).toContain("columns = 2,");
+    expect(lua).toContain("onChange = function(values)");
+  });
+
+  it("writes only the multiselect fields that are set, and an empty default as an empty table", () => {
+    const bare = widgetLua([{ type: "multiselect", id: "bare", label: "Bare", options: ["a"] }]);
+    expect(bare).toContain('type = "multiselect",');
+    expect(bare).not.toContain("default =");
+    expect(bare).not.toContain("columns =");
+    const empty = widgetLua([{ type: "multiselect", id: "none", label: "None", options: ["a"], default: [] }]);
+    expect(empty).toContain("default = {},");
+  });
+
+  it("exports numeric multiselect option values as strings, which a default entry then names", () => {
+    const lua = widgetLua([
+      { type: "multiselect", id: "levels", label: "Levels", options: [{ label: "One", value: 1 }, { value: 2 }], default: ["1"] },
+    ]);
+    expect(lua).toContain('{ label = "One", value = "1" },');
+    expect(lua).toContain('default = { "1" },');
+  });
+
   it("exports tooltip on a plain item, a separator and a fold child", () => {
     const lua = widgetLua([
       { type: "button", id: "go", label: "Go", tooltip: 'Runs "it"' },

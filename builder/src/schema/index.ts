@@ -15,6 +15,7 @@ export type {
   KeybindItem,
   LabelItem,
   MenuDocument,
+  MultiselectItem,
   NumberItem,
   RadioItem,
   RowItem,

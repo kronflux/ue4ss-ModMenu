@@ -9,6 +9,7 @@ import type {
   Item,
   KeybindItem,
   MenuDocument,
+  MultiselectItem,
   NumberItem,
   ProgressItem,
   RadioItem,
@@ -618,6 +619,41 @@ function ItemFields({
         </Field>
         <Text label="Default" value={radio.default ?? ""} onChange={(value) => onPatch({ default: value || undefined })} />
         <Toggle label="Inline (options on one line)" checked={radio.inline === true} onChange={(inline) => onPatch({ inline })} />
+      </>
+    );
+  }
+  if (item.type === "multiselect") {
+    const multi = item as MultiselectItem;
+    // The default is picked from the options, so a typo cannot name a value that is not one.
+    const values = multi.options.map((opt) => (typeof opt === "string" ? opt : String(opt.value ?? opt.label ?? "")));
+    const checked = multi.default ?? [];
+    return (
+      <>
+        <IdField item={multi} section={section} path={path} onPatch={onPatch} />
+        <Text label="Label" value={multi.label} onChange={(label) => onPatch({ label })} />
+        <Field label="Options (one per line, or label|value)">
+          <textarea
+            rows={5}
+            value={formatOptions(multi.options)}
+            onChange={(event) => {
+              const options = parseOptions(event.target.value);
+              onPatch({ options: options.length > 0 ? options : multi.options });
+            }}
+          />
+        </Field>
+        <p className="ed-muted">Checked by default</p>
+        {values.map((value) => (
+          <Toggle
+            key={value}
+            label={value}
+            checked={checked.includes(value)}
+            onChange={(on) => {
+              const next = values.filter((name) => (name === value ? on : checked.includes(name)));
+              onPatch({ default: next.length > 0 ? next : undefined });
+            }}
+          />
+        ))}
+        <OptNumber label="Columns (1 to 4, blank for 1)" value={multi.columns} onChange={(columns) => onPatch({ columns })} />
       </>
     );
   }

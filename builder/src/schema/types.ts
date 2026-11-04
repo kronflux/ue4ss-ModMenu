@@ -28,6 +28,7 @@ export type ItemType =
   | "keybind"
   | "stepper"
   | "progress"
+  | "multiselect"
   | "row"
   | "fold";
 
@@ -183,6 +184,18 @@ export type ProgressItem = ItemCommon & {
   variant?: ButtonVariant;
 };
 
+// A multiselect is a caption and one toggle button per option, in 1 to 4 columns (default 1). Options use
+// the dropdown's option shape, and default is an array of option values. The value is the array of checked
+// values in option order. Its height depends on the option count, so it is allowed in a fold but not in a row.
+export type MultiselectItem = ItemCommon & {
+  type: "multiselect";
+  id: string;
+  label: string;
+  options: DropdownOption[];
+  default?: string[];
+  columns?: number;
+};
+
 export type RowChild =
   | ButtonItem
   | CheckboxItem
@@ -201,6 +214,7 @@ export type FoldChild =
   | DropdownItem
   | KeybindItem
   | LabelItem
+  | MultiselectItem
   | NumberItem
   | ProgressItem
   | RadioItem
@@ -231,6 +245,7 @@ export type Item =
   | KeybindItem
   | StepperItem
   | ProgressItem
+  | MultiselectItem
   | RowItem
   | FoldItem;
 
@@ -300,6 +315,7 @@ export const FOLD_CHILD_TYPES: ReadonlySet<ItemType> = new Set([
   "dropdown",
   "keybind",
   "label",
+  "multiselect",
   "number",
   "progress",
   "radio",
@@ -338,6 +354,7 @@ export const ITEM_TYPES: ReadonlySet<string> = new Set([
   "keybind",
   "stepper",
   "progress",
+  "multiselect",
   "row",
   "fold",
 ]);

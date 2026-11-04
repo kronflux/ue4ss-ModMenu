@@ -340,6 +340,10 @@ export function createItem(type: ItemType, section: Section): Item {
     const label = "Progress";
     return { type: "progress", id: take("progress", label), label, min: 0, max: 1, default: 0.5 };
   }
+  if (type === "multiselect") {
+    const label = "Tags";
+    return { type: "multiselect", id: take("multiselect", label), label, options: ["A", "B", "C"], default: ["A"], columns: 1 };
+  }
   if (type === "row") {
     return {
       type: "row",

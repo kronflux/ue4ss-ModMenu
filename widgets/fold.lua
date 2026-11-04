@@ -27,6 +27,7 @@ local ALLOWED = {
     dropdown = true,
     keybind = true,
     label = true,
+    multiselect = true,
     number = true,
     progress = true,
     radio = true,

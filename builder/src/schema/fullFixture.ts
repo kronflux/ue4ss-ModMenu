@@ -159,6 +159,17 @@ export function fullDocument(): MenuDocument {
             enabled: false,
           },
           {
+            type: "multiselect",
+            id: "mul",
+            label: "Multiselect",
+            options: ["a", { label: "Bee", value: "b" }, "c"],
+            default: ["a", "c"],
+            columns: 2,
+            tooltip: "Multiselect tip",
+            enabled: false,
+            visible: true,
+          },
+          {
             type: "row",
             enabled: false,
             visible: true,
@@ -190,6 +201,7 @@ export function fullDocument(): MenuDocument {
               { type: "slider", id: "foldSld", label: "Fold slider", min: 0, max: 9, labelWidth: 60 },
               { type: "stepper", id: "foldStp", label: "Fold stepper", max: 3, tooltip: "Fold stepper tip" },
               { type: "progress", id: "foldPrg", label: "Fold progress", default: 0.25, tooltip: "Fold progress tip" },
+              { type: "multiselect", id: "foldMul", label: "Fold multiselect", options: ["p", "q"], default: ["q"], columns: 4 },
               { type: "separator" },
               {
                 type: "row",

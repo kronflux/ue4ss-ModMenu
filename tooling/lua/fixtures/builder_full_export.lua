@@ -222,6 +222,24 @@ ModMenu.Register({
             variant = "success",
         },
         {
+            type = "multiselect",
+            id = "mul",
+            label = "Multiselect",
+            tooltip = "Multiselect tip",
+            enabled = false,
+            options = {
+                "a",
+                { label = "Bee", value = "b" },
+                "c",
+            },
+            default = { "a", "c" },
+            columns = 2,
+            onChange = function(values)
+                -- TODO: game call
+                -- local value = ModMenu.Get("All", "mul")
+            end,
+        },
+        {
             type = "row",
             tooltip = "Row tip",
             enabled = false,
@@ -390,6 +408,21 @@ ModMenu.Register({
                     label = "Fold progress",
                     tooltip = "Fold progress tip",
                     default = 0.25,
+                },
+                {
+                    type = "multiselect",
+                    id = "foldMul",
+                    label = "Fold multiselect",
+                    options = {
+                        "p",
+                        "q",
+                    },
+                    default = { "q" },
+                    columns = 4,
+                    onChange = function(values)
+                        -- TODO: game call
+                        -- local value = ModMenu.Get("All", "foldMul")
+                    end,
                 },
                 { type = "separator" },
                 {

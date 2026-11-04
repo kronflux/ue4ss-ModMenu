@@ -21,6 +21,7 @@ import type {
   Item,
   KeybindItem,
   MenuDocument,
+  MultiselectItem,
   NumberItem,
   RadioItem,
   RowItem,
@@ -303,6 +304,35 @@ function validateRadio(path: string, item: RadioItem, issues: Issue[]) {
   checkBoolean(path, "inline", item.inline, issues);
 }
 
+// The rules and messages follow Multiselect.validate in widgets/multiselect.lua. The default is an
+// array, and each entry must be the value of an option, so the message names the values to pick from.
+function validateMultiselect(path: string, item: MultiselectItem, issues: Issue[]) {
+  requireId(path, item.id, issues);
+  requireLabel(path, item.label, issues);
+  if (!Array.isArray(item.options)) {
+    issues.push(issue(path, "multiselect requires an .options array"));
+  } else {
+    const values = radioValues(path, item.options, issues);
+    if (values.length === 0) {
+      issues.push(issue(path, "multiselect requires at least one option"));
+    } else if (item.default !== undefined) {
+      const entries: unknown = item.default;
+      if (!Array.isArray(entries)) {
+        issues.push(issue(path, "default must be an array"));
+      } else if (entries.some((entry) => typeof entry !== "string" || !values.includes(entry))) {
+        issues.push(issue(path, `default must be one of ${values.join(", ")}`));
+      }
+    }
+  }
+  const columns: unknown = item.columns;
+  if (
+    columns !== undefined &&
+    (typeof columns !== "number" || !Number.isInteger(columns) || columns < 1 || columns > 4)
+  ) {
+    issues.push(issue(path, "columns must be a number from 1 to 4"));
+  }
+}
+
 // The rules and messages follow Keybind.validate in widgets/keybind.lua. An empty default means no binding.
 function validateKeybind(path: string, item: KeybindItem, issues: Issue[]) {
   requireId(path, item.id, issues);
@@ -408,6 +438,10 @@ function validateItem(path: string, item: unknown, issues: Issue[]) {
   }
   if (typeName === "progress") {
     validateProgress(path, item as ProgressItem, issues);
+    return;
+  }
+  if (typeName === "multiselect") {
+    validateMultiselect(path, item as MultiselectItem, issues);
     return;
   }
   if (typeName === "row") {

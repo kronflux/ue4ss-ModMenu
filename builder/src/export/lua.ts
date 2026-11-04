@@ -7,6 +7,7 @@ import type {
   Item,
   KeybindItem,
   MenuDocument,
+  MultiselectItem,
   NumberItem,
   RadioItem,
   Section,
@@ -20,6 +21,10 @@ import { ensureIds } from "../editor/model";
 
 function luaString(value: string): string {
   return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r/g, "\\r").replace(/\n/g, "\\n")}"`;
+}
+
+function luaStringArray(values: string[]): string {
+  return values.length === 0 ? "{}" : `{ ${values.map((value) => luaString(String(value))).join(", ")} }`;
 }
 
 function indent(level: number): string {
@@ -292,6 +297,16 @@ function emitItem(item: Item, sectionId: string, level: number): string {
       ["inline", radio.inline === true ? "true" : undefined],
     ]);
     for (const stub of stubOnChange(sectionId, radio.id, "value")) {
+      lines.push(`${inner}${stub}`);
+    }
+  } else if (item.type === "multiselect") {
+    const multi = item as MultiselectItem;
+    lines.push(`${inner}options = ${emitOptions(multi.options, level + 1)},`);
+    emitFieldLines(lines, inner, [
+      ["default", multi.default !== undefined ? luaStringArray(multi.default) : undefined],
+      ["columns", numberField(multi.columns)],
+    ]);
+    for (const stub of stubOnChange(sectionId, multi.id, "values")) {
       lines.push(`${inner}${stub}`);
     }
   } else if (item.type === "keybind") {

@@ -484,6 +484,24 @@
   flex-wrap: wrap;
 }
 
+/* The multiselect matches widgets/multiselect.lua: a muted caption over a uniform grid of option
+   buttons, with a 2 px gap around each button. */
+.mm-multi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mm-multi-label {
+  font-size: var(--mm-font-hint);
+  color: var(--mm-text-muted);
+}
+
+.mm-multi-grid {
+  display: grid;
+  gap: 4px;
+}
+
 .mm-key-chip {
   display: inline-block;
   margin-left: 4px;

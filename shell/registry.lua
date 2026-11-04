@@ -258,6 +258,16 @@ function M.Set(S, sectionId, itemId, value)
             return
         end
     end
+    -- A multiselect value is an array that is normalized to its options in option order. A value that
+    -- is not an array is ignored, and nil resets the item to its default, as a number's nil does.
+    local multiselectItem = FindTypedItem(S, sectionId, itemId, "multiselect")
+    if multiselectItem then
+        local widget = Widgets.get("multiselect")
+        if value ~= nil and type(value) ~= "table" then
+            return
+        end
+        value = widget._normalize(value == nil and multiselectItem.default or value, multiselectItem)
+    end
     S.values[vkey] = value
     ApplyLive(S, vkey, value)
     Session.NoteChange(S)

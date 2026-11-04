@@ -6,6 +6,7 @@ import type {
   FoldItem,
   Item,
   KeybindItem,
+  MultiselectItem,
   NumberItem,
   ProgressItem,
   RadioItem,
@@ -290,6 +291,29 @@ function MmRadio({ item, inline }: { item: RadioItem; inline: boolean }) {
   );
 }
 
+// The runtime draws one button per option in a uniform grid, with "[x] " or "[ ] " before the label and
+// the checked options painted active, as Multiselect._caption in widgets/multiselect.lua does.
+function MmMultiselect({ item }: { item: MultiselectItem }) {
+  const list = normalizeOptions(item.options);
+  const checked = item.default ?? [];
+  return (
+    <div className="mm-multi">
+      <span className="mm-multi-label">{item.label}</span>
+      <div className="mm-multi-grid" style={{ gridTemplateColumns: `repeat(${item.columns ?? 1}, 1fr)` }}>
+        {list.map((opt) => {
+          const on = checked.includes(opt.value);
+          return (
+            <button key={opt.value} type="button" className="mm-btn" style={buttonChrome({ active: on })}>
+              {on ? "[x] " : "[ ] "}
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // The runtime button reads "Label: F7", or "Label: None" without a binding, as Caption in widgets/keybind.lua writes it.
 function MmKeybind({ item }: { item: KeybindItem }) {
   const bound = item.default !== undefined && item.default !== "";
@@ -451,6 +475,9 @@ function PreviewItemBody({ item, sectionId, actions, index, layout = "vertical" 
   }
   if (item.type === "radio") {
     return <MmRadio item={item} inline={item.inline === true} />;
+  }
+  if (item.type === "multiselect") {
+    return <MmMultiselect item={item} />;
   }
   if (item.type === "keybind") {
     return <MmKeybind item={item} />;

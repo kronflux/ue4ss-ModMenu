@@ -11,6 +11,7 @@
 ]]
 
 local Util = require("ModMenu.core.util")
+local Options = require("ModMenu.core.options")
 
 local M = {}
 
@@ -29,6 +30,7 @@ M.VALUE_TYPES = {
     checkbox = true,
     dropdown = true,
     keybind = true,
+    multiselect = true,
     number = true,
     radio = true,
     slider = true,
@@ -38,11 +40,13 @@ M.VALUE_TYPES = {
 
 --- The Lua type a saved value must have for each value-bearing item type.
 --- A saved value of another type is ignored on load, so a hand-edited or stale file cannot put a
---- string into a checkbox or a boolean into a number.
+--- string into a checkbox or a boolean into a number. "strings" is an array of strings, which is
+--- the one value that is a table.
 local VALUE_KIND = {
     checkbox = "boolean",
     dropdown = "string",
     keybind = "string",
+    multiselect = "strings",
     number = "number",
     radio = "string",
     slider = "number",
@@ -65,13 +69,55 @@ local SIDES = { left = true, right = true, top = true, bottom = true }
 local pending = nil
 
 --- True for a value the snapshot keeps: a boolean, a string, or a finite number.
---- Tables are left out, because no value-bearing item stores one and JSON cannot hold every table.
+--- Tables are left out here, because JSON cannot hold every table. The one table a value-bearing
+--- item stores is a multiselect's array of strings, which StringArray checks.
 local function IsScalar(value)
     local t = type(value)
     if t == "boolean" or t == "string" then
         return true
     end
     return t == "number" and value == value and value ~= math.huge and value ~= -math.huge
+end
+
+--- Return a copy of value when it is a sequence of strings with no other keys, otherwise nil.
+--- The copy keeps the snapshot from sharing a table with the live value.
+local function StringArray(value)
+    if type(value) ~= "table" then
+        return nil
+    end
+    local copy = {}
+    local count = 0
+    for key, entry in pairs(value) do
+        if type(key) ~= "number" or type(entry) ~= "string" then
+            return nil
+        end
+        count = count + 1
+    end
+    for i = 1, count do
+        if type(value[i]) ~= "string" then
+            return nil
+        end
+        copy[i] = value[i]
+    end
+    return copy
+end
+
+--- True when every entry of a string array is the value of one of the item's options.
+local function AllAreOptions(entries, item)
+    local ok, list = pcall(Options.NormalizeOptions, item.options)
+    if not ok then
+        return false
+    end
+    local known = {}
+    for _, opt in ipairs(list) do
+        known[opt.value] = true
+    end
+    for _, entry in ipairs(entries) do
+        if not known[entry] then
+            return false
+        end
+    end
+    return true
 end
 
 local function HasTab(config, name)
@@ -156,7 +202,9 @@ function M.Snapshot(state)
                 end
             elseif M.VALUE_TYPES[item.type] then
                 local value = values[key]
-                if IsScalar(value) then
+                if VALUE_KIND[item.type] == "strings" then
+                    snapshot.values[key] = StringArray(value)
+                elseif IsScalar(value) then
                     snapshot.values[key] = value
                 else
                     snapshot.values[key] = nil
@@ -212,7 +260,12 @@ function M.ApplySection(state, section)
             end
         elseif M.VALUE_TYPES[item.type] then
             local value = values[key]
-            if IsScalar(value) and type(value) == VALUE_KIND[item.type] then
+            if VALUE_KIND[item.type] == "strings" then
+                local entries = StringArray(value)
+                if entries ~= nil and AllAreOptions(entries, item) then
+                    state.values[key] = entries
+                end
+            elseif IsScalar(value) and type(value) == VALUE_KIND[item.type] then
                 state.values[key] = value
             elseif value == nil and clearedMap[key] == true and CLEARABLE[item.type] then
                 state.values[key] = nil

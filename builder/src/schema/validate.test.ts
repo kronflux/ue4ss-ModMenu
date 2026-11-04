@@ -360,6 +360,56 @@ describe("validateDocument for the progress bar", () => {
   });
 });
 
+// The messages follow Multiselect.validate in widgets/multiselect.lua. A multiselect is fold only.
+describe("validateDocument for the multiselect", () => {
+  const multiselect = { type: "multiselect", id: "tags", label: "Tags", options: ["a", "b", "c"], default: ["a", "c"], columns: 2 };
+  const inFold = (item: unknown) => widgetDoc([{ type: "fold", id: "f", label: "F", items: [item] }]);
+
+  it("accepts a full multiselect and a bare one inside a fold", () => {
+    expect(messages(inFold(multiselect))).toEqual([]);
+    expect(messages(inFold({ type: "multiselect", id: "bare", label: "Bare", options: ["a"] }))).toEqual([]);
+  });
+
+  it("accepts options in the label and value shape, and defaults that name the values", () => {
+    const item = { ...multiselect, options: [{ label: "Red", value: "r" }, "g"], default: ["r"] };
+    expect(messages(inFold(item))).toEqual([]);
+  });
+
+  const cases: Array<[string, unknown, string]> = [
+    ["a missing options array", { ...multiselect, options: undefined }, "multiselect requires an .options array"],
+    ["options that are not an array", { ...multiselect, options: "a" }, "multiselect requires an .options array"],
+    ["an empty options array", { ...multiselect, options: [], default: undefined }, "multiselect requires at least one option"],
+    ["a default that is not an array", { ...multiselect, default: "a" }, "default must be an array"],
+    ["a default entry that is not an option", { ...multiselect, default: ["a", "z"] }, "default must be one of a, b, c"],
+    ["a default entry that is not a string", { ...multiselect, default: [1] }, "default must be one of a, b, c"],
+    ["columns of zero", { ...multiselect, columns: 0 }, "columns must be a number from 1 to 4"],
+    ["columns of five", { ...multiselect, columns: 5 }, "columns must be a number from 1 to 4"],
+    ["columns that are text", { ...multiselect, columns: "2" }, "columns must be a number from 1 to 4"],
+    ["columns that are not whole", { ...multiselect, columns: 1.5 }, "columns must be a number from 1 to 4"],
+    ["enabled", { ...multiselect, enabled: "no" }, "enabled must be a boolean"],
+  ];
+  for (const [name, item, message] of cases) {
+    it(`reports ${name}`, () => {
+      expect(messages(inFold(item))).toEqual([`Register(Main) items[0].items[0]: ${message}`]);
+    });
+  }
+
+  it("requires an id and a label", () => {
+    expect(messages(inFold({ type: "multiselect", options: ["a"] }))).toEqual([
+      "Register(Main) items[0].items[0]: requires .id",
+      "Register(Main) items[0].items[0]: requires .label",
+    ]);
+  });
+
+  it("rejects a multiselect in a row, naming the allowed list, and at the top of a section", () => {
+    const doc = widgetDoc([{ type: "row", items: [multiselect] }]);
+    expect(messages(doc)).toEqual([
+      "Register(Main) items[0].items[0]: unsupported row child type 'multiselect' (button|checkbox|label|number|progress|slider|stepper|textinput)",
+    ]);
+    expect(messages(widgetDoc([multiselect]))).toEqual([]);
+  });
+});
+
 describe("validateDocument for the Init options the library reads", () => {
   function withInit(patch: Record<string, unknown>) {
     const doc = emptyDocument();

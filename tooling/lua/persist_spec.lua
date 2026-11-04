@@ -280,3 +280,48 @@ Persist.Apply({ values = { ["Sec.count"] = 9 } }, stepperState)
 assert_eq("Apply restores a stepper value", stepperState.values["Sec.count"], 9)
 Persist.Apply({ values = { ["Sec.count"] = "3" } }, stepperState)
 assert_eq("Apply ignores a stepper value that is not a number", stepperState.values["Sec.count"], 9)
+
+-- A multiselect value is an array of option values. It is saved as an array, and restored only when
+-- every entry is a string that is still an option, so a stale or hand-edited file cannot check a ghost.
+local function MultiState()
+    local state = NewState("right", "A")
+    state.sections = {
+        {
+            id = "Sec",
+            items = {
+                { type = "fold", id = "more", label = "More", items = {
+                    { type = "multiselect", id = "tags", label = "Tags", options = { "a", "b", { label = "Cee", value = "c" } } },
+                } },
+            },
+        },
+    }
+    return state
+end
+local multiState = MultiState()
+multiState.values["Sec.tags"] = { "a", "c" }
+local multiSnap = Persist.Snapshot(multiState)
+assert_eq("Snapshot stores a multiselect array", multiSnap.values["Sec.tags"], { "a", "c" })
+assert_true("a snapshot with a multiselect array is JSON-safe", Json.IsSafe(multiSnap))
+local multiBack = MultiState()
+Persist.Apply(Json.DecodeObject(Json.Encode(multiSnap)), multiBack)
+assert_eq("a multiselect array survives a JSON round trip", multiBack.values["Sec.tags"], { "a", "c" })
+local multiGhost = MultiState()
+Persist.Apply({ values = { ["Sec.tags"] = { "a", "gone" } } }, multiGhost)
+assert_eq("Apply ignores a multiselect array holding an entry that is not an option", multiGhost.values["Sec.tags"], nil)
+local multiNotArray = MultiState()
+Persist.Apply({ values = { ["Sec.tags"] = "a" } }, multiNotArray)
+assert_eq("Apply ignores a multiselect value that is not an array", multiNotArray.values["Sec.tags"], nil)
+local multiNumbers = MultiState()
+Persist.Apply({ values = { ["Sec.tags"] = { 1, 2 } } }, multiNumbers)
+assert_eq("Apply ignores a multiselect array of non-strings", multiNumbers.values["Sec.tags"], nil)
+local multiEmpty = MultiState()
+multiEmpty.values["Sec.tags"] = {}
+Persist.Apply(Persist.Snapshot(multiEmpty), multiEmpty)
+assert_eq("an empty multiselect array is saved and restored", multiEmpty.values["Sec.tags"], {})
+local multiMapLike = MultiState()
+Persist.Apply({ values = { ["Sec.tags"] = { x = "a" } } }, multiMapLike)
+assert_eq("Apply ignores a multiselect table that is not a sequence", multiMapLike.values["Sec.tags"], nil)
+multiState.values["Sec.tags"] = "a"
+assert_eq("Snapshot drops a multiselect value that is not an array", Persist.Snapshot(multiState).values["Sec.tags"], nil)
+multiState.values["Sec.tags"] = { "a", {} }
+assert_eq("Snapshot drops a multiselect array holding a non-scalar", Persist.Snapshot(multiState).values["Sec.tags"], nil)
