@@ -340,6 +340,7 @@ function Dropdown.build(ctx)
     umg.StyleText(caption, ctx.config.fontHint)
     umg.SetLabelText(caption, item.label)
     ctx.contentBox:AddChildToVerticalBox(caption)
+    umg.RecordNode(ctx, caption)
 
     local root, picker = CreatePicker(ctx.contentBox, ctx.namePrefix, item.options, current, {
         searchable = item.searchable == true,
@@ -351,7 +352,8 @@ function Dropdown.build(ctx)
 
     ctx.values[vkey] = picker.selectedValue
     ctx.contentBox:AddChildToVerticalBox(root)
-    umg.AddSpacer(ctx.contentBox, ctx.namePrefix .. "_Pad", 8)
+    umg.RecordNode(ctx, root)
+    umg.RecordNode(ctx, umg.AddSpacer(ctx.contentBox, ctx.namePrefix .. "_Pad", 8))
 
     table.insert(ctx.liveControls, Dropdown.liveControl(picker, {
         sectionId = ctx.section.id,

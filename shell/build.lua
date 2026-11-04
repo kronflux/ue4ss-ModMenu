@@ -5,6 +5,7 @@
 local UEHelpers = require("UEHelpers.UEHelpers")
 local Util = require("ModMenu.core.util")
 local Umg = require("ModMenu.core.umg")
+local ItemState = require("ModMenu.core.itemstate")
 local Theme = require("ModMenu.core.theme")
 local Instance = require("ModMenu.core.instance")
 local InputMode = require("ModMenu.core.inputmode")
@@ -176,6 +177,8 @@ function M.BuildContent(S)
             ctx.namePrefix = namePrefix
             local firstNew = #S.liveControls + 1
             widget.build(ctx)
+            -- A disabled or hidden item, or one inside a disabled or hidden row or fold, is dimmed or collapsed now.
+            ItemState.ApplyItems(S, { item }, true)
             -- Every control this build added is attached, which includes the children of a row or fold.
             for c = firstNew, #S.liveControls do
                 Tooltip.Attach(S, S.liveControls[c])

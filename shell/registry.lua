@@ -8,6 +8,7 @@ local Input = require("ModMenu.core.input")
 local Options = require("ModMenu.core.options")
 local Tooltip = require("ModMenu.core.tooltip")
 local Persist = require("ModMenu.core.persist")
+local ItemState = require("ModMenu.core.itemstate")
 local Widgets = require("ModMenu.widgets.init")
 local Session = require("ModMenu.shell.session")
 local Build = require("ModMenu.shell.build")
@@ -26,11 +27,12 @@ local Button = Widgets.get("button")
 
 local M = {}
 
---- Check the tooltip field of an item and of the children of a row or fold, at any depth.
---- The registry does this for every type, because tooltip is common to all of them.
+--- Check the tooltip, enabled and visible fields of an item and of the children of a row or fold, at any depth.
+--- The registry does this for every type, because those fields are common to all of them.
 --- A child that is not a table is skipped here, so the row or fold validate reports it in its own words.
 local function ValidateTooltips(item, prefix)
     Tooltip.Validate(item, prefix)
+    ItemState.Validate(item, prefix)
     if (item.type == "row" or item.type == "fold") and type(item.items) == "table" then
         for i, child in ipairs(item.items) do
             if type(child) == "table" then
@@ -326,19 +328,42 @@ local function SyncLiveButton(S, sectionId, itemId)
     end
 end
 
-function M.SetButtonEnabled(S, sectionId, itemId, enabled)
+--- Set one common flag of an item and apply the section's effective states in place, with no rebuild.
+--- A parent's state reaches its children, so the whole section tree is applied.
+---@param field string "enabled" or "visible"
+---@return boolean found false when the section or the item is not registered
+local function SetItemFlag(S, sectionId, itemId, field, value)
+    -- A nil id would match the first item that has no id, such as a separator.
+    if itemId == nil then
+        return false
+    end
     local idx = S.sectionIndexById[sectionId]
     if not idx then
         return false
     end
     local section = S.sections[idx]
-    local item = FindItemById(section.items, itemId, "button")
+    local item = FindItemById(section.items, itemId, nil)
     if not item then
         return false
     end
-    item.enabled = enabled and true or false
-    SyncLiveButton(S, sectionId, itemId)
+    item[field] = value and true or false
+    ItemState.ApplyItems(S, section.items, false)
     return true
+end
+
+--- Enable or disable any item. A disabled item draws dim and ignores input; a row or fold passes the flag to its children.
+function M.SetEnabled(S, sectionId, itemId, enabled)
+    return SetItemFlag(S, sectionId, itemId, "enabled", enabled)
+end
+
+--- Show or hide any item. A hidden item takes no space and keeps its value.
+function M.SetVisible(S, sectionId, itemId, visible)
+    return SetItemFlag(S, sectionId, itemId, "visible", visible)
+end
+
+--- Kept so a host that calls it still works; it is SetEnabled for a button.
+function M.SetButtonEnabled(S, sectionId, itemId, enabled)
+    return M.SetEnabled(S, sectionId, itemId, enabled)
 end
 
 function M.SetButtonVariant(S, sectionId, itemId, variant)

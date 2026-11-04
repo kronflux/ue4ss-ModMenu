@@ -82,7 +82,8 @@ function Button.applyChrome(ctrl, ctx)
         return
     end
     local item = ctrl.item
-    local enabled = item.enabled ~= false
+    -- stateDisabled is set by ItemState when this button or a parent row or fold is disabled.
+    local enabled = item.enabled ~= false and ctrl.stateDisabled ~= true
     ctrl.enabled = enabled
     local colors = Theme.Of(ctx and ctx.config)
     local bg, fg = ChromeColors(colors, item)
@@ -103,6 +104,11 @@ function Button.applyChrome(ctrl, ctx)
     if ctrl.labelWidget ~= nil and ctx ~= nil and ctx.umg ~= nil then
         ctx.umg.StyleText(ctrl.labelWidget, ctx.config.fontItem, fg)
     end
+end
+
+--- ItemState calls this when the button's enabled or visible state changed, so the disabled chrome follows.
+function Button.onItemState(ctrl, _enabled, _visible, ctx)
+    Button.applyChrome(ctrl, ctx)
 end
 
 function Button.validate(item, sectionId, index)

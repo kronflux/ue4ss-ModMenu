@@ -260,3 +260,11 @@ Persist._clock = clockBefore
 assert_true("Snapshot is JSON-safe", Json.IsSafe(snap))
 
 RemoveTemp()
+
+-- A hidden item keeps its value and autosave still stores it (AC-17), because visible only changes how the item is drawn.
+local hiddenState = NewState("right", "A")
+hiddenState.sections = {
+    { id = "Sec", items = { { type = "slider", id = "speed", label = "Speed", min = 0, max = 10, visible = false } } },
+}
+hiddenState.values["Sec.speed"] = 7
+assert_eq("Snapshot stores the value of a hidden item", Persist.Snapshot(hiddenState).values["Sec.speed"], 7)

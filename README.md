@@ -371,12 +371,25 @@ Label items need an `id` for this to work.
 
 ```lua
 ModMenu.SetButtonLabel(sectionId, itemId, "Scanning...")
-ModMenu.SetButtonEnabled(sectionId, itemId, false)  -- no clicks + themed disabled chrome
+ModMenu.SetEnabled(sectionId, itemId, false)  -- no clicks + themed disabled chrome
 ModMenu.SetButtonVariant(sectionId, itemId, "danger")  -- default|primary|secondary|success|danger|warning|info
 ModMenu.SetButtonActive(sectionId, itemId, true)     -- selected/on (green)
 ```
 
 Button items need an `id`. Optional Register fields: `enabled = false`, `variant = "primary"|"danger"|…`, `active = true`. Paint order: disabled, then active, then variant. `accent` is accepted as an alias of `primary`.
+
+### Enabled and visible
+
+Every item accepts `enabled` and `visible`, and both default to true.
+
+```lua
+{ type = "slider", id = "speed", label = "Speed", min = 0, max = 10, visible = false }
+
+ModMenu.SetEnabled(sectionId, itemId, false)  -- draws dim, ignores clicks, drags and typing
+ModMenu.SetVisible(sectionId, itemId, false)  -- takes no space; the value is kept and autosave still saves it
+```
+
+Both return `false` when the section or item is not registered. Neither rebuilds the section. A row or fold passes both flags to its children, so a disabled fold disables everything inside it and a hidden fold hides it. `SetButtonEnabled` stays and does the same as `SetEnabled`.
 
 ### Confirm
 

@@ -59,7 +59,9 @@ local function PollControls(S)
     -- pollClick is the LMB-latch fallback. Handlers must SuppressPressEdge so
     -- a latch click is not also treated as an IsPressed rising edge next tick.
     for _, ctrl in ipairs(S.liveControls) do
-        if ctrl.kind == "close" then
+        if ctrl.stateDisabled then
+            -- A disabled item takes no input and shows no hover.
+        elseif ctrl.kind == "close" then
             Close.Poll(S, ctrl)
         elseif ctrl.kind == "collapse" then
             Collapse.Poll(S, ctrl)
@@ -77,7 +79,9 @@ local function PollControls(S)
         -- List order. Dropdown.pollClick does option rows then header.
         local consumed = false
         for _, ctrl in ipairs(S.liveControls) do
-            if ctrl.kind == "close" then
+            if ctrl.stateDisabled then
+                -- A disabled item does not claim the click.
+            elseif ctrl.kind == "close" then
                 if Close.PollClick(S, ctrl) then
                     consumed = true
                     break

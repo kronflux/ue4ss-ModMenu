@@ -75,6 +75,9 @@ local function ProbeButtons()
     end
 end
 
+-- Autosave writes through the store, and the store writes Mods/ModMenuLab/config.json once it is initialised.
+pcall(ModMenu.ConfigManager.Init, { id = "ModMenuLab" })
+
 local okInit, initErr = pcall(ModMenu.Init, {
     title = "ModMenuLab",
     instanceId = "ModMenuLab",
@@ -159,6 +162,38 @@ reg({
             { type = "radio", id = "fold_r", label = "fold radio", options = { "x", "y" }, default = "x", onChange = report("fold_r") },
             { type = "keybind", id = "fold_k", label = "fold key", default = "F9", onChange = report("fold_k") },
         } },
+    },
+})
+
+-- enabled and visible: each toggle button flips one flag and logs the new value.
+local labState = { targetEnabled = true, sliderVisible = false, foldEnabled = true, foldVisible = true }
+local function toggle(key, apply, sectionId, itemId)
+    return function()
+        labState[key] = not labState[key]
+        local found = apply(sectionId, itemId, labState[key])
+        say(string.format("%s -> %s found=%s", key, tostring(labState[key]), tostring(found)))
+    end
+end
+
+reg({
+    id = "LabState", title = "Enabled and visible", tab = "Layout",
+    items = {
+        { type = "button", id = "t_target", label = "Target button", onClick = report("t_target") },
+        { type = "button", id = "t_toggleEnabled", label = "Toggle target enabled", variant = "info",
+          onClick = toggle("targetEnabled", ModMenu.SetEnabled, "LabState", "t_target") },
+        { type = "slider", id = "t_slider", label = "Hidden slider", min = 0, max = 10, step = 1, default = 3,
+          integer = true, visible = false, onChange = report("t_slider") },
+        { type = "button", id = "t_toggleVisible", label = "Toggle slider visible", variant = "info",
+          onClick = toggle("sliderVisible", ModMenu.SetVisible, "LabState", "t_slider") },
+        { type = "fold", id = "t_fold", label = "State fold", collapsed = false, items = {
+            { type = "button", id = "t_inner", label = "Inner button", onClick = report("t_inner") },
+            { type = "slider", id = "t_innerSlider", label = "Inner slider", min = 0, max = 10, step = 1, default = 5,
+              integer = true, onChange = report("t_innerSlider") },
+        } },
+        { type = "button", id = "t_toggleFoldEnabled", label = "Toggle fold enabled", variant = "info",
+          onClick = toggle("foldEnabled", ModMenu.SetEnabled, "LabState", "t_fold") },
+        { type = "button", id = "t_toggleFoldVisible", label = "Toggle fold visible", variant = "info",
+          onClick = toggle("foldVisible", ModMenu.SetVisible, "LabState", "t_fold") },
     },
 })
 

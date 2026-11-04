@@ -598,4 +598,16 @@ function M.ArmClick(state, widget)
     return true, false
 end
 
+--- Drop a press in progress, so a control that stops polling mid-press, such as one the host
+--- disables, cannot fire the stale press when it polls again.
+---@param state table the control's own table, as passed to ReleaseClick and ArmClick
+function M.ClearPress(state)
+    if state == nil then
+        return
+    end
+    state.holding = false
+    state.armed = false
+    state.armTicks = nil
+end
+
 return M

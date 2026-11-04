@@ -181,6 +181,23 @@ function M.FillVerticalSlot(slot)
     end)
 end
 
+--- Remember a widget a build added for ctx.item, in ctx.nodes, so SetVisible and SetEnabled can reach it
+--- later without a rebuild. A context with no nodes table records nothing.
+---@param ctx table
+---@param widget any
+function M.RecordNode(ctx, widget)
+    local nodes = ctx.nodes
+    if nodes == nil or ctx.item == nil or widget == nil then
+        return
+    end
+    local list = nodes[ctx.item]
+    if list == nil then
+        list = {}
+        nodes[ctx.item] = list
+    end
+    list[#list + 1] = widget
+end
+
 function M.AddSpacer(parent, name, height)
     local spacer = M.Construct("/Script/UMG.Spacer", parent, name)
     pcall(function()
@@ -219,6 +236,7 @@ function M.AddToContent(ctx, widget, opts)
             M.FillVerticalSlot(slot)
         end
     end
+    M.RecordNode(ctx, widget)
     return slot
 end
 
@@ -227,7 +245,9 @@ function M.AddItemPad(ctx, name, size)
     if ctx.layout == "horizontal" then
         return nil
     end
-    return M.AddSpacer(ctx.contentBox, name, size or 8)
+    local spacer = M.AddSpacer(ctx.contentBox, name, size or 8)
+    M.RecordNode(ctx, spacer)
+    return spacer
 end
 
 --- Style an EditableTextBox from theme field tokens.

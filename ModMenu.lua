@@ -129,6 +129,8 @@ S.makeWidgetCtx = function()
         liveControls = S.liveControls,
         -- The keybind widget checks conflicts against this shell's registered sections, including ones on a tab that is not built.
         sections = S.sections,
+        -- The widgets a build adds for each item, so SetEnabled and SetVisible can reach them later.
+        nodes = S.itemNodes,
         config = S.config,
         umg = Umg,
         Input = Input,
@@ -308,7 +310,27 @@ function ModMenu.SetButtonLabel(sectionId, itemId, text)
     return Registry.SetButtonLabel(S, sectionId, itemId, text)
 end
 
---- Enable/disable a button (blocks poll clicks + themed disabled chrome).
+--- Enable or disable any item. A disabled item draws dim and ignores input, and a disabled row or fold
+--- disables its children. The change is made in place, with no rebuild.
+---@param sectionId string
+---@param itemId string
+---@param enabled boolean
+---@return boolean found false when the section or item is not registered
+function ModMenu.SetEnabled(sectionId, itemId, enabled)
+    return Registry.SetEnabled(S, sectionId, itemId, enabled)
+end
+
+--- Show or hide any item. A hidden item takes no space and keeps its value, and a hidden row or fold
+--- hides its children. The change is made in place, with no rebuild.
+---@param sectionId string
+---@param itemId string
+---@param visible boolean
+---@return boolean found false when the section or item is not registered
+function ModMenu.SetVisible(sectionId, itemId, visible)
+    return Registry.SetVisible(S, sectionId, itemId, visible)
+end
+
+--- Enable/disable a button. This is SetEnabled, kept so existing hosts still work.
 ---@param sectionId string
 ---@param itemId string
 ---@param enabled boolean

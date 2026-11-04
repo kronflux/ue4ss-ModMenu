@@ -45,7 +45,8 @@ function Label.apply(ctrl, text, ctx)
         ctx.umg.SetLabelText(ctrl.widget, s)
     end
     local empty = s:match("^%s*$") ~= nil
-    local vis = empty and VIS_COLLAPSED or VIS_VISIBLE
+    -- A hidden label stays collapsed when its text changes; ItemState shows it again.
+    local vis = (empty or ctrl.stateHidden) and VIS_COLLAPSED or VIS_VISIBLE
     pcall(function()
         if ctrl.widget ~= nil then
             ctrl.widget:SetVisibility(vis)
@@ -54,6 +55,13 @@ function Label.apply(ctrl, text, ctx)
             ctrl.pad:SetVisibility(vis)
         end
     end)
+end
+
+--- ItemState calls this after the label's state changed. A shown label with empty text stays collapsed.
+function Label.onItemState(ctrl, _enabled, visible, ctx)
+    if visible then
+        Label.apply(ctrl, ctrl.item.label, ctx)
+    end
 end
 
 return Label

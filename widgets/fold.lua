@@ -217,6 +217,13 @@ local function Toggle(ctrl, ctx)
     ctx.ReclaimMenuInput()
 end
 
+--- ItemState calls this after the fold's state changed. A shown fold keeps its body folded or open as it was.
+function Fold.onItemState(ctrl, _enabled, visible)
+    if visible then
+        SetBodyVisible(ctrl, ctrl.collapsed)
+    end
+end
+
 function Fold.poll(ctrl, ctx)
     ctx.umg.TrackPointer(ctrl)
     if ctx.Input.ReleaseClick(ctrl, ctrl.widget) then

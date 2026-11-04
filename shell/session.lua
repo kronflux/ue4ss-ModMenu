@@ -31,6 +31,8 @@ function M.New(opts)
         pollFn = nil, ---@type function|nil strong ref for LoopInGameThreadWithDelay
         hooksInstalled = false,
         liveControls = {},
+        -- The widgets each item's build added to the panel, keyed by the item table; see core/itemstate.lua.
+        itemNodes = {},
         contentDirty = false, --- rebuild on next Open after Register/SetOptions while closed
         collapsedById = {}, ---@type table<string, boolean>
         foldCollapsedByKey = {}, ---@type table<string, boolean> "sectionId.foldId"
@@ -90,6 +92,10 @@ function M.ClearLive(S)
     local list = S.liveControls
     for i = #list, 1, -1 do
         list[i] = nil
+    end
+    -- The nodes belong to the tree that was just dropped, so they go with the controls.
+    for item in pairs(S.itemNodes) do
+        S.itemNodes[item] = nil
     end
 end
 

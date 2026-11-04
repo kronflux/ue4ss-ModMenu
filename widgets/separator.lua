@@ -10,7 +10,7 @@ function Separator.validate(_item, _sectionId, _index)
 end
 
 function Separator.build(ctx)
-    ctx.umg.AddSpacer(ctx.contentBox, ctx.namePrefix .. "_Sep", 14)
+    ctx.umg.RecordNode(ctx, ctx.umg.AddSpacer(ctx.contentBox, ctx.namePrefix .. "_Sep", 14))
 end
 
 return Separator
