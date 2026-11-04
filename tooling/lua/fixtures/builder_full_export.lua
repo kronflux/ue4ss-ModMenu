@@ -211,6 +211,17 @@ ModMenu.Register({
             end,
         },
         {
+            type = "progress",
+            id = "prg",
+            label = "Progress",
+            enabled = false,
+            default = 50,
+            min = 0,
+            max = 200,
+            format = "%d of 200",
+            variant = "success",
+        },
+        {
             type = "row",
             tooltip = "Row tip",
             enabled = false,
@@ -270,6 +281,13 @@ ModMenu.Register({
                         -- TODO: game call
                         -- local value = ModMenu.Get("All", "rowStp")
                     end,
+                },
+                {
+                    type = "progress",
+                    id = "rowPrg",
+                    label = "Row progress",
+                    max = 5,
+                    variant = "danger",
                 },
                 {
                     type = "label",
@@ -365,6 +383,13 @@ ModMenu.Register({
                         -- TODO: game call
                         -- local value = ModMenu.Get("All", "foldStp")
                     end,
+                },
+                {
+                    type = "progress",
+                    id = "foldPrg",
+                    label = "Fold progress",
+                    tooltip = "Fold progress tip",
+                    default = 0.25,
                 },
                 { type = "separator" },
                 {

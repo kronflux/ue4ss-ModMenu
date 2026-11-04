@@ -11,6 +11,7 @@ import type {
   RadioItem,
   Section,
   SliderItem,
+  ProgressItem,
   StepperItem,
   TextInputItem,
 } from "../schema";
@@ -273,6 +274,16 @@ function emitItem(item: Item, sectionId: string, level: number): string {
     for (const stub of stubOnChange(sectionId, stepper.id, "value")) {
       lines.push(`${inner}${stub}`);
     }
+  } else if (item.type === "progress") {
+    // A progress bar has no input, so no onChange stub is written. A default variant is left out, as a button's is.
+    const progress = item as ProgressItem;
+    emitFieldLines(lines, inner, [
+      ["default", numberField(progress.default)],
+      ["min", numberField(progress.min)],
+      ["max", numberField(progress.max)],
+      ["format", progress.format !== undefined ? luaString(progress.format) : undefined],
+      ["variant", progress.variant && progress.variant !== "default" ? luaString(progress.variant) : undefined],
+    ]);
   } else if (item.type === "radio") {
     const radio = item as RadioItem;
     lines.push(`${inner}options = ${emitOptions(radio.options, level + 1)},`);

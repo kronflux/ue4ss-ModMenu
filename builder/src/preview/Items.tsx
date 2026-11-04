@@ -7,6 +7,7 @@ import type {
   Item,
   KeybindItem,
   NumberItem,
+  ProgressItem,
   RadioItem,
   RowItem,
   SliderItem,
@@ -241,6 +242,32 @@ function MmStepper({ item }: { item: StepperItem }) {
   );
 }
 
+// The bar shows the value the runtime seeds a progress item with: the default or else min, kept inside the range.
+// Without a format the readout is the percent of the range. A format goes through the slider's formatter, which
+// shows the plain number for a format string it cannot apply, where the runtime would fall back to the percent.
+function MmProgress({ item }: { item: ProgressItem }) {
+  const low = item.min ?? 0;
+  const high = item.max ?? 1;
+  const value = Math.min(high, Math.max(low, item.default ?? low));
+  const span = high - low;
+  const fraction = span > 0 ? (value - low) / span : 0;
+  const text =
+    item.format !== undefined
+      ? sliderText(value, { ...item, min: low, max: high } as unknown as SliderItem)
+      : `${Math.round(fraction * 100)}%`;
+  // The default variant and an unset one use the accent, as the runtime does.
+  const fill = item.variant && item.variant !== "default" ? buttonChrome({ variant: item.variant }).background : undefined;
+  return (
+    <div className="mm-progress">
+      <span className="mm-progress-label">{item.label}</span>
+      <span className="mm-progress-bar">
+        <span className="mm-progress-fill" style={{ width: `${fraction * 100}%`, background: fill }} />
+      </span>
+      <span className="mm-progress-readout">{text}</span>
+    </div>
+  );
+}
+
 function MmRadio({ item, inline }: { item: RadioItem; inline: boolean }) {
   const list = normalizeOptions(item.options);
   const chosen = item.default ?? null;
@@ -418,6 +445,9 @@ function PreviewItemBody({ item, sectionId, actions, index, layout = "vertical" 
   }
   if (item.type === "stepper") {
     return <MmStepper item={item} />;
+  }
+  if (item.type === "progress") {
+    return <MmProgress item={item} />;
   }
   if (item.type === "radio") {
     return <MmRadio item={item} inline={item.inline === true} />;

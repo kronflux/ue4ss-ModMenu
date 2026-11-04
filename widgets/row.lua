@@ -2,7 +2,7 @@
   ModMenu widget: row (horizontal group of child items)
 
   Children share one HorizontalBox. Supported child types:
-    button | checkbox | label | number | slider | stepper | textinput
+    button | checkbox | label | number | progress | slider | stepper | textinput
   Nested row / dropdown / radio / keybind / separator are rejected at validate time.
 ]]
 
@@ -18,6 +18,7 @@ local ALLOWED = {
     checkbox = true,
     label = true,
     number = true,
+    progress = true,
     slider = true,
     stepper = true,
     textinput = true,
@@ -48,7 +49,7 @@ function Row.validate(item, sectionId, index)
         local t = child.type
         if not ALLOWED[t] then
             error(childPrefix .. " unsupported row child type '" .. tostring(t)
-                .. "' (button|checkbox|label|number|slider|stepper|textinput)")
+                .. "' (button|checkbox|label|number|progress|slider|stepper|textinput)")
         end
         local widget = reg.get(t)
         if not widget then

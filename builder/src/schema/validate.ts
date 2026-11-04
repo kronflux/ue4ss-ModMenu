@@ -26,6 +26,7 @@ import type {
   RowItem,
   Section,
   SliderItem,
+  ProgressItem,
   StepperItem,
   TextInputItem,
 } from "./types";
@@ -237,6 +238,31 @@ function validateStepper(path: string, item: StepperItem, issues: Issue[]) {
   }
 }
 
+// The rules and messages follow Progress.validate in widgets/progress.lua. A missing min counts as 0
+// and a missing max as 1, so a min of 2 alone is an inverted range, as it is in the library.
+function validateProgress(path: string, item: ProgressItem, issues: Issue[]) {
+  requireId(path, item.id, issues);
+  requireLabel(path, item.label, issues);
+  if (item.min !== undefined && typeof item.min !== "number") {
+    issues.push(issue(path, "min must be a number"));
+  }
+  if (item.max !== undefined && typeof item.max !== "number") {
+    issues.push(issue(path, "max must be a number"));
+  }
+  const low = item.min ?? 0;
+  const high = item.max ?? 1;
+  if (typeof low === "number" && typeof high === "number" && low >= high) {
+    issues.push(issue(path, "min must be less than max"));
+  }
+  if (item.default !== undefined && typeof item.default !== "number") {
+    issues.push(issue(path, "default must be numeric"));
+  }
+  if (item.format !== undefined && typeof item.format !== "string") {
+    issues.push(issue(path, "format must be a string or a function"));
+  }
+  checkVariant(path, "variant", item.variant, issues);
+}
+
 // This returns the option values the same way core/options.lua normalizes them: a string is its
 // own value, and a table's value falls back to its label. A bad option is reported and skipped.
 function radioValues(path: string, options: unknown[], issues: Issue[]): string[] {
@@ -380,6 +406,10 @@ function validateItem(path: string, item: unknown, issues: Issue[]) {
     validateStepper(path, item as StepperItem, issues);
     return;
   }
+  if (typeName === "progress") {
+    validateProgress(path, item as ProgressItem, issues);
+    return;
+  }
   if (typeName === "row") {
     validateRow(path, item as RowItem, issues);
     return;
@@ -403,7 +433,7 @@ function validateRow(path: string, item: RowItem, issues: Issue[]) {
     }
     const t = child.type;
     if (typeof t !== "string" || !ROW_CHILD_TYPES.has(t as never)) {
-      issues.push(issue(childPath, `unsupported row child type '${String(t)}' (button|checkbox|label|number|slider|stepper|textinput)`));
+      issues.push(issue(childPath, `unsupported row child type '${String(t)}' (button|checkbox|label|number|progress|slider|stepper|textinput)`));
       continue;
     }
     validateItem(childPath, child, issues);

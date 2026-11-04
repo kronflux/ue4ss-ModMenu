@@ -336,6 +336,10 @@ export function createItem(type: ItemType, section: Section): Item {
     const label = "Quantity";
     return { type: "stepper", id: take("stepper", label), label, min: 0, max: 10, default: 1, step: 1, integer: true };
   }
+  if (type === "progress") {
+    const label = "Progress";
+    return { type: "progress", id: take("progress", label), label, min: 0, max: 1, default: 0.5 };
+  }
   if (type === "row") {
     return {
       type: "row",

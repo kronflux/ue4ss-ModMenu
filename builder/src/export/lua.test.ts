@@ -126,6 +126,33 @@ describe("printLua for slider, radio, keybind and tooltip", () => {
     }
   });
 
+  it("exports a progress bar with its range, format and variant, and no onChange stub", () => {
+    const lua = widgetLua([
+      { type: "progress", id: "load", label: "Load", min: 0, max: 100, default: 25, format: "%d of 100", variant: "success" },
+    ]);
+    expect(lua).toContain('type = "progress",');
+    expect(lua).toContain('id = "load",');
+    expect(lua).toContain("default = 25,");
+    expect(lua).toContain("min = 0,");
+    expect(lua).toContain("max = 100,");
+    expect(lua).toContain('format = "%d of 100",');
+    expect(lua).toContain('variant = "success",');
+    expect(lua).not.toContain("onChange");
+  });
+
+  it("writes only the progress fields that are set", () => {
+    const lua = widgetLua([{ type: "progress", id: "bare", label: "Bare" }]);
+    expect(lua).toContain('type = "progress",');
+    for (const field of ["default =", "min =", "max =", "format =", "variant ="]) {
+      expect(lua).not.toContain(field);
+    }
+  });
+
+  it("leaves out a default variant, as a button does", () => {
+    const lua = widgetLua([{ type: "progress", id: "p", label: "P", variant: "default" }]);
+    expect(lua).not.toContain("variant =");
+  });
+
   it("exports tooltip on a plain item, a separator and a fold child", () => {
     const lua = widgetLua([
       { type: "button", id: "go", label: "Go", tooltip: 'Runs "it"' },

@@ -431,6 +431,37 @@
   color: var(--mm-text-muted);
 }
 
+/* The progress bar matches widgets/progress.lua: the label takes the free width, then a 200 px by
+   14 px bar and a 56 px right-aligned readout, each after an 8 px gap. */
+.mm-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--mm-font-item);
+}
+
+.mm-progress-label {
+  flex: 1;
+  color: var(--mm-text-primary);
+}
+
+.mm-progress-bar {
+  display: flex;
+  flex: 0 0 200px;
+  height: 14px;
+  background: var(--mm-button-bg);
+}
+
+.mm-progress-fill {
+  background: var(--mm-button-bg-primary);
+}
+
+.mm-progress-readout {
+  flex: 0 0 56px;
+  text-align: right;
+  color: var(--mm-text-muted);
+}
+
 .mm-radio {
   display: flex;
   flex-direction: column;

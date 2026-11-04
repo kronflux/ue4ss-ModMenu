@@ -250,9 +250,35 @@ function M.Set(S, sectionId, itemId, value)
             return
         end
     end
+    -- A progress value is clamped to its range here, so Set and SetValue store the same number.
+    local progressItem = FindTypedItem(S, sectionId, itemId, "progress")
+    if progressItem then
+        value = Widgets.get("progress")._coerce(value, progressItem)
+        if value == nil then
+            return
+        end
+    end
     S.values[vkey] = value
     ApplyLive(S, vkey, value)
     Session.NoteChange(S)
+end
+
+--- Move a progress bar. The value is clamped to the bar's range and the bar changes in place.
+--- A progress value is not saved, so this does not mark the settings as changed.
+---@return boolean found false when the item is not a registered progress bar or the value is not a number
+function M.SetValue(S, sectionId, itemId, value)
+    local item = FindTypedItem(S, sectionId, itemId, "progress")
+    if not item then
+        return false
+    end
+    local n = Widgets.get("progress")._coerce(value, item)
+    if n == nil then
+        return false
+    end
+    local vkey = ValueKey(sectionId, itemId)
+    S.values[vkey] = n
+    ApplyLive(S, vkey, n)
+    return true
 end
 
 --- Write a saved snapshot over the sections registered so far, then seed them again.
@@ -280,11 +306,25 @@ function M.SetLabel(S, sectionId, itemId, text)
     end
     local section = S.sections[idx]
     local item = FindItemById(section.items, itemId, "label")
+    local isProgress = false
+    if not item then
+        -- A progress bar has a label too, and one name changes both, so a host learns one call.
+        item = FindItemById(section.items, itemId, "progress")
+        isProgress = item ~= nil
+    end
     if not item then
         return false
     end
     item.label = tostring(text)
     local vkey = ValueKey(sectionId, itemId)
+    if isProgress then
+        for _, ctrl in ipairs(S.liveControls) do
+            if ctrl.kind == "progress" and ctrl.valueKey == vkey then
+                SetLabelText(ctrl.labelWidget, item.label)
+            end
+        end
+        return true
+    end
     local ctx = S.makeWidgetCtx()
     local labelWidget = Widgets.get("label")
     for _, ctrl in ipairs(S.liveControls) do

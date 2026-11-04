@@ -218,7 +218,7 @@ describe("validateDocument for slider, radio, keybind and tooltip", () => {
   it("accepts a slider in a row and rejects a radio there, naming the allowed list", () => {
     const doc = widgetDoc([{ type: "row", items: [slider, radio] }]);
     expect(messages(doc)).toEqual([
-      "Register(Main) items[0].items[1]: unsupported row child type 'radio' (button|checkbox|label|number|slider|stepper|textinput)",
+      "Register(Main) items[0].items[1]: unsupported row child type 'radio' (button|checkbox|label|number|progress|slider|stepper|textinput)",
     ]);
   });
 
@@ -314,6 +314,47 @@ describe("validateDocument for the stepper", () => {
     const doc = widgetDoc([
       { type: "row", items: [stepper] },
       { type: "fold", id: "f", label: "F", items: [{ ...stepper, id: "inFold" }] },
+    ]);
+    expect(messages(doc)).toEqual([]);
+  });
+});
+
+// The messages follow Progress.validate in widgets/progress.lua. A missing min is 0 and a missing max is 1.
+describe("validateDocument for the progress bar", () => {
+  const progress = { type: "progress", id: "load", label: "Load", min: 0, max: 100, default: 25, format: "%d%%", variant: "success" };
+
+  it("accepts a full progress item and a bare one", () => {
+    expect(messages(widgetDoc([progress, { type: "progress", id: "bare", label: "Bare" }]))).toEqual([]);
+  });
+
+  const cases: Array<[string, unknown, string]> = [
+    ["min", { ...progress, min: "a" }, "min must be a number"],
+    ["max", { ...progress, max: "a" }, "max must be a number"],
+    ["an equal min and max", { ...progress, min: 3, max: 3 }, "min must be less than max"],
+    ["an inverted range", { ...progress, min: 9, max: 1 }, "min must be less than max"],
+    ["a min that is not below the default max of 1", { type: "progress", id: "p", label: "P", min: 2 }, "min must be less than max"],
+    ["a default that is not numeric", { ...progress, default: "loud" }, "default must be numeric"],
+    ["format", { ...progress, format: 3 }, "format must be a string or a function"],
+    ["variant", { ...progress, variant: "loud" }, "variant must be default|primary|secondary|success|danger|warning|info"],
+    ["enabled", { ...progress, enabled: "no" }, "enabled must be a boolean"],
+  ];
+  for (const [name, item, message] of cases) {
+    it(`reports ${name}`, () => {
+      expect(messages(widgetDoc([item]))).toEqual([`Register(Main) items[0]: ${message}`]);
+    });
+  }
+
+  it("requires an id and a label", () => {
+    expect(messages(widgetDoc([{ type: "progress" }]))).toEqual([
+      "Register(Main) items[0]: requires .id",
+      "Register(Main) items[0]: requires .label",
+    ]);
+  });
+
+  it("accepts a progress item in a row and in a fold", () => {
+    const doc = widgetDoc([
+      { type: "row", items: [progress] },
+      { type: "fold", id: "f", label: "F", items: [{ ...progress, id: "inFold" }] },
     ]);
     expect(messages(doc)).toEqual([]);
   });

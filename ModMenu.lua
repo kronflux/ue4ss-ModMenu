@@ -293,6 +293,7 @@ function ModMenu.Get(sectionId, itemId)
 end
 
 --- Update a label item's text (by id) in the section + live widget if present.
+--- A progress item takes its caption from the same call.
 ---@param sectionId string
 ---@param itemId string
 ---@param text string
@@ -363,6 +364,16 @@ end
 ---@param value any
 function ModMenu.Set(sectionId, itemId, value)
     Registry.Set(S, sectionId, itemId, value)
+end
+
+--- Move a progress bar. The value is clamped to the bar's min and max, and the bar and its readout
+--- change in place, with no rebuild. The value is not saved with the player's settings.
+---@param sectionId string
+---@param itemId string
+---@param value number
+---@return boolean found false when the item is not a registered progress item or the value is not a number
+function ModMenu.SetValue(sectionId, itemId, value)
+    return Registry.SetValue(S, sectionId, itemId, value)
 end
 
 --- Replace dropdown options.

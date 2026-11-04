@@ -27,6 +27,7 @@ export type ItemType =
   | "radio"
   | "keybind"
   | "stepper"
+  | "progress"
   | "row"
   | "fold";
 
@@ -168,7 +169,29 @@ export type StepperItem = ItemCommon & {
   format?: string;
 };
 
-export type RowChild = ButtonItem | CheckboxItem | LabelItem | NumberItem | SliderItem | StepperItem | TextInputItem;
+// A progress bar is a label, a bar and a readout. It has no input and no onChange, and the host
+// moves it with ModMenu.SetValue, so it is not saved. The range is min 0 to max 1 unless set. Without
+// a format the readout shows the percent of the range. The variant picks the fill colour.
+export type ProgressItem = ItemCommon & {
+  type: "progress";
+  id: string;
+  label: string;
+  min?: number;
+  max?: number;
+  default?: number;
+  format?: string;
+  variant?: ButtonVariant;
+};
+
+export type RowChild =
+  | ButtonItem
+  | CheckboxItem
+  | LabelItem
+  | NumberItem
+  | ProgressItem
+  | SliderItem
+  | StepperItem
+  | TextInputItem;
 
 export type RowItem = ItemCommon & { type: "row"; items: RowChild[] };
 
@@ -179,6 +202,7 @@ export type FoldChild =
   | KeybindItem
   | LabelItem
   | NumberItem
+  | ProgressItem
   | RadioItem
   | RowItem
   | SeparatorItem
@@ -206,6 +230,7 @@ export type Item =
   | RadioItem
   | KeybindItem
   | StepperItem
+  | ProgressItem
   | RowItem
   | FoldItem;
 
@@ -262,6 +287,7 @@ export const ROW_CHILD_TYPES: ReadonlySet<ItemType> = new Set([
   "checkbox",
   "label",
   "number",
+  "progress",
   "slider",
   "stepper",
   "textinput",
@@ -275,6 +301,7 @@ export const FOLD_CHILD_TYPES: ReadonlySet<ItemType> = new Set([
   "keybind",
   "label",
   "number",
+  "progress",
   "radio",
   "row",
   "separator",
@@ -310,6 +337,7 @@ export const ITEM_TYPES: ReadonlySet<string> = new Set([
   "radio",
   "keybind",
   "stepper",
+  "progress",
   "row",
   "fold",
 ]);

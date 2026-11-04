@@ -21,6 +21,7 @@ export type {
   Section,
   SeparatorItem,
   SliderItem,
+  ProgressItem,
   StepperItem,
   TextInputItem,
   ThemeName,

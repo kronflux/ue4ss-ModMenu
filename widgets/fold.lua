@@ -28,6 +28,7 @@ local ALLOWED = {
     keybind = true,
     label = true,
     number = true,
+    progress = true,
     radio = true,
     row = true,
     separator = true,

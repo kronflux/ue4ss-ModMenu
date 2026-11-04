@@ -148,6 +148,17 @@ export function fullDocument(): MenuDocument {
             enabled: false,
           },
           {
+            type: "progress",
+            id: "prg",
+            label: "Progress",
+            min: 0,
+            max: 200,
+            default: 50,
+            format: "%d of 200",
+            variant: "success",
+            enabled: false,
+          },
+          {
             type: "row",
             enabled: false,
             visible: true,
@@ -158,6 +169,7 @@ export function fullDocument(): MenuDocument {
               { type: "number", id: "rowNum", label: "Row number", step: 2, prefix: "#", suffix: "x" },
               { type: "slider", id: "rowSld", label: "Row slider", min: 0, max: 5, showValue: false },
               { type: "stepper", id: "rowStp", label: "Row stepper", min: 0, max: 5, step: 0.5 },
+              { type: "progress", id: "rowPrg", label: "Row progress", max: 5, variant: "danger" },
               { type: "label", id: "rowLbl", label: "Row label", align: "right", style: "warning" },
               { type: "textinput", id: "rowTxt", label: "Row text" },
             ],
@@ -177,6 +189,7 @@ export function fullDocument(): MenuDocument {
               { type: "keybind", id: "foldKey", label: "Fold key", default: "F9" },
               { type: "slider", id: "foldSld", label: "Fold slider", min: 0, max: 9, labelWidth: 60 },
               { type: "stepper", id: "foldStp", label: "Fold stepper", max: 3, tooltip: "Fold stepper tip" },
+              { type: "progress", id: "foldPrg", label: "Fold progress", default: 0.25, tooltip: "Fold progress tip" },
               { type: "separator" },
               {
                 type: "row",

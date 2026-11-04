@@ -10,6 +10,7 @@ import type {
   KeybindItem,
   MenuDocument,
   NumberItem,
+  ProgressItem,
   RadioItem,
   Section,
   SliderItem,
@@ -307,7 +308,7 @@ function ItemFields({
     return <p className="ed-muted">No fields.</p>;
   }
   if (item.type === "row") {
-    return <p className="ed-muted">Row children are in the outline. Add button, checkbox, label, number, slider, stepper, or text.</p>;
+    return <p className="ed-muted">Row children are in the outline. Add button, checkbox, label, number, progress, slider, stepper, or text.</p>;
   }
   if (item.type === "label") {
     return (
@@ -565,6 +566,37 @@ function ItemFields({
           onChange={(format) => onPatch({ format: format || undefined })}
         />
         <Toggle label="Integer" checked={stepper.integer === true} onChange={(integer) => onPatch({ integer })} />
+      </>
+    );
+  }
+  if (item.type === "progress") {
+    const progress = item as ProgressItem;
+    return (
+      <>
+        <IdField item={progress} section={section} path={path} onPatch={onPatch} />
+        <Text label="Label" value={progress.label} onChange={(label) => onPatch({ label })} />
+        <OptNumber label="Min (blank for 0)" value={progress.min} onChange={(min) => onPatch({ min })} />
+        <OptNumber label="Max (blank for 1)" value={progress.max} onChange={(max) => onPatch({ max })} />
+        <OptNumber label="Default" value={progress.default} onChange={(value) => onPatch({ default: value })} />
+        <Text
+          label="Format (string.format pattern, blank for the percent)"
+          value={progress.format ?? ""}
+          onChange={(format) => onPatch({ format: format || undefined })}
+        />
+        <Field label="Variant">
+          <select
+            value={progress.variant ?? "default"}
+            onChange={(event) => {
+              onPatch({ variant: event.target.value as ButtonVariant });
+            }}
+          >
+            {VARIANTS.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </Field>
       </>
     );
   }
