@@ -37,15 +37,26 @@ export type ConfirmSpec = {
   variant?: ButtonVariant;
 };
 
-// The registry checks tooltip on every item type, so every item shape carries it.
-// The runtime shows the text 400 ms after the pointer starts hovering the item.
-type WithTooltip = { tooltip?: string };
+// The registry checks tooltip, enabled and visible on every item type, so every item shape carries them.
+// The runtime shows the tooltip 400 ms after the pointer starts hovering the item. A disabled item draws
+// dim and ignores input, and a hidden item takes no space but keeps its value.
+type ItemCommon = { tooltip?: string; enabled?: boolean; visible?: boolean };
 
-export type SeparatorItem = WithTooltip & { type: "separator" };
+export type LabelAlign = "left" | "center" | "right";
+export type LabelStyle = "normal" | "muted" | "heading" | "warning";
 
-export type LabelItem = WithTooltip & { type: "label"; id?: string; label: string };
+export type SeparatorItem = ItemCommon & { type: "separator" };
 
-export type ButtonItem = WithTooltip & {
+export type LabelItem = ItemCommon & {
+  type: "label";
+  id?: string;
+  label: string;
+  align?: LabelAlign;
+  wrap?: boolean;
+  style?: LabelStyle;
+};
+
+export type ButtonItem = ItemCommon & {
   type: "button";
   id: string;
   label: string;
@@ -55,14 +66,14 @@ export type ButtonItem = WithTooltip & {
   confirm?: ConfirmSpec;
 };
 
-export type CheckboxItem = WithTooltip & {
+export type CheckboxItem = ItemCommon & {
   type: "checkbox";
   id: string;
   label: string;
   default?: boolean;
 };
 
-export type DropdownItem = WithTooltip & {
+export type DropdownItem = ItemCommon & {
   type: "dropdown";
   id: string;
   label: string;
@@ -75,7 +86,7 @@ export type DropdownItem = WithTooltip & {
   allowEmpty?: boolean;
 };
 
-export type NumberItem = WithTooltip & {
+export type NumberItem = ItemCommon & {
   type: "number";
   id: string;
   label: string;
@@ -87,9 +98,12 @@ export type NumberItem = WithTooltip & {
   fieldWidth?: number;
   labelWidth?: number;
   debounceMs?: number;
+  step?: number;
+  prefix?: string;
+  suffix?: string;
 };
 
-export type TextInputItem = WithTooltip & {
+export type TextInputItem = ItemCommon & {
   type: "textinput";
   id: string;
   label: string;
@@ -103,7 +117,7 @@ export type TextInputItem = WithTooltip & {
 
 // A slider snaps its value to step counted from min, and rounds it when integer is true.
 // The format string goes through Lua's string.format; the document cannot hold a Lua function.
-export type SliderItem = WithTooltip & {
+export type SliderItem = ItemCommon & {
   type: "slider";
   id: string;
   label: string;
@@ -114,10 +128,12 @@ export type SliderItem = WithTooltip & {
   integer?: boolean;
   format?: string;
   live?: boolean;
+  showValue?: boolean;
+  labelWidth?: number;
 };
 
 // Radio options use the dropdown's option shape, and default must be one of the option values.
-export type RadioItem = WithTooltip & {
+export type RadioItem = ItemCommon & {
   type: "radio";
   id: string;
   label: string;
@@ -127,7 +143,7 @@ export type RadioItem = WithTooltip & {
 };
 
 // A keybind value is an FKey name such as "F7" or "LeftControl+F7", and "" means no binding.
-export type KeybindItem = WithTooltip & {
+export type KeybindItem = ItemCommon & {
   type: "keybind";
   id: string;
   label: string;
@@ -137,7 +153,7 @@ export type KeybindItem = WithTooltip & {
 
 export type RowChild = ButtonItem | CheckboxItem | LabelItem | NumberItem | SliderItem | TextInputItem;
 
-export type RowItem = WithTooltip & { type: "row"; items: RowChild[] };
+export type RowItem = ItemCommon & { type: "row"; items: RowChild[] };
 
 export type FoldChild =
   | ButtonItem
@@ -152,7 +168,7 @@ export type FoldChild =
   | SliderItem
   | TextInputItem;
 
-export type FoldItem = WithTooltip & {
+export type FoldItem = ItemCommon & {
   type: "fold";
   id: string;
   label: string;
@@ -180,6 +196,8 @@ export type Section = {
   tab?: string;
   collapsible?: boolean;
   collapsed?: boolean;
+  description?: string;
+  prefix?: string;
   items: Item[];
 };
 
@@ -240,6 +258,8 @@ export const BUTTON_VARIANTS: ReadonlySet<string> = new Set([
 
 export const DOCK_SIDES: ReadonlySet<string> = new Set(["left", "right", "top", "bottom"]);
 export const THEMES: ReadonlySet<string> = new Set(["light", "dark"]);
+export const LABEL_ALIGNS: ReadonlySet<string> = new Set(["left", "center", "right"]);
+export const LABEL_STYLES: ReadonlySet<string> = new Set(["normal", "muted", "heading", "warning"]);
 export const ITEM_TYPES: ReadonlySet<string> = new Set([
   "separator",
   "label",

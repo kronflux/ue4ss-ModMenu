@@ -4,6 +4,8 @@ import {
   DOCUMENT_VERSION,
   FOLD_CHILD_TYPES,
   ITEM_TYPES,
+  LABEL_ALIGNS,
+  LABEL_STYLES,
   ROW_CHILD_TYPES,
   THEMES,
 } from "./types";
@@ -61,6 +63,12 @@ function checkDebounce(path: string, value: unknown, issues: Issue[]) {
   }
   if (typeof value !== "number" || value < 0) {
     issues.push(issue(path, "debounceMs must be a number >= 0"));
+  }
+}
+
+function checkString(path: string, field: string, value: unknown, issues: Issue[]) {
+  if (value !== undefined && typeof value !== "string") {
+    issues.push(issue(path, `${field} must be a string`));
   }
 }
 
@@ -148,6 +156,12 @@ function validateNumber(path: string, item: NumberItem, issues: Issue[]) {
   checkPositive(path, "fieldWidth", item.fieldWidth, issues);
   checkPositive(path, "labelWidth", item.labelWidth, issues);
   checkDebounce(path, item.debounceMs, issues);
+  // step is positive but may be fractional, so it is not checkPositive, which asks for at least 1.
+  if (item.step !== undefined && (typeof item.step !== "number" || item.step <= 0)) {
+    issues.push(issue(path, "step must be a positive number"));
+  }
+  checkString(path, "prefix", item.prefix, issues);
+  checkString(path, "suffix", item.suffix, issues);
 }
 
 function validateTextInput(path: string, item: TextInputItem, issues: Issue[]) {
@@ -187,6 +201,8 @@ function validateSlider(path: string, item: SliderItem, issues: Issue[]) {
   }
   checkBoolean(path, "integer", item.integer, issues);
   checkBoolean(path, "live", item.live, issues);
+  checkBoolean(path, "showValue", item.showValue, issues);
+  checkPositive(path, "labelWidth", item.labelWidth, issues);
   // The Lua widget also takes a function, which a JSON document cannot hold, so the message names both.
   if (item.format !== undefined && typeof item.format !== "string") {
     issues.push(issue(path, "format must be a string or a function"));
@@ -274,11 +290,22 @@ function validateItem(path: string, item: unknown, issues: Issue[]) {
     issues.push(issue(path, "tooltip must be a string"));
   }
 
+  // enabled and visible apply to every type, as core/itemstate.lua's Validate does.
+  checkBoolean(path, "enabled", item.enabled, issues);
+  checkBoolean(path, "visible", item.visible, issues);
+
   if (typeName === "separator") {
     return;
   }
   if (typeName === "label") {
     requireLabel(path, item.label, issues);
+    if (item.style !== undefined && (typeof item.style !== "string" || !LABEL_STYLES.has(item.style))) {
+      issues.push(issue(path, "style must be one of normal, muted, heading, warning"));
+    }
+    if (item.align !== undefined && (typeof item.align !== "string" || !LABEL_ALIGNS.has(item.align))) {
+      issues.push(issue(path, "align must be one of left, center, right"));
+    }
+    checkBoolean(path, "wrap", item.wrap, issues);
     return;
   }
   if (typeName === "button") {
@@ -440,6 +467,8 @@ function validateSection(index: number, section: unknown, tabs: string[] | undef
   if (spec.collapsed !== undefined && typeof spec.collapsed !== "boolean") {
     issues.push(issue(sectionPath, "collapsed must be a boolean"));
   }
+  checkString(sectionPath, "description", spec.description, issues);
+  checkString(sectionPath, "prefix", spec.prefix, issues);
   if (spec.collapsed === true && spec.collapsible !== true) {
     issues.push(issue(sectionPath, "collapsed=true requires collapsible=true"));
   }

@@ -227,3 +227,52 @@ describe("validateDocument for slider, radio, keybind and tooltip", () => {
     expect(messages(doc)).toEqual([]);
   });
 });
+
+// The messages below are the ones the Lua widgets raise after their `Register(<section>) items[<n>]` prefix.
+describe("validateDocument for enabled, visible and the presentation fields", () => {
+  const cases: Array<[string, unknown, string]> = [
+    ["enabled on a checkbox", { type: "checkbox", id: "c", label: "C", enabled: "no" }, "enabled must be a boolean"],
+    ["visible on a checkbox", { type: "checkbox", id: "c", label: "C", visible: 1 }, "visible must be a boolean"],
+    ["visible on a separator", { type: "separator", visible: "no" }, "visible must be a boolean"],
+    ["label style", { type: "label", label: "L", style: "loud" }, "style must be one of normal, muted, heading, warning"],
+    ["label align", { type: "label", label: "L", align: "middle" }, "align must be one of left, center, right"],
+    ["label wrap", { type: "label", label: "L", wrap: "yes" }, "wrap must be a boolean"],
+    ["slider showValue", { ...slider, showValue: "x" }, "showValue must be a boolean"],
+    ["slider labelWidth", { ...slider, labelWidth: 0 }, "labelWidth must be a positive number"],
+    ["number step", { type: "number", id: "n", label: "N", step: 0 }, "step must be a positive number"],
+    ["number prefix", { type: "number", id: "n", label: "N", prefix: 3 }, "prefix must be a string"],
+    ["number suffix", { type: "number", id: "n", label: "N", suffix: 3 }, "suffix must be a string"],
+  ];
+
+  for (const [name, item, message] of cases) {
+    it(`reports ${name}`, () => {
+      expect(messages(widgetDoc([item]))).toContain(`Register(Main) items[0]: ${message}`);
+    });
+  }
+
+  it("accepts a fractional number step", () => {
+    expect(messages(widgetDoc([{ type: "number", id: "n", label: "N", step: 0.5 }]))).toEqual([]);
+  });
+
+  it("reports a section description and prefix that are not strings", () => {
+    const doc = emptyDocument();
+    (doc.sections[0] as unknown as Record<string, unknown>).description = 3;
+    (doc.sections[0] as unknown as Record<string, unknown>).prefix = 3;
+    expect(messages(doc)).toEqual([
+      "Register(Main): description must be a string",
+      "Register(Main): prefix must be a string",
+    ]);
+  });
+
+  it("accepts every field set to a valid value", () => {
+    const doc = widgetDoc([
+      { type: "label", label: "L", align: "center", wrap: false, style: "heading", enabled: false, visible: false },
+      { ...slider, showValue: false, labelWidth: 80, enabled: true },
+      { type: "number", id: "n", label: "N", step: 5, prefix: "$", suffix: "ms", visible: true },
+      { type: "separator", visible: true },
+    ]);
+    (doc.sections[0] as unknown as Record<string, unknown>).description = "Muted line";
+    (doc.sections[0] as unknown as Record<string, unknown>).prefix = "[tag]";
+    expect(messages(doc)).toEqual([]);
+  });
+});
