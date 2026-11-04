@@ -37,6 +37,12 @@ Record the result of each step as the log lines it produced. A step with no line
 | 12a | Layout tab: click the `Row and fold` section header | `click path=release kind=collapse`, the body hides, a second click shows it |
 | 12b | Press and hold any button, move off it, release | no `click` line and no `->` line for that button |
 | 13 | Close with F7, relaunch, repeat step 2 | the values from steps 8 to 11 restored (`autosave`) |
+| 14 | Controls tab: click `+` and `-` on the first stepper | `st_1 -> 6`, `st_1 -> 4`; the value stops at 0 and at 20 with no line past an end |
+| 15 | Controls tab: press and hold `+` on the first stepper for two seconds | one step at first, then a step about every 100 ms after 400 ms, ending at 20 |
+| 16 | Controls tab: click `Progress +0.1` three times, then `Progress -0.1` | `pr_1 SetValue +0.10 -> 0.35 found=true` and so on; the green bar and its percent move with no rebuild |
+| 17 | Controls tab: click `Rename progress label` | `pr_1 SetLabel found=true` and the label text changes |
+| 18 | Controls tab: drag a colour slider and release | one `cp_1 -> {A=...,B=...,G=...,R=...}` line per drag; the swatch follows the sliders; the second picker has no A slider |
+| 19 | Multi tab, last: click two options | `ms_1 -> {Beta,...}` style lines with the checked values in option order; the options sit in two columns |
 
 ## Comparing runs
 

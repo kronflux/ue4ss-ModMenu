@@ -85,7 +85,7 @@ local okInit, initErr = pcall(ModMenu.Init, {
     keyHint = "F7",
     dock = "right",
     theme = "dark",
-    tabs = { "Buttons", "Inputs", "Widgets", "Layout" },
+    tabs = { "Buttons", "Inputs", "Widgets", "Layout", "Controls", "Multi" },
     consoleCommand = "modmenulab",
     ignoreLook = true,
     autosave = true,
@@ -97,9 +97,22 @@ if not okInit then
 end
 say("Init ok; F7 or `modmenulab` opens the lab")
 
+-- A table value, such as a multiselect array or a colour, is written out so the log shows what it holds.
+local function describe(v)
+    if type(v) ~= "table" then
+        return tostring(v)
+    end
+    local parts = {}
+    for key, value in pairs(v) do
+        parts[#parts + 1] = tostring(key) .. "=" .. describe(value)
+    end
+    table.sort(parts)
+    return "{" .. table.concat(parts, ",") .. "}"
+end
+
 local function report(id)
     return function(v)
-        say(id .. " -> " .. tostring(v))
+        say(id .. " -> " .. describe(v))
     end
 end
 
@@ -181,6 +194,59 @@ reg({
           showValue = false, onChange = report("s_noval") },
         { type = "slider", id = "s_wide", label = "Label column 220 wide", min = 0, max = 10, step = 1, default = 6, integer = true,
           labelWidth = 220, onChange = report("s_wide") },
+    },
+})
+
+-- The Controls tab holds the stepper, the progress bar and the colour picker. The multiselect has its own
+-- tab, so a failure when it is built cannot hide the rest: open the Multi tab last.
+local function bump(delta)
+    return function()
+        local now = tonumber(ModMenu.Get("LabControls", "pr_1")) or 0
+        local found = ModMenu.SetValue("LabControls", "pr_1", now + delta)
+        say(string.format("pr_1 SetValue %+.2f -> %s found=%s", delta, tostring(ModMenu.Get("LabControls", "pr_1")), tostring(found)))
+    end
+end
+
+reg({
+    id = "LabControls", title = "Stepper, progress and colour", tab = "Controls",
+    items = {
+        { type = "stepper", id = "st_1", label = "Stepper 0 to 20 by 2", min = 0, max = 20, step = 2, default = 4,
+          integer = true, onChange = report("st_1") },
+        { type = "stepper", id = "st_2", label = "Stepper 0 to 1 by 0.1", min = 0, max = 1, step = 0.1, default = 0.5,
+          format = "%.1f", onChange = report("st_2") },
+        { type = "row", items = {
+            { type = "stepper", id = "st_row", label = "In a row", min = 0, max = 5, default = 2, onChange = report("st_row") },
+            { type = "button", id = "st_btn", label = "row button", onClick = report("st_btn") },
+        } },
+        { type = "separator" },
+        { type = "progress", id = "pr_1", label = "Progress", default = 0.25, variant = "success" },
+        { type = "progress", id = "pr_2", label = "Custom readout", min = 0, max = 200, default = 50, variant = "danger",
+          format = function(v) return string.format("%d of 200", v) end },
+        { type = "button", id = "pr_up", label = "Progress +0.1", variant = "info", onClick = bump(0.1) },
+        { type = "button", id = "pr_down", label = "Progress -0.1", variant = "info", onClick = bump(-0.1) },
+        { type = "button", id = "pr_label", label = "Rename progress label", variant = "info", onClick = function()
+            local found = ModMenu.SetLabel("LabControls", "pr_1", "Renamed " .. os.date("%H:%M:%S"))
+            say("pr_1 SetLabel found=" .. tostring(found))
+        end },
+        { type = "fold", id = "col_fold", label = "Colour pickers", collapsed = false, items = {
+            { type = "colorpicker", id = "cp_1", label = "Colour with alpha", default = { R = 0.2, G = 0.5, B = 0.8, A = 1 },
+              onChange = report("cp_1") },
+            { type = "colorpicker", id = "cp_2", label = "Colour without alpha", alpha = false,
+              default = { R = 0.9, G = 0.4, B = 0.1, A = 1 }, onChange = report("cp_2") },
+        } },
+    },
+})
+
+reg({
+    id = "LabMulti", title = "Multiselect (open this tab last)", tab = "Multi",
+    items = {
+        { type = "fold", id = "ms_fold", label = "Two columns", collapsed = false, items = {
+            { type = "multiselect", id = "ms_1", label = "Tags", columns = 2,
+              options = { "Alpha", "Beta", "Gamma", "Delta", { label = "Epsilon", value = "e" } },
+              default = { "Beta" }, onChange = report("ms_1") },
+            { type = "multiselect", id = "ms_2", label = "One column", options = { "Red", "Green", "Blue" },
+              onChange = report("ms_2") },
+        } },
     },
 })
 

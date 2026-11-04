@@ -505,7 +505,7 @@ The snapshot holds six things.
 - The active tab, when `Init` sets `tabs`.
 - The collapse state of each collapsible section, in `collapsed`.
 - The collapse state of each fold, in `folds`.
-- The value of each `checkbox`, `dropdown`, `number`, `textinput`, `slider`, `radio` and `keybind` item. Buttons, labels and separators hold no value and are not saved.
+- The value of each `checkbox`, `dropdown`, `number`, `textinput`, `slider`, `radio`, `keybind`, `stepper`, `multiselect` and `colorpicker` item. A multiselect saves its array of checked values and a colorpicker saves its four numbers `R`, `G`, `B` and `A`, and each is restored only when it is still valid for the item. Buttons, labels, separators and progress bars hold no saved value.
 - The key of each `checkbox`, `dropdown`, `radio` and `textinput` value that was cleared with `ModMenu.Set(sectionId, itemId, nil)`, in `cleared`. A cleared value stays cleared after a restart rather than coming back as the default.
 
 ```json
@@ -624,7 +624,7 @@ Dropdown also exposes helpers used by the registry (`refreshLive`, `collapseAll`
 
 ## Item types
 
-Supported: `checkbox` | `button` | `dropdown` | `label` | `separator` | `number` | `textinput` | `slider` | `radio` | `keybind` | `row` | `fold`  
+Supported: `checkbox` | `button` | `dropdown` | `label` | `separator` | `number` | `textinput` | `slider` | `radio` | `keybind` | `stepper` | `progress` | `multiselect` | `colorpicker` | `row` | `fold`  
 (Implemented in `widgets/<type>.lua`.)
 
 ### Tooltips
@@ -879,12 +879,92 @@ Capture never binds the menu's toggle key, because that key opens and closes the
 
 The menu stores the binding but does not act on it. The host reads it with `Get` and checks the key itself. `Register` raises an error when `default` is not a string or is not a key name with known modifiers, when `allowModifiers` is not a boolean, or when `onConflict` or `onChange` is not a function. `Set` stores its value as given, ends any capture, never checks for a conflict and never fires `onChange`. Once the menu has built the item, `Set(sectionId, itemId, nil)` resets it to its `default`. A `Set` made before the section is registered that is not a key name is replaced by the default when `Register` runs.
 
+### `stepper`
+
+A label with a minus button, a readout and a plus button. The value is a number (`Get` / `Set`).
+
+```lua
+{
+  type = "stepper",
+  id = "count",
+  label = "Count",
+  min = 0,
+  max = 20,
+  step = 2,          -- optional; a positive number, default 1
+  default = 4,
+  integer = true,    -- optional; round to a whole number
+  format = "%d",     -- optional; a string.format pattern for the readout
+  onChange = function(value) end,
+}
+```
+
+A click moves the value one step and keeps it between `min` and `max`. Holding a button repeats the step, first after 400 ms and then every 100 ms. `onChange` fires after each step that changed the value, and a click at either end changes nothing. `Set` snaps and clamps its value, ignores a value that is not numeric, resets to `default` for `nil`, and never fires `onChange`. A stepper may sit in a row or a fold. `Register` raises an error naming the field for a `min` or `max` that is not a number, `min` not below `max`, a `step` that is not positive, a `default` that is not numeric, an `integer` that is not a boolean, a `format` that is not a string, or an `onChange` that is not a function.
+
+### `progress`
+
+A label, a bar and a readout. The bar has no input, so the host moves it.
+
+```lua
+{
+  type = "progress",
+  id = "load",
+  label = "Loading",
+  min = 0,            -- optional, default 0
+  max = 1,            -- optional, default 1
+  default = 0.25,
+  format = "%d%%",    -- optional; a string.format pattern or a function(value) returning text. The default is the percent of the range.
+  variant = "success", -- optional; a button variant name for the fill colour
+}
+```
+
+```lua
+ModMenu.SetValue("Main", "load", 0.5)   -- clamps to the range and moves the bar with no rebuild; false for an unknown item
+ModMenu.SetLabel("Main", "load", "Done") -- SetLabel also changes a progress item's label
+```
+
+The value is not saved, because the host drives it. A progress bar may sit in a row or a fold.
+
+### `multiselect`
+
+A caption and one toggle button per option, laid out in one to four columns. The value is an array of the checked option values, in option order (`Get` / `Set`).
+
+```lua
+{
+  type = "multiselect",
+  id = "tags",
+  label = "Tags",
+  options = { "Alpha", "Beta", { label = "Gamma", value = "g" } },  -- the dropdown's option shape
+  default = { "Beta" },   -- optional; every entry must be an option value
+  columns = 2,            -- optional; 1 to 4, default 1
+  onChange = function(values) end,
+}
+```
+
+Each click toggles one option and fires `onChange` with a copy of the new array. `Set` keeps only values that are options, in option order, ignores a value that is not a table, and resets to `default` for `nil`. Autosave saves the array. A multiselect is allowed in a fold only, because its height depends on the option count.
+
+### `colorpicker`
+
+A caption, a swatch filled with the current colour, and one slider per channel. The value is a table `{ R, G, B, A }` with each channel from 0 to 1 (`Get` / `Set`).
+
+```lua
+{
+  type = "colorpicker",
+  id = "tint",
+  label = "Tint",
+  default = { R = 0.2, G = 0.5, B = 0.8, A = 1 },
+  alpha = true,           -- optional; false hides the A slider and keeps A at 1
+  onChange = function(color) end,
+}
+```
+
+The sliders step by 0.01 and the swatch follows them as they move. `onChange` fires once when a drag ends and the colour changed. `Set` clamps each channel and ignores a value that is not a table. Autosave saves the four numbers. A colorpicker is allowed in a fold only.
+
 ### `row`
 
 Horizontal group. Children share one line (Unity-style Count + field + button).
 
-Allowed children: `button` | `checkbox` | `label` | `number` | `slider` | `textinput`  
-(Not: nested `row`, `dropdown`, `separator`, `fold`. Put a `row` *inside* a `fold` instead.)
+Allowed children: `button` | `checkbox` | `label` | `number` | `progress` | `slider` | `stepper` | `textinput`  
+(Not: nested `row`, `dropdown`, `multiselect`, `colorpicker`, `separator`, `fold`. Put a `row` *inside* a `fold` instead.)
 
 ```lua
 {
@@ -922,7 +1002,7 @@ Nested collapsible group **inside** a section (keybind categories, extra tools, 
 
 Default is **collapsed** (`collapsed` omitted or `true`). Pass `collapsed = false` to start open.
 
-Allowed children: `button` | `checkbox` | `dropdown` | `keybind` | `label` | `number` | `radio` | `row` | `separator` | `slider` | `textinput`  
+Allowed children: `button` | `checkbox` | `colorpicker` | `dropdown` | `keybind` | `label` | `multiselect` | `number` | `progress` | `radio` | `row` | `separator` | `slider` | `stepper` | `textinput`  
 (Not: nested `fold`. Put folds in a collapsible **section** instead.)
 
 `id` is required. `Get` / `Set` / `SetLabel` / `SetButtonLabel` / `SetButtonEnabled` / `SetOptions` resolve fold children, including a control nested in a `row` inside a fold.
