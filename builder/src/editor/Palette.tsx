@@ -16,6 +16,9 @@ const WIDGETS: { id: ItemType; label: string }[] = [
   { id: "dropdown", label: "Dropdown" },
   { id: "number", label: "Number" },
   { id: "textinput", label: "Text" },
+  { id: "slider", label: "Slider" },
+  { id: "radio", label: "Radio" },
+  { id: "keybind", label: "Keybind" },
   { id: "row", label: "Row" },
   { id: "fold", label: "Fold" },
 ];

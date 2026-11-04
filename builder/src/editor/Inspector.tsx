@@ -7,9 +7,12 @@ import type {
   DropdownItem,
   FoldItem,
   Item,
+  KeybindItem,
   MenuDocument,
   NumberItem,
+  RadioItem,
   Section,
+  SliderItem,
   TextInputItem,
   ThemeName,
 } from "../schema";
@@ -238,7 +241,7 @@ function ItemFields({
     return <p className="ed-muted">No fields.</p>;
   }
   if (item.type === "row") {
-    return <p className="ed-muted">Row children are in the outline. Add button, checkbox, label, number, or text.</p>;
+    return <p className="ed-muted">Row children are in the outline. Add button, checkbox, label, number, slider, or text.</p>;
   }
   if (item.type === "label") {
     return (
@@ -393,7 +396,88 @@ function ItemFields({
       </>
     );
   }
+  if (item.type === "slider") {
+    const slider = item as SliderItem;
+    // Min and max are required by the schema, so an emptied field keeps the old number rather than
+    // writing undefined, which the validator would reject on export.
+    const numberOr = (value: string, fallback: number) => (value === "" ? fallback : Number(value));
+    return (
+      <>
+        <IdField item={slider} section={section} path={path} onPatch={onPatch} />
+        <Text label="Label" value={slider.label} onChange={(label) => onPatch({ label })} />
+        <Text label="Min" value={String(slider.min)} onChange={(value) => onPatch({ min: numberOr(value, slider.min) })} />
+        <Text label="Max" value={String(slider.max)} onChange={(value) => onPatch({ max: numberOr(value, slider.max) })} />
+        <Text
+          label="Step"
+          value={slider.step === undefined ? "" : String(slider.step)}
+          onChange={(value) => onPatch({ step: value === "" ? undefined : Number(value) })}
+        />
+        <Text
+          label="Default"
+          value={slider.default === undefined ? "" : String(slider.default)}
+          onChange={(value) => onPatch({ default: value === "" ? undefined : Number(value) })}
+        />
+        <Text
+          label="Format (string.format pattern, blank for the default)"
+          value={slider.format ?? ""}
+          onChange={(format) => onPatch({ format: format || undefined })}
+        />
+        <Toggle label="Integer" checked={slider.integer === true} onChange={(integer) => onPatch({ integer })} />
+        <Toggle label="Live (apply while dragging)" checked={slider.live === true} onChange={(live) => onPatch({ live })} />
+      </>
+    );
+  }
+  if (item.type === "radio") {
+    const radio = item as RadioItem;
+    return (
+      <>
+        <IdField item={radio} section={section} path={path} onPatch={onPatch} />
+        <Text label="Label" value={radio.label} onChange={(label) => onPatch({ label })} />
+        <Field label="Options (one per line, or label|value)">
+          <textarea
+            rows={5}
+            value={formatOptions(radio.options)}
+            onChange={(event) => {
+              const options = parseOptions(event.target.value);
+              onPatch({ options: options.length > 0 ? options : radio.options });
+            }}
+          />
+        </Field>
+        <Text label="Default" value={radio.default ?? ""} onChange={(value) => onPatch({ default: value || undefined })} />
+        <Toggle label="Inline (options on one line)" checked={radio.inline === true} onChange={(inline) => onPatch({ inline })} />
+      </>
+    );
+  }
+  if (item.type === "keybind") {
+    const keybind = item as KeybindItem;
+    return (
+      <>
+        <IdField item={keybind} section={section} path={path} onPatch={onPatch} />
+        <Text label="Label" value={keybind.label} onChange={(label) => onPatch({ label })} />
+        <Text
+          label="Default key (FKey name such as F7, blank for none)"
+          value={keybind.default ?? ""}
+          onChange={(value) => onPatch({ default: value })}
+        />
+        <Toggle
+          label="Allow modifiers"
+          checked={keybind.allowModifiers === true}
+          onChange={(allowModifiers) => onPatch({ allowModifiers })}
+        />
+      </>
+    );
+  }
   return null;
+}
+
+// Every item but a separator can carry a tooltip, so the field sits beside the type fields rather
+// than inside each branch above.
+function TooltipField({ item, onPatch }: { item: Item; onPatch: (patch: Record<string, unknown>) => void }) {
+  if (item.type === "separator") {
+    return null;
+  }
+  const tooltip = "tooltip" in item && typeof item.tooltip === "string" ? item.tooltip : "";
+  return <Text label="Tooltip" value={tooltip} onChange={(value) => onPatch({ tooltip: value || undefined })} />;
 }
 
 export function Inspector({
@@ -450,7 +534,12 @@ export function Inspector({
         if (!item || !section) {
           return <p className="ed-muted">Missing item.</p>;
         }
-        return <ItemFields item={item} section={section} path={selection.path} onPatch={(patch) => onPatchItem(selection, patch)} />;
+        return (
+          <>
+            <ItemFields item={item} section={section} path={selection.path} onPatch={(patch) => onPatchItem(selection, patch)} />
+            <TooltipField item={item} onPatch={(patch) => onPatchItem(selection, patch)} />
+          </>
+        );
       })()}
       {issues.length > 0 && (
         <ul className="ed-issues">

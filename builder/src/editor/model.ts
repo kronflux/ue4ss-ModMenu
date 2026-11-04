@@ -322,6 +322,18 @@ export function createItem(type: ItemType, section: Section): Item {
     const label = "Name";
     return { type: "textinput", id: take("textinput", label), label, default: "", placeholder: "Enter name..." };
   }
+  if (type === "slider") {
+    const label = "Amount";
+    return { type: "slider", id: take("slider", label), label, min: 0, max: 100, default: 50, step: 1 };
+  }
+  if (type === "radio") {
+    const label = "Mode";
+    return { type: "radio", id: take("radio", label), label, options: ["A", "B"], default: "A" };
+  }
+  if (type === "keybind") {
+    const label = "Hotkey";
+    return { type: "keybind", id: take("keybind", label), label, default: "" };
+  }
   if (type === "row") {
     return {
       type: "row",

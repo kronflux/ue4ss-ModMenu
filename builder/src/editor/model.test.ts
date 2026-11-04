@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyDocument } from "../schema";
+import { emptyDocument, validateDocument } from "../schema";
 import {
   addItem,
   addSection,
@@ -33,6 +33,32 @@ describe("editor model", () => {
     expect(canAccept("fold", "fold")).toBe(false);
     expect(canAccept("fold", "row")).toBe(true);
     expect(canAccept("row", "button")).toBe(true);
+  });
+
+  it("accepts a slider in a row and a slider, radio or keybind in a fold", () => {
+    expect(canAccept("row", "slider")).toBe(true);
+    expect(canAccept("row", "radio")).toBe(false);
+    expect(canAccept("row", "keybind")).toBe(false);
+    expect(canAccept("fold", "slider")).toBe(true);
+    expect(canAccept("fold", "radio")).toBe(true);
+    expect(canAccept("fold", "keybind")).toBe(true);
+  });
+
+  it("creates a valid slider, radio and keybind from the palette", () => {
+    const slider = addItem(emptyDocument(), { kind: "section", index: 0 }, "slider");
+    const radio = addItem(emptyDocument(), { kind: "section", index: 0 }, "radio");
+    const keybind = addItem(emptyDocument(), { kind: "section", index: 0 }, "keybind");
+    expect(slider && radio && keybind).toBeTruthy();
+    if (!slider || !radio || !keybind) {
+      return;
+    }
+    // The empty document starts with one hint label, so the added item is the second one.
+    expect(slider.doc.sections[0].items[1]).toMatchObject({ type: "slider", min: 0, max: 100, default: 50, step: 1 });
+    expect(radio.doc.sections[0].items[1]).toMatchObject({ type: "radio", options: ["A", "B"], default: "A" });
+    expect(keybind.doc.sections[0].items[1]).toMatchObject({ type: "keybind", default: "" });
+    for (const added of [slider, radio, keybind]) {
+      expect(validateDocument(added.doc)).toEqual([]);
+    }
   });
 
   it("adds a dropdown after a selected row, not inside it", () => {
