@@ -46,6 +46,27 @@ export const hostFixture: MenuDocument = {
           default: "Normal",
         },
         {
+          type: "slider",
+          id: "speed",
+          label: "Speed",
+          tooltip: "Movement speed as a percentage of normal.",
+          min: 0,
+          max: 200,
+          step: 5,
+          default: 100,
+          integer: true,
+          format: "%d%%",
+        },
+        {
+          type: "radio",
+          id: "stance",
+          label: "Stance",
+          options: ["Stand", "Crouch", "Prone"],
+          default: "Stand",
+          inline: true,
+        },
+        { type: "keybind", id: "dashKey", label: "Dash key", default: "F5", allowModifiers: true },
+        {
           type: "row",
           items: [
             {

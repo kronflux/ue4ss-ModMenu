@@ -24,8 +24,8 @@ describe("validateDocument", () => {
 
   it("rejects a dropdown inside a row", () => {
     const doc = clone();
-    const row = doc.sections[1].items[3];
-    if (row.type !== "row") {
+    const row = doc.sections[1].items.find((item) => item.type === "row");
+    if (row === undefined || row.type !== "row") {
       throw new Error("expected Toggles row");
     }
     (row.items as unknown as Item[]).push({
@@ -95,8 +95,8 @@ describe("validateDocument", () => {
 
   it("rejects min > max", () => {
     const doc = clone();
-    const row = doc.sections[1].items[3];
-    if (row.type !== "row" || row.items[0].type !== "number") {
+    const row = doc.sections[1].items.find((item) => item.type === "row");
+    if (row === undefined || row.type !== "row" || row.items[0].type !== "number") {
       throw new Error("expected heal number");
     }
     row.items[0].min = 10;

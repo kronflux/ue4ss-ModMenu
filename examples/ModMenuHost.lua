@@ -107,6 +107,42 @@ ModMenu.Register({
             end,
         },
         {
+            type = "slider",
+            id = "speed",
+            label = "Speed",
+            tooltip = "Movement speed as a percentage of normal.",
+            min = 0,
+            max = 200,
+            step = 5,
+            default = 100,
+            integer = true,
+            format = "%d%%",
+            onChange = function(value)
+                Log("speed = " .. tostring(value))
+            end,
+        },
+        {
+            type = "radio",
+            id = "stance",
+            label = "Stance",
+            options = { "Stand", "Crouch", "Prone" },
+            default = "Stand",
+            inline = true,
+            onChange = function(value)
+                Log("stance = " .. tostring(value))
+            end,
+        },
+        {
+            type = "keybind",
+            id = "dashKey",
+            label = "Dash key",
+            default = "F5",
+            allowModifiers = true,
+            onChange = function(value)
+                Log("dashKey = " .. tostring(value))
+            end,
+        },
+        {
             type = "row",
             items = {
                 {
