@@ -151,6 +151,8 @@ function M.Register(S, section)
         items = section.items,
         collapsible = section.collapsible == true,
         collapsed = section.collapsed == true,
+        description = section.description,
+        prefix = section.prefix,
         onToggle = section.onToggle,
         tab = Tabs.ResolveSectionTab(S, section),
     }

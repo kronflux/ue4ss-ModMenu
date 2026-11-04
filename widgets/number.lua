@@ -4,6 +4,7 @@
 
 local Options = require("ModMenu.core.options")
 local Util = require("ModMenu.core.util")
+local Theme = require("ModMenu.core.theme")
 
 local Number = {}
 Number.type = "number"
@@ -97,6 +98,16 @@ local function coerce(raw, item)
 end
 
 -- The spec runs without the game and cannot build a widget, so the module exposes these helpers.
+--- The value one step from `value`: dir is 1 for plus and -1 for minus. The result is rounded and clamped like any other value.
+---@param value number
+---@param dir number
+---@param item table
+---@return number
+local function Step(value, dir, item)
+    return RoundAndClamp(value + dir * (item.step or 1), item)
+end
+
+Number._step = Step
 Number._coerce = coerce
 Number._parseText = ParseText
 Number._formatValue = FormatValue
@@ -131,6 +142,15 @@ function Number.validate(item, sectionId, index)
         error(prefix .. " labelWidth must be a positive number")
     end
     Util.ValidateDebounceMs(item, prefix)
+    if item.step ~= nil and (type(item.step) ~= "number" or item.step <= 0) then
+        error(prefix .. " step must be a positive number")
+    end
+    if item.prefix ~= nil and type(item.prefix) ~= "string" then
+        error(prefix .. " prefix must be a string")
+    end
+    if item.suffix ~= nil and type(item.suffix) ~= "string" then
+        error(prefix .. " suffix must be a string")
+    end
 end
 
 function Number.seed(sectionId, item, values)
@@ -159,6 +179,23 @@ function Number.build(ctx)
     end
 
     local fillField = ctx.layout ~= "horizontal" and item.fill ~= false
+    -- The minus and plus buttons show only when the item sets step, so a number that does not keeps its look.
+    local stepButtons = {}
+    local function AddStepButtons(row)
+        local colors = Theme.Of(ctx.config)
+        for _, spec in ipairs({ { key = "minus", text = "-" }, { key = "plus", text = "+" } }) do
+            local fill, button, text = umg.CreateFilledButton(row, ctx.namePrefix .. "_" .. spec.key, spec.text, nil, ctx.config.fontItem)
+            local slot = row:AddChildToHorizontalBox(fill)
+            pcall(function()
+                slot:SetSize({ SizeRule = 0, Value = 0.0 })
+                slot:SetPadding({ Left = 6, Top = 0, Right = 0, Bottom = 0 })
+                slot:SetVerticalAlignment(2)
+            end)
+            local stepCtrl = { widget = button, fill = fill, labelWidget = text, dir = spec.key == "plus" and 1 or -1 }
+            umg.SetFill(stepCtrl, colors.buttonBg)
+            table.insert(stepButtons, stepCtrl)
+        end
+    end
     local root, edit, label = umg.CreateLabeledEditable(
         ctx.contentBox,
         ctx.namePrefix,
@@ -170,6 +207,9 @@ function Number.build(ctx)
             labelWidth = item.labelWidth,
             hint = item.placeholder,
             fillField = fillField,
+            prefix = item.prefix,
+            suffix = item.suffix,
+            extras = item.step ~= nil and AddStepButtons or nil,
         }
     )
     umg.AddToContent(ctx, root, {
@@ -188,7 +228,21 @@ function Number.build(ctx)
         lastText = FormatValue(current, item.integer == true),
         lastFiredOnChange = current,
         debounceMs = Util.ResolveDebounceMs(item, Util.DEFAULT_INPUT_DEBOUNCE_MS),
+        stepButtons = stepButtons,
     })
+end
+
+--- One click on a minus or plus button: move the value one step and fire onChange, as typing does after its pause.
+local function FireStep(ctrl, ctx, stepCtrl)
+    local current = tonumber(ctx.values[ctrl.valueKey]) or CoerceDefault(ctrl.item)
+    local n = Step(current, stepCtrl.dir, ctrl.item)
+    ctx.Input.SuppressPressEdge(stepCtrl)
+    ctx.Input.IgnoreClicks(2)
+    if n ~= current then
+        Number.apply(ctrl, n, ctx)
+        ctx.SafeCall(ctrl.item.onChange, n)
+    end
+    ctx.ReclaimMenuInput()
 end
 
 --- Poll typed text; update store when a valid number is parsed.
@@ -197,6 +251,12 @@ end
 function Number.poll(ctrl, ctx)
     if ctrl.edit == nil then
         return
+    end
+    for _, stepCtrl in ipairs(ctrl.stepButtons or {}) do
+        ctx.umg.TrackPointer(stepCtrl)
+        if ctx.Input.ReleaseClick(stepCtrl, stepCtrl.widget) then
+            FireStep(ctrl, ctx, stepCtrl)
+        end
     end
     local text = Options.GetWidgetPlainText(ctrl.edit)
     if text ~= ctrl.lastText then
@@ -208,6 +268,32 @@ function Number.poll(ctrl, ctx)
         end
     end
     Util.FlushDebouncedOnChange(ctrl, ctx)
+end
+
+--- ItemState calls this when the number's state changes. The shell stops polling a disabled
+--- number, so a press on a step button is dropped here rather than fired once it is enabled again.
+function Number.onItemState(ctrl, enabled, _visible, ctx)
+    if enabled then
+        return
+    end
+    for _, stepCtrl in ipairs(ctrl.stepButtons or {}) do
+        ctx.Input.ClearPress(stepCtrl)
+    end
+end
+
+--- The mouse-down latch on a step button is claimed here and fired on release by poll.
+--- @return boolean true if click consumed
+function Number.pollClick(ctrl, ctx)
+    for _, stepCtrl in ipairs(ctrl.stepButtons or {}) do
+        local consumed, fireNow = ctx.Input.ArmClick(stepCtrl, stepCtrl.widget)
+        if consumed then
+            if fireNow then
+                FireStep(ctrl, ctx, stepCtrl)
+            end
+            return true
+        end
+    end
+    return false
 end
 
 function Number.apply(ctrl, value, ctx)

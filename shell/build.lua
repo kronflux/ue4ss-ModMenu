@@ -39,6 +39,20 @@ function M.PanelPadding(config)
     return Theme.PadPanel(config)
 end
 
+--- A section's description: one line of muted text under its title.
+local function AddDescription(S, section, contentBox, suffix)
+    if type(section.description) ~= "string" or section.description == "" then
+        return
+    end
+    local text = Construct("/Script/UMG.TextBlock", contentBox, string.format("ModMenu_SecDesc_%s_%s", section.id, suffix))
+    -- The hint size in the muted colour darkened by a third, so the description reads as a quieter line
+    -- than the title rather than in nearly the title's colour.
+    StyleText(text, S.config.fontHint, Theme.Shade(Theme.Of(S.config).textMuted, -0.35))
+    SetLabelText(text, section.description)
+    Umg.EnableAutoWrap(text)
+    contentBox:AddChildToVerticalBox(text)
+end
+
 function M.BuildContent(S)
     if not IsValid(S.contentBox) then
         return
@@ -141,6 +155,7 @@ function M.BuildContent(S)
         local itemParent = contentBox
         if Collapse.IsCollapsible(section) then
             local header = Collapse.BuildHeader(S, section, contentBox, suffix)
+            AddDescription(S, section, contentBox, suffix)
             local body = Construct(
                 "/Script/UMG.VerticalBox",
                 contentBox,
@@ -156,8 +171,9 @@ function M.BuildContent(S)
                 string.format("ModMenu_Sec_%s_%s", section.id, suffix)
             )
             StyleText(secTitle, config.fontSection)
-            SetLabelText(secTitle, section.title or section.id)
+            SetLabelText(secTitle, Collapse.TitleText(section))
             contentBox:AddChildToVerticalBox(secTitle)
+            AddDescription(S, section, contentBox, suffix)
         end
         AddSpacer(itemParent, string.format("ModMenu_SecPad_%s_%s", section.id, suffix), config.spacing.gapItem)
 

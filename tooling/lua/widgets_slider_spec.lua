@@ -120,3 +120,22 @@ values["s.v"] = nil
 Slider.apply(ctrl, nil, ctx)
 assert_eq("apply with nil resets to the default", values["s.v"], 0)
 assert_eq("apply never calls onChange", calls, 0)
+
+-- showValue and labelWidth are checked by validate.
+local function sliderError(extra)
+    local item = { id = "v", label = "V", min = 0, max = 10 }
+    for key, value in pairs(extra) do
+        item[key] = value
+    end
+    local ok, err = pcall(Slider.validate, item, "s", 1)
+    return (not ok) and tostring(err) or nil
+end
+assert_true("a slider with showValue false and a labelWidth is valid", sliderError({ showValue = false, labelWidth = 80 }) == nil)
+assert_true(
+    "a non-boolean showValue is rejected",
+    string.find(sliderError({ showValue = "x" }) or "", "showValue must be a boolean", 1, true) ~= nil
+)
+assert_true(
+    "a zero labelWidth is rejected",
+    string.find(sliderError({ labelWidth = 0 }) or "", "labelWidth must be a positive number", 1, true) ~= nil
+)

@@ -83,3 +83,37 @@ assert_eq("apply with a numeric string stores the number", values["s.n"], 5)
 Number.apply(ctrl, "abc", ctx)
 assert_eq("apply with junk keeps the number", values["s.n"], 5)
 assert_eq("apply never calls onChange", calls, 0)
+
+-- step is what the minus and plus buttons add. The value stays inside the range.
+local stepItem = { min = 0, max = 10, step = 2 }
+assert_eq("a plus step adds the step", Number._step(4, 1, stepItem), 6)
+assert_eq("a plus step stops at max", Number._step(9, 1, stepItem), 10)
+assert_eq("a minus step stops at min", Number._step(1, -1, stepItem), 0)
+assert_eq("an integer item rounds a fractional step", Number._step(1, 1, { min = 0, max = 10, step = 0.5, integer = true }), 2)
+
+local function stepError(item)
+    local ok, err = pcall(Number.validate, item, "s", 1)
+    return (not ok) and tostring(err) or nil
+end
+local function stepMentions(err, text)
+    return err ~= nil and string.find(err, text, 1, true) ~= nil
+end
+assert_true("a number with a step, prefix and suffix is valid", pcall(Number.validate, { id = "n", label = "N", step = 0.5, prefix = "$", suffix = "ms" }, "s", 1))
+assert_true("a zero step is rejected", stepMentions(stepError({ id = "n", label = "N", step = 0 }), "step must be a positive number"))
+assert_true("a non-string prefix is rejected", stepMentions(stepError({ id = "n", label = "N", prefix = 1 }), "prefix must be a string"))
+assert_true("a non-string suffix is rejected", stepMentions(stepError({ id = "n", label = "N", suffix = 1 }), "suffix must be a string"))
+
+-- Disabling the number drops a press on its step buttons, so enabling it again cannot fire a stale step.
+local stubbedNumberHelpers = package.loaded["UEHelpers.UEHelpers"] == nil
+if stubbedNumberHelpers then
+    package.loaded["UEHelpers.UEHelpers"] = {}
+end
+local NumberInput = require("ModMenu.core.input")
+if stubbedNumberHelpers then
+    package.loaded["UEHelpers.UEHelpers"] = nil
+end
+local heldStep = { dir = 1, holding = true, armed = true, armTicks = 1 }
+local steppedCtrl = { kind = "number", item = stepItem, stepButtons = { heldStep } }
+Number.onItemState(steppedCtrl, false, true, { Input = NumberInput })
+assert_eq("disabling a number clears a held step button", heldStep.holding, false)
+assert_eq("disabling a number clears an armed step button", heldStep.armed, false)

@@ -320,6 +320,8 @@ Add or **replace** a section by `section.id`. If the menu is open, content rebui
 }
 ```
 
+A section may also set `description`, one line of muted text under its title, and `prefix`, a short string such as a tag drawn before the title text.
+
 Default is **not** collapsible — existing sections stay always-open. Session remembers open/closed per `id` (re-Register does not reset it; saved to disk only with `Init({ autosave = true })`). Nest groups **inside** a section with `type = "fold"` (see **Item types**).
 
 Omit `Init tabs` and the menu stays a single scroll (Mortal Shell 2 and other hosts unchanged). With tabs, only the **active** tab's sections are built — switching rebuilds content (values from `Get` / `Set` still live for hidden tabs). Last tab is session-only (survives close/open; written to disk only with `Init({ autosave = true })`).
@@ -649,7 +651,16 @@ A tooltip shows only on an item that builds a live control. A `separator`, a `ro
 { type = "label", label = "Hint text" }
 { type = "label", id = "status", label = "Ready" }  -- id required for SetLabel
 -- Empty / whitespace-only labels are collapsed (no leftover gap). SetLabel("") hides the row; SetLabel("text") shows it again.
+{ type = "label", label = "Heads up", style = "warning", align = "center", wrap = false }
 ```
+
+| Field | Default | Meaning |
+|---|---|---|
+| `style` | `"normal"` | `normal`, `muted` (the muted text colour), `heading` (the section font size in the accent colour) or `warning` (the status colour). |
+| `align` | `"left"` | `left`, `center` or `right`. |
+| `wrap` | `true` | `false` keeps the text on one line. A label in a row never wraps. |
+
+`Register` rejects any other `style` or `align` and lists the allowed values.
 
 ### `button`
 
@@ -768,6 +779,9 @@ Labeled numeric field. Value is stored as a Lua number (`Get` / `Set`). Invalid 
   fieldWidth = 72,      -- EditableTextBox width
   labelWidth = 156,     -- optional; same width on every row = table-aligned fields
   debounceMs = 250,     -- delay onChange only (default 250; 0 = immediate). Get stays live.
+  step = 5,             -- optional; adds minus and plus buttons that move the value by this much
+  prefix = "$",         -- optional short text inside the field, before the entry
+  suffix = "ms",        -- optional short text inside the field, after the entry
   onChange = function(n) end,
 }
 ```
@@ -809,6 +823,8 @@ A labelled track with a draggable knob over a numeric range. The current value i
   integer = true,       -- optional; round to the nearest whole number
   format = "%d%%",      -- optional; a string.format pattern, or function(value) returning the text
   live = false,         -- optional; true fires onChange on every step while dragging
+  showValue = true,     -- optional; false hides the readout beside the label
+  labelWidth = 140,     -- optional; fixes the label column, as number's does
   onChange = function(n) end,
 }
 ```

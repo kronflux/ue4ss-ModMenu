@@ -369,8 +369,37 @@ function M.CreateLabeledEditable(outer, namePrefix, caption, initialText, opts)
         end
     end)
     M.StyleEditableTextBox(edit, fontSize)
+    -- A short text inside the field, before the entry such as a currency sign or after it such as a unit.
+    -- The field colours apply to it, because it sits on the field's own fill.
+    local hasNote = (opts.prefix ~= nil and opts.prefix ~= "") or (opts.suffix ~= nil and opts.suffix ~= "")
+    local content = edit
+    if hasNote then
+        content = M.Construct("/Script/UMG.HorizontalBox", border, namePrefix .. "_FieldRow")
+        local function AddNote(noteName, text, padLeft, padRight)
+            local note = M.Construct("/Script/UMG.TextBlock", content, namePrefix .. noteName)
+            M.StyleText(note, fontSize, Colors().fieldHint)
+            M.SetLabelText(note, text)
+            local noteSlot = content:AddChildToHorizontalBox(note)
+            pcall(function()
+                noteSlot:SetSize({ SizeRule = 0, Value = 0.0 })
+                noteSlot:SetPadding({ Left = padLeft, Top = 0, Right = padRight, Bottom = 0 })
+                noteSlot:SetVerticalAlignment(2)
+            end)
+        end
+        if opts.prefix ~= nil and opts.prefix ~= "" then
+            AddNote("_Prefix", opts.prefix, 0, 2)
+        end
+        local editSlot = content:AddChildToHorizontalBox(edit)
+        pcall(function()
+            editSlot:SetSize({ SizeRule = 1, Value = 1.0 })
+            editSlot:SetVerticalAlignment(2)
+        end)
+        if opts.suffix ~= nil and opts.suffix ~= "" then
+            AddNote("_Suffix", opts.suffix, 2, 0)
+        end
+    end
     pcall(function()
-        border:SetContent(edit)
+        border:SetContent(content)
         sizeBox:SetContent(border)
     end)
 
@@ -384,6 +413,11 @@ function M.CreateLabeledEditable(outer, namePrefix, caption, initialText, opts)
         fieldSlot:SetPadding({ Left = 0, Top = 0, Right = 0, Bottom = 0 })
         fieldSlot:SetVerticalAlignment(2)
     end)
+
+    -- The caller may add more children to the row, after the field, such as step buttons.
+    if opts.extras ~= nil then
+        opts.extras(root)
+    end
 
     return root, edit, label
 end

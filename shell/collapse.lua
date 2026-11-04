@@ -53,6 +53,17 @@ function M.Mark(collapsed)
     return MARK_EXPANDED
 end
 
+--- The title a section shows: its title or id, with the prefix before it when the section has one.
+---@param section table
+---@return string
+function M.TitleText(section)
+    local title = tostring(section.title or section.id)
+    if type(section.prefix) == "string" and section.prefix ~= "" then
+        return section.prefix .. " " .. title
+    end
+    return title
+end
+
 function M.Validate(section)
     local id = tostring(section.id)
     if section.collapsible ~= nil and type(section.collapsible) ~= "boolean" then
@@ -66,6 +77,12 @@ function M.Validate(section)
     end
     if section.collapsed == true and section.collapsible ~= true then
         error("Register(" .. id .. ") collapsed=true requires collapsible=true")
+    end
+    if section.description ~= nil and type(section.description) ~= "string" then
+        error("Register(" .. id .. ") description must be a string")
+    end
+    if section.prefix ~= nil and type(section.prefix) ~= "string" then
+        error("Register(" .. id .. ") prefix must be a string")
     end
 end
 
@@ -243,7 +260,7 @@ function M.BuildHeader(S, section, contentBox, suffix)
     local name = string.format("ModMenu_SecHdr_%s_%s", section.id, suffix)
     local colors = Theme.Of(S.config)
     local fontSize = S.config.fontSection
-    local titleText = tostring(section.title or section.id)
+    local titleText = M.TitleText(section)
 
     -- The Border is the visible fill, and the Button inside it is transparent (see Umg.SetFillColors).
     local fill = Umg.Construct("/Script/UMG.Border", contentBox, name .. "_Fill")

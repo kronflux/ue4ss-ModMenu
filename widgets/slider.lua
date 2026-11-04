@@ -160,6 +160,12 @@ function Slider.validate(item, sectionId, index)
     if item.live ~= nil and type(item.live) ~= "boolean" then
         error(prefix .. " live must be a boolean")
     end
+    if item.showValue ~= nil and type(item.showValue) ~= "boolean" then
+        error(prefix .. " showValue must be a boolean")
+    end
+    if item.labelWidth ~= nil and (type(item.labelWidth) ~= "number" or item.labelWidth < 1) then
+        error(prefix .. " labelWidth must be a positive number")
+    end
     if item.format ~= nil and type(item.format) ~= "string" and type(item.format) ~= "function" then
         error(prefix .. " format must be a string or a function")
     end
@@ -276,15 +282,30 @@ function Slider.build(ctx)
     local valueText = umg.Construct("/Script/UMG.TextBlock", header, name .. "_Value")
     umg.StyleText(valueText, ctx.config.fontItem, colors.textMuted)
     umg.SetLabelText(valueText, Format(current, item))
+    -- labelWidth fixes the label column, as the number widget's does, and the readout takes the rest of the row.
+    local labelHost = label
+    local fixedLabel = type(item.labelWidth) == "number"
+    if fixedLabel then
+        labelHost = umg.Construct("/Script/UMG.SizeBox", header, name .. "_LabelSize")
+        pcall(function()
+            labelHost:SetWidthOverride(item.labelWidth)
+            labelHost:SetContent(label)
+        end)
+    end
     pcall(function()
-        local labelSlot = header:AddChildToHorizontalBox(label)
-        labelSlot:SetSize({ SizeRule = 1, Value = 1.0 })
+        local labelSlot = header:AddChildToHorizontalBox(labelHost)
+        labelSlot:SetSize({ SizeRule = fixedLabel and 0 or 1, Value = fixedLabel and 0.0 or 1.0 })
         labelSlot:SetVerticalAlignment(2)
         local valueSlot = header:AddChildToHorizontalBox(valueText)
-        valueSlot:SetSize({ SizeRule = 0, Value = 0.0 })
+        valueSlot:SetSize({ SizeRule = fixedLabel and 1 or 0, Value = fixedLabel and 1.0 or 0.0 })
         valueSlot:SetPadding({ Left = 8, Top = 0, Right = 0, Bottom = 0 })
         valueSlot:SetVerticalAlignment(2)
     end)
+    if item.showValue == false then
+        pcall(function()
+            valueText:SetVisibility(1)
+        end)
+    end
     pcall(function()
         local headerSlot = root:AddChildToVerticalBox(header)
         headerSlot:SetPadding({ Left = 0, Top = 0, Right = 0, Bottom = HEADER_GAP })

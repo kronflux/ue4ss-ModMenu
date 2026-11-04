@@ -159,6 +159,7 @@ local specs = {
     "widgets_button_spec.lua",
     "input_click_spec.lua",
     "itemstate_spec.lua",
+    "widgets_label_spec.lua",
     "widgets_keybind_spec.lua",
     "persist_spec.lua",
     "persist_shell_spec.lua",

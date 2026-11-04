@@ -165,6 +165,25 @@ reg({
     },
 })
 
+reg({
+    id = "LabStyle", title = "Presentation", prefix = "[C]", tab = "Inputs",
+    description = "This line is the section description, under a title that starts with a prefix.",
+    items = {
+        { type = "label", label = "Heading style", style = "heading" },
+        { type = "label", label = "Muted style, in the muted text colour.", style = "muted" },
+        { type = "label", label = "Warning style, in the status colour.", style = "warning" },
+        { type = "label", label = "Centred label", align = "center" },
+        { type = "label", label = "Right-aligned label", align = "right" },
+        { type = "label", label = "A long label with wrap off stays on one line and runs past the panel edge when it is long enough", wrap = false },
+        { type = "number", id = "n_step", label = "Stepper", default = 20, min = 0, max = 100, step = 5, integer = true,
+          prefix = "$", suffix = "ms", onChange = report("n_step") },
+        { type = "slider", id = "s_noval", label = "No readout", min = 0, max = 10, step = 1, default = 4, integer = true,
+          showValue = false, onChange = report("s_noval") },
+        { type = "slider", id = "s_wide", label = "Label column 220 wide", min = 0, max = 10, step = 1, default = 6, integer = true,
+          labelWidth = 220, onChange = report("s_wide") },
+    },
+})
+
 -- enabled and visible: each toggle button flips one flag and logs the new value.
 local labState = { targetEnabled = true, sliderVisible = false, foldEnabled = true, foldVisible = true }
 local function toggle(key, apply, sectionId, itemId)
