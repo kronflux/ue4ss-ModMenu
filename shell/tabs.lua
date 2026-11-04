@@ -18,7 +18,6 @@ local Session = require("ModMenu.shell.session")
 
 local Debug = Util.Debug
 local Construct = Umg.Construct
-local CreateTextButton = Umg.CreateTextButton
 local AddSpacer = Umg.AddSpacer
 
 local M = {}
@@ -112,11 +111,10 @@ function M.BuildStrip(S, contentBox, suffix)
             end)
             host = size
         end
-        local btn, lbl = CreateTextButton(
+        local fill, btn, lbl = Umg.CreateFilledButton(
             host,
             "ModMenu_Tab" .. tostring(i) .. "_" .. suffix,
             name,
-            bg,
             fg,
             S.config.fontItem
         )
@@ -124,7 +122,7 @@ function M.BuildStrip(S, contentBox, suffix)
             -- Button must fill the SizeBox or the extra height is not hittable.
             local contentSlot
             pcall(function()
-                contentSlot = size:SetContent(btn)
+                contentSlot = size:SetContent(fill)
             end)
             pcall(function()
                 if contentSlot ~= nil then
@@ -136,7 +134,7 @@ function M.BuildStrip(S, contentBox, suffix)
                 btn:SetPadding({ Left = tabGap, Top = tabPad, Right = tabGap, Bottom = tabPad })
             end)
         end
-        local slot = row:AddChildToHorizontalBox(size or btn)
+        local slot = row:AddChildToHorizontalBox(size or fill)
         pcall(function()
             slot:SetSize({ SizeRule = 1, Value = 1.0 })
             slot:SetPadding({
@@ -147,12 +145,15 @@ function M.BuildStrip(S, contentBox, suffix)
             })
             slot:SetVerticalAlignment(2)
         end)
-        table.insert(S.liveControls, {
+        local tabCtrl = {
             kind = "tab",
             widget = btn,
+            fill = fill,
             label = lbl,
             tabId = name,
-        })
+        }
+        Umg.SetFill(tabCtrl, bg)
+        table.insert(S.liveControls, tabCtrl)
     end
 
     AddSpacer(contentBox, "ModMenu_TabPad_" .. suffix, tabPad)
@@ -245,8 +246,9 @@ function M.Select(S, tabId)
 end
 
 function M.Poll(S, ctrl)
-    if Input.WidgetPressedEdge(ctrl, ctrl.widget) then
-        Input.DebugClick("press-edge", ctrl, ctrl.widget)
+    Umg.TrackPointer(ctrl)
+    if Input.ReleaseClick(ctrl, ctrl.widget) then
+        Input.DebugClick("release", ctrl, ctrl.widget)
         M.QueueSelect(S, ctrl.tabId)
         InputMode.Reclaim()
         Input.IgnoreClicks(2)
@@ -255,15 +257,15 @@ end
 
 ---@return boolean
 function M.PollClick(S, ctrl)
-    if not Input.WidgetHovered(ctrl.widget) then
-        return false
+    local consumed, fireNow = Input.ArmClick(ctrl, ctrl.widget)
+    if fireNow then
+        Input.DebugClick("latch-hover", ctrl, ctrl.widget)
+        Input.SuppressPressEdge(ctrl)
+        M.QueueSelect(S, ctrl.tabId)
+        InputMode.Reclaim()
+        Input.IgnoreClicks(2)
     end
-    Input.DebugClick("latch-hover", ctrl, ctrl.widget)
-    Input.SuppressPressEdge(ctrl)
-    M.QueueSelect(S, ctrl.tabId)
-    InputMode.Reclaim()
-    Input.IgnoreClicks(2)
-    return true
+    return consumed
 end
 
 return M

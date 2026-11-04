@@ -148,7 +148,7 @@ reg({
 })
 
 reg({
-    id = "LabLayout", title = "Row and fold", tab = "Layout",
+    id = "LabLayout", title = "Row and fold", tab = "Layout", collapsible = true,
     items = {
         { type = "row", id = "row_1", items = {
             { type = "button", id = "row_btn", label = "row button", onClick = report("row_btn") },

@@ -109,8 +109,9 @@ function M.QueueToggle(S, sectionId, source)
 end
 
 function M.Poll(S, ctrl)
-    if Input.WidgetPressedEdge(ctrl, ctrl.widget) then
-        Input.DebugClick("press-edge", ctrl, ctrl.widget)
+    Umg.TrackPointer(ctrl)
+    if Input.ReleaseClick(ctrl, ctrl.widget) then
+        Input.DebugClick("release", ctrl, ctrl.widget)
         Input.SuppressPressEdge(ctrl)
         Input.IgnoreClicks(2)
         M.QueueToggle(S, ctrl.sectionId, "press")
@@ -119,14 +120,14 @@ end
 
 ---@return boolean
 function M.PollClick(S, ctrl)
-    if not Input.WidgetHovered(ctrl.widget) then
-        return false
+    local consumed, fireNow = Input.ArmClick(ctrl, ctrl.widget)
+    if fireNow then
+        Input.DebugClick("latch-hover", ctrl, ctrl.widget)
+        Input.SuppressPressEdge(ctrl)
+        Input.IgnoreClicks(2)
+        M.QueueToggle(S, ctrl.sectionId, "latch")
     end
-    Input.DebugClick("latch-hover", ctrl, ctrl.widget)
-    Input.SuppressPressEdge(ctrl)
-    Input.IgnoreClicks(2)
-    M.QueueToggle(S, ctrl.sectionId, "latch")
-    return true
+    return consumed
 end
 
 function M.Apply(S, sectionId, source)
@@ -244,7 +245,9 @@ function M.BuildHeader(S, section, contentBox, suffix)
     local fontSize = S.config.fontSection
     local titleText = tostring(section.title or section.id)
 
-    local button = Umg.Construct("/Script/UMG.Button", contentBox, name .. "_Btn")
+    -- The Border is the visible fill, and the Button inside it is transparent (see Umg.SetFillColors).
+    local fill = Umg.Construct("/Script/UMG.Border", contentBox, name .. "_Fill")
+    local button = Umg.Construct("/Script/UMG.Button", fill, name .. "_Btn")
     local row = Umg.Construct("/Script/UMG.HorizontalBox", button, name .. "_Row")
     local spacing = S.config.spacing
     local title = AddHeaderText(row, name .. "_Title", titleText, fontSize, colors.textPrimary, true, spacing)
@@ -252,23 +255,26 @@ function M.BuildHeader(S, section, contentBox, suffix)
 
     pcall(function()
         button:SetContent(row)
-        button:SetBackgroundColor(colors.sectionHeaderBg)
         if button.SetClickMethod then
             button:SetClickMethod(1) -- MouseDown; matches other constructed buttons
         end
+        fill:SetPadding({ Left = 0, Top = 0, Right = 0, Bottom = 0 })
+        fill:SetContent(button)
     end)
 
-    local slot = contentBox:AddChildToVerticalBox(button)
+    local slot = contentBox:AddChildToVerticalBox(fill)
     Umg.FillVerticalSlot(slot)
     local ctrl = {
         kind = "collapse",
         sectionId = section.id,
         widget = button,
+        fill = fill,
         label = title,
         mark = mark,
         body = nil,
         wasPressed = false,
     }
+    Umg.SetFill(ctrl, colors.sectionHeaderBg)
     table.insert(S.liveControls, ctrl)
     return ctrl
 end

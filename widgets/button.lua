@@ -86,26 +86,20 @@ function Button.applyChrome(ctrl, ctx)
     ctrl.enabled = enabled
     local colors = Theme.Of(ctx and ctx.config)
     local bg, fg = ChromeColors(colors, item)
-    -- This paints the resting fill, so the hover poll compares against the normal state from here.
-    ctrl.lastState = "normal"
     -- Disabled and active buttons keep one fill in every pointer state.
     local hover, pressed = bg, bg
     if enabled and item.active ~= true then
         local states = Theme.ButtonStates(colors, item.variant)
         hover, pressed = states.hover, states.pressed
     end
-    ctrl.stateColors = { normal = bg, hover = hover, pressed = pressed }
     pcall(function()
         if ctrl.widget ~= nil then
             ctrl.widget:SetIsEnabled(enabled)
-            -- Fully transparent, so UMG's stock grey hovered brush draws nothing; the Border
-            -- behind the button carries every state colour (2026-11-04).
-            ctrl.widget:SetBackgroundColor({ R = 1, G = 1, B = 1, A = 0 })
-        end
-        if ctrl.fill ~= nil then
-            ctrl.fill:SetBrushColor(bg)
         end
     end)
+    if ctx ~= nil and ctx.umg ~= nil then
+        ctx.umg.SetFillColors(ctrl, bg, hover, pressed)
+    end
     if ctrl.labelWidget ~= nil and ctx ~= nil and ctx.umg ~= nil then
         ctx.umg.StyleText(ctrl.labelWidget, ctx.config.fontItem, fg)
     end
@@ -189,99 +183,31 @@ local function FireClick(ctrl, ctx, path)
     return true
 end
 
-local function IsTrue(value)
-    return value == true or value == 1
-end
-
---- Read the pointer state of the UButton as "pressed", "hover" or "normal".
-local function PointerState(widget)
-    local hovered, pressed = false, false
-    pcall(function()
-        hovered = IsTrue(widget:IsHovered())
-    end)
-    pcall(function()
-        pressed = IsTrue(widget:IsPressed())
-    end)
-    if pressed then
-        return "pressed"
-    end
-    if hovered then
-        return "hover"
-    end
-    return "normal"
-end
-
---- Repaint the Border behind the button when the pointer state changes.
-local function PaintPointerState(ctrl)
-    if ctrl.widget == nil or ctrl.item == nil or ctrl.item.active == true then
-        return
-    end
-    local state = PointerState(ctrl.widget)
-    if state == ctrl.lastState then
-        return
-    end
-    ctrl.lastState = state
-    local colors = ctrl.stateColors
-    if colors ~= nil and ctrl.fill ~= nil then
-        pcall(function()
-            ctrl.fill:SetBrushColor(colors[state] or colors.normal)
-        end)
-    end
-end
-
---- Continuous press poll. A mouse click fires when the button is released over it, so the
---- pressed colour stays visible while the button is held and dragging off cancels the click.
---- A touch tap has no held phase, so it fires on the press edge.
+--- Continuous press poll. The click rule is Input.ReleaseClick: a mouse click fires when the
+--- button is released over it, so the pressed colour stays visible while the button is held.
 function Button.poll(ctrl, ctx)
     if ctrl.enabled == false then
         return
     end
-    PaintPointerState(ctrl)
-    if ctx.Input.IsTouch() then
-        if ctx.Input.WidgetPressedEdge(ctrl, ctrl.widget) then
-            FireClick(ctrl, ctx, "press-edge")
-        end
-        return
+    -- An active button keeps its one fill in every pointer state.
+    if ctrl.item ~= nil and ctrl.item.active ~= true then
+        ctx.umg.TrackPointer(ctrl)
     end
-    local down = ctx.Input.WidgetIsDown(ctrl.widget)
-    if down then
-        ctrl.holding = true
-        ctrl.armTicks = 0
-        return
-    end
-    if ctrl.holding then
-        ctrl.holding = false
-        ctrl.armed = false
-        if ctx.Input.WidgetHovered(ctrl.widget) then
-            FireClick(ctrl, ctx, "release")
-        end
-        return
-    end
-    -- The mouse-down latch can arrive a tick before IsPressed turns true. Give up on an armed
-    -- press that never shows as held, so a stale latch cannot fire a later click.
-    if ctrl.armed then
-        ctrl.armTicks = (ctrl.armTicks or 0) + 1
-        if ctrl.armTicks > 5 then
-            ctrl.armed = false
-        end
+    if ctx.Input.ReleaseClick(ctrl, ctrl.widget) then
+        FireClick(ctrl, ctx, "release")
     end
 end
 
---- The mouse-down latch claims a press on the hovered button without firing it; the release
---- in Button.poll fires. Touch fires here, as it did before.
+--- The mouse-down latch claims a press on the hovered button; the release in Button.poll fires it.
 --- @return boolean true if click consumed
 function Button.pollClick(ctrl, ctx)
     if ctrl.enabled == false then
         return false
     end
-    if not ctx.Input.WidgetHovered(ctrl.widget) then
-        return false
-    end
-    if ctx.Input.IsTouch() then
+    local consumed, fireNow = ctx.Input.ArmClick(ctrl, ctrl.widget)
+    if fireNow then
         return FireClick(ctrl, ctx, "latch-hover")
     end
-    ctrl.armed = true
-    ctrl.armTicks = 0
-    return true
+    return consumed
 end
 return Button

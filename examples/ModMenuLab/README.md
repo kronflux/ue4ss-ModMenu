@@ -34,6 +34,8 @@ Record the result of each step as the log lines it produced. A step with no line
 | 10 | Click `Crouch`, then `B` | `r_1 -> Crouch`, `r_2 -> B`, the chosen option painted green |
 | 11 | Click the keybind, press Ctrl+G | `k_1 -> Ctrl+G` |
 | 12 | Layout tab: use the row's three controls and the fold's two | one `row_...` or `fold_...` line each |
+| 12a | Layout tab: click the `Row and fold` section header | `click path=release kind=collapse`, the body hides, a second click shows it |
+| 12b | Press and hold any button, move off it, release | no `click` line and no `->` line for that button |
 | 13 | Close with F7, relaunch, repeat step 2 | the values from steps 8 to 11 restored (`autosave`) |
 
 ## Comparing runs

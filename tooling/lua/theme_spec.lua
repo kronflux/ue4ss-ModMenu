@@ -33,3 +33,7 @@ assert_eq("pressed still derives beside an explicit hover", explicit.pressed, Th
 local explicitPressed = { R = 0.1, G = 0.1, B = 0.9, A = 1 }
 local mergedDefault = Theme.Merge(dark, { buttonPressed = explicitPressed })
 assert_eq("explicit buttonPressed wins for default", Theme.ButtonStates(mergedDefault, "default").pressed, explicitPressed)
+
+local lighter, darker = Theme.FillStates(grey)
+assert_eq("FillStates hover lightens the fill", lighter, Theme.Shade(grey, 0.25))
+assert_eq("FillStates pressed darkens the fill", darker, Theme.Shade(grey, -0.25))

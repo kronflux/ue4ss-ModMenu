@@ -215,12 +215,15 @@ end
 --- Paint the button as active while it captures, so the player sees which item is listening.
 local function Paint(ctrl, ctx)
     ctx.umg.SetLabelText(ctrl.labelWidget, Caption(ctrl.item, ctx.values[ctrl.valueKey], ctrl.capturing))
-    Button.applyChrome({
+    -- The paint table is kept, because it holds the fill colours the pointer poll repaints from.
+    ctrl.paint = ctrl.paint or {
         kind = "keybind",
         widget = ctrl.widget,
+        fill = ctrl.fill,
         labelWidget = ctrl.labelWidget,
-        item = { active = ctrl.capturing == true, enabled = true, variant = "default" },
-    }, ctx)
+    }
+    ctrl.paint.item = { active = ctrl.capturing == true, enabled = true, variant = "default" }
+    Button.applyChrome(ctrl.paint, ctx)
 end
 
 function Keybind.build(ctx)
@@ -230,18 +233,19 @@ function Keybind.build(ctx)
     if ctx.values[vkey] == nil then
         ctx.values[vkey] = DefaultValue(item)
     end
-    local button, label = umg.CreateTextButton(
+    local fill, button, label = umg.CreateFilledButton(
         ctx.contentBox,
         ctx.namePrefix,
         Caption(item, ctx.values[vkey], false)
     )
-    umg.AddToContent(ctx, button)
+    umg.AddToContent(ctx, fill)
     umg.AddItemPad(ctx, ctx.namePrefix .. "_Pad", 8)
     local ctrl = {
         kind = "keybind",
         sectionId = ctx.section.id,
         item = item,
         widget = button,
+        fill = fill,
         labelWidget = label,
         valueKey = vkey,
         wasPressed = false,
@@ -438,8 +442,11 @@ function Keybind.poll(ctrl, ctx)
     if not ctx.IsValid(ctrl.widget) then
         return
     end
-    if ctx.Input.WidgetPressedEdge(ctrl, ctrl.widget) then
-        FireClick(ctrl, ctx, "press-edge")
+    if ctrl.paint ~= nil then
+        ctx.umg.TrackPointer(ctrl.paint)
+    end
+    if ctx.Input.ReleaseClick(ctrl, ctrl.widget) then
+        FireClick(ctrl, ctx, "release")
         return
     end
     if ctrl.capturing then
@@ -449,10 +456,11 @@ end
 
 --- @return boolean true if click consumed
 function Keybind.pollClick(ctrl, ctx)
-    if not ctx.Input.WidgetHovered(ctrl.widget) then
-        return false
+    local consumed, fireNow = ctx.Input.ArmClick(ctrl, ctrl.widget)
+    if fireNow then
+        return FireClick(ctrl, ctx, "latch-hover")
     end
-    return FireClick(ctrl, ctx, "latch-hover")
+    return consumed
 end
 
 --- End the capture of every keybind control in ctx.liveControls.

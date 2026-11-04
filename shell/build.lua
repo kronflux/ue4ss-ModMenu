@@ -25,7 +25,6 @@ local Construct = Umg.Construct
 local StyleText = Umg.StyleText
 local SetLabelText = Umg.SetLabelText
 local AddSpacer = Umg.AddSpacer
-local CreateTextButton = Umg.CreateTextButton
 
 local M = {}
 
@@ -73,24 +72,27 @@ function M.BuildContent(S)
 
     -- Title-row Close: same path as the toggle key. Opt out with showClose = false.
     if config.showClose ~= false then
-        local closeBtn, closeLbl = CreateTextButton(
+        local closeFill, closeBtn, closeLbl = Umg.CreateFilledButton(
             titleRow,
             "ModMenu_Close_" .. suffix,
             "Close"
         )
-        local closeSlot = titleRow:AddChildToHorizontalBox(closeBtn)
+        local closeSlot = titleRow:AddChildToHorizontalBox(closeFill)
         pcall(function()
             closeSlot:SetSize({ SizeRule = 0, Value = 0.0 })
             closeSlot:SetPadding({ Left = 8, Top = 0, Right = 0, Bottom = 0 })
             closeSlot:SetVerticalAlignment(2)
         end)
-        table.insert(S.liveControls, {
+        local closeCtrl = {
             kind = "close",
             widget = closeBtn,
+            fill = closeFill,
             label = closeLbl,
             role = "close",
             wasPressed = false,
-        })
+        }
+        Umg.SetFill(closeCtrl, Theme.Of(config).buttonBg)
+        table.insert(S.liveControls, closeCtrl)
     end
 
     local keyName = tostring(config.keyHint or config.keyName or "F6")

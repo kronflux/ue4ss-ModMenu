@@ -286,6 +286,15 @@ function M.ButtonStates(colors, variant)
     return { hover = hover, pressed = pressed }
 end
 
+--- Return the hover and pressed fills for any resting fill, for buttons that have no variant,
+--- such as tabs, headers and the checkbox: lightened for hover and darkened for pressed.
+---@param fill table
+---@return table hover
+---@return table pressed
+function M.FillStates(fill)
+    return M.Shade(fill, STATE_SHADE), M.Shade(fill, -STATE_SHADE)
+end
+
 function M.Of(config)
     if config ~= nil and type(config.colors) == "table" then
         return config.colors

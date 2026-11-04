@@ -121,9 +121,12 @@ function Fold.build(ctx)
     local fontSize = ctx.config.fontHint or ctx.config.fontSection or 14
     local namePrefix = ctx.namePrefix
 
-    local headerBtn = umg.Construct("/Script/UMG.Button", ctx.contentBox, namePrefix .. "_Hdr")
+    -- The Border is the visible fill, and the Button inside it is transparent (see Umg.SetFillColors).
+    local headerFill = umg.Construct("/Script/UMG.Border", ctx.contentBox, namePrefix .. "_HdrFill")
+    local headerBtn = umg.Construct("/Script/UMG.Button", headerFill, namePrefix .. "_Hdr")
     pcall(function()
-        headerBtn:SetBackgroundColor(colors.sectionHeaderBg)
+        headerFill:SetPadding({ Left = 0, Top = 0, Right = 0, Bottom = 0 })
+        headerFill:SetContent(headerBtn)
         if headerBtn.SetClickMethod then
             headerBtn:SetClickMethod(1)
         end
@@ -156,7 +159,7 @@ function Fold.build(ctx)
     pcall(function()
         headerBtn:SetContent(headerRow)
     end)
-    umg.AddToContent(ctx, headerBtn, { fillVertical = true })
+    umg.AddToContent(ctx, headerFill, { fillVertical = true })
 
     local body = umg.Construct("/Script/UMG.VerticalBox", ctx.contentBox, namePrefix .. "_Body")
     umg.AddToContent(ctx, body)
@@ -188,16 +191,19 @@ function Fold.build(ctx)
     ctx.layout = savedLayout
     umg.AddItemPad(ctx, namePrefix .. "_Pad", 8)
 
-    table.insert(ctx.liveControls, {
+    local foldCtrl = {
         kind = "fold",
         sectionId = ctx.section.id,
         item = item,
         widget = headerBtn,
+        fill = headerFill,
         mark = mark,
         body = body,
         collapsed = collapsed,
         wasPressed = false,
-    })
+    }
+    umg.SetFill(foldCtrl, colors.sectionHeaderBg)
+    table.insert(ctx.liveControls, foldCtrl)
 end
 
 local function Toggle(ctrl, ctx)
@@ -212,19 +218,20 @@ local function Toggle(ctrl, ctx)
 end
 
 function Fold.poll(ctrl, ctx)
-    if ctx.Input.WidgetPressedEdge(ctrl, ctrl.widget) then
-        ctx.Input.DebugClick("press-edge", ctrl, ctrl.widget)
+    ctx.umg.TrackPointer(ctrl)
+    if ctx.Input.ReleaseClick(ctrl, ctrl.widget) then
+        ctx.Input.DebugClick("release", ctrl, ctrl.widget)
         Toggle(ctrl, ctx)
     end
 end
 
 function Fold.pollClick(ctrl, ctx)
-    if not ctx.Input.WidgetHovered(ctrl.widget) then
-        return false
+    local consumed, fireNow = ctx.Input.ArmClick(ctrl, ctrl.widget)
+    if fireNow then
+        ctx.Input.DebugClick("latch-hover", ctrl, ctrl.widget)
+        Toggle(ctrl, ctx)
     end
-    ctx.Input.DebugClick("latch-hover", ctrl, ctrl.widget)
-    Toggle(ctrl, ctx)
-    return true
+    return consumed
 end
 
 return Fold

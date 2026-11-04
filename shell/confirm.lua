@@ -126,15 +126,19 @@ local function MakeButton(S, parent, namePrefix, label, variant, role)
     local pair = keys[variant] or keys.default
     local bg = colors[pair[1]] or colors.buttonBg
     local fg = colors[pair[2]] or colors.buttonText
-    local button, text = Umg.CreateTextButton(parent, namePrefix, label, bg, fg, S.config.fontItem)
-    return {
+    local fill, button, text = Umg.CreateFilledButton(parent, namePrefix, label, fg, S.config.fontItem)
+    local ctrl = {
         kind = "confirm",
         role = role,
         widget = button,
+        fill = fill,
         labelWidget = text,
         item = { variant = variant, enabled = true, label = label },
         wasPressed = false,
     }
+    local states = Theme.ButtonStates(colors, variant)
+    Umg.SetFillColors(ctrl, bg, states.hover, states.pressed)
+    return ctrl
 end
 
 local function BuildOverlay(S, spec)
@@ -227,7 +231,7 @@ local function BuildOverlay(S, spec)
     end)
 
     local cancel = MakeButton(S, row, "ModMenu_ConfirmNo_" .. suffix, spec.cancelLabel, "secondary", "cancel")
-    local cancelSlot = row:AddChildToHorizontalBox(cancel.widget)
+    local cancelSlot = row:AddChildToHorizontalBox(cancel.fill)
     pcall(function()
         cancelSlot:SetSize({ SizeRule = 0, Value = 0.0 })
         cancelSlot:SetPadding({ Left = 0, Top = 0, Right = S.config.spacing.confirmGap, Bottom = 0 })
@@ -235,7 +239,7 @@ local function BuildOverlay(S, spec)
     end)
 
     local ok = MakeButton(S, row, "ModMenu_ConfirmYes_" .. suffix, spec.confirmLabel, spec.variant, "confirm")
-    local okSlot = row:AddChildToHorizontalBox(ok.widget)
+    local okSlot = row:AddChildToHorizontalBox(ok.fill)
     pcall(function()
         okSlot:SetSize({ SizeRule = 0, Value = 0.0 })
         okSlot:SetPadding({ Left = 0, Top = 0, Right = 0, Bottom = 0 })
@@ -295,8 +299,9 @@ function M.Poll(S)
 
     local fired = nil
     for _, ctrl in ipairs(S.confirmControls or {}) do
-        if Input.WidgetPressedEdge(ctrl, ctrl.widget) then
-            Input.DebugClick("press-edge", ctrl, ctrl.widget)
+        Umg.TrackPointer(ctrl)
+        if Input.ReleaseClick(ctrl, ctrl.widget) then
+            Input.DebugClick("release", ctrl, ctrl.widget)
             fired = ctrl.role
             Input.SuppressPressEdge(ctrl)
             break
@@ -306,10 +311,13 @@ function M.Poll(S)
     if Input.ConsumeMouseClick() and fired == nil then
         local latchHit = false
         for _, ctrl in ipairs(S.confirmControls or {}) do
-            if Input.WidgetHovered(ctrl.widget) then
-                Input.DebugClick("latch-hover", ctrl, ctrl.widget)
-                fired = ctrl.role
-                Input.SuppressPressEdge(ctrl)
+            local consumed, fireNow = Input.ArmClick(ctrl, ctrl.widget)
+            if consumed then
+                if fireNow then
+                    Input.DebugClick("latch-hover", ctrl, ctrl.widget)
+                    fired = ctrl.role
+                    Input.SuppressPressEdge(ctrl)
+                end
                 latchHit = true
                 break
             end

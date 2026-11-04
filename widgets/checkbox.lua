@@ -30,13 +30,15 @@ local function PaintToggle(ctrl, ctx, isOn)
         enabled = true,
         variant = "default",
     }
-    local paint = {
+    -- The paint table is kept, because it holds the fill colours the pointer poll repaints from.
+    ctrl.paint = ctrl.paint or {
         kind = "checkbox",
         widget = ctrl.widget,
+        fill = ctrl.fill,
         labelWidget = ctrl.label or ctrl.labelWidget,
-        item = ctrl.paintItem,
     }
-    Button.applyChrome(paint, ctx)
+    ctrl.paint.item = ctrl.paintItem
+    Button.applyChrome(ctrl.paint, ctx)
 end
 
 function Checkbox.validate(item, sectionId, index)
@@ -75,8 +77,9 @@ function Checkbox.build(ctx)
     local asButton = UseTouchButton(ctx)
     local widget
     local label
+    local fill
     if asButton then
-        widget, label = umg.CreateTextButton(ctx.contentBox, ctx.namePrefix, Caption(item, current))
+        fill, widget, label = umg.CreateFilledButton(ctx.contentBox, ctx.namePrefix, Caption(item, current))
     else
         widget, label = umg.CreateLabeledToggle(
             ctx.contentBox,
@@ -85,13 +88,14 @@ function Checkbox.build(ctx)
             current
         )
     end
-    umg.AddToContent(ctx, widget)
+    umg.AddToContent(ctx, fill or widget)
     umg.AddItemPad(ctx, ctx.namePrefix .. "_Pad", 8)
     local ctrl = {
         kind = "checkbox",
         sectionId = ctx.section.id,
         item = item,
         widget = widget,
+        fill = fill,
         label = label,
         labelWidget = label,
         valueKey = vkey,
@@ -123,8 +127,9 @@ function Checkbox.poll(ctrl, ctx)
         return
     end
     if ctrl.asButton then
-        if ctx.Input.WidgetPressedEdge(ctrl, ctrl.widget) then
-            FireToggle(ctrl, ctx, "press-edge")
+        ctx.umg.TrackPointer(ctrl.paint)
+        if ctx.Input.ReleaseClick(ctrl, ctrl.widget) then
+            FireToggle(ctrl, ctx, "release")
         end
         return
     end
@@ -143,10 +148,11 @@ function Checkbox.pollClick(ctrl, ctx)
     if not ctrl.asButton then
         return false
     end
-    if not ctx.Input.WidgetHovered(ctrl.widget) then
-        return false
+    local consumed, fireNow = ctx.Input.ArmClick(ctrl, ctrl.widget)
+    if fireNow then
+        return FireToggle(ctrl, ctx, "latch-hover")
     end
-    return FireToggle(ctrl, ctx, "latch-hover")
+    return consumed
 end
 
 function Checkbox.apply(ctrl, value, ctx)

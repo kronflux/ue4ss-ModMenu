@@ -10,44 +10,54 @@ end
 -- FireClick schedules a delayed re-claim of the menu input; the spec has no game thread to run it.
 ExecuteInGameThreadWithDelay = function() end
 
---- A pointer the spec drives by setting fields; the widget and context read it on each poll.
-local function newPointer(touch)
-    return { down = false, hovered = true, touch = touch == true, wasDown = false }
+-- Input requires UEHelpers at load, so an empty stub stands in when no earlier spec loaded it.
+local stubbedHelpers = package.loaded["UEHelpers.UEHelpers"] == nil
+if stubbedHelpers then
+    package.loaded["UEHelpers.UEHelpers"] = {}
+end
+local okInput, Input = pcall(require, "ModMenu.core.input")
+if stubbedHelpers then
+    package.loaded["UEHelpers.UEHelpers"] = nil
+end
+assert_true("core.input loads under MoonSharp", okInput)
+if not okInput then
+    return
 end
 
-local function newContext(pointer, clicks)
+--- A pointer the spec drives by setting fields; the fake widget reports them to the real Input.
+local function newPointer(touch)
+    return { down = false, hovered = true, touch = touch == true }
+end
+
+local function newWidget(pointer)
+    local widget = {}
+    function widget:IsPressed()
+        return pointer.down
+    end
+    function widget:HasMouseCapture()
+        return pointer.down
+    end
+    function widget:IsHovered()
+        return pointer.hovered
+    end
+    return widget
+end
+
+local function newContext()
     return {
-        Input = {
-            IsTouch = function()
-                return pointer.touch
-            end,
-            WidgetIsDown = function()
-                return pointer.down
-            end,
-            WidgetHovered = function()
-                return pointer.hovered
-            end,
-            WidgetPressedEdge = function(state)
-                local wentDown = pointer.down and not state.wasPressed
-                state.wasPressed = pointer.down
-                return wentDown
-            end,
-            DebugClick = function() end,
-            SuppressPressEdge = function() end,
-            IgnoreClicks = function() end,
-        },
+        Input = Input,
+        umg = { TrackPointer = function() end },
         SafeCall = function(fn)
             fn()
         end,
         ReclaimMenuInput = function() end,
-        clicks = clicks,
     }
 end
 
-local function newControl(clicks)
+local function newControl(pointer, clicks)
     return {
         kind = "button",
-        widget = {},
+        widget = newWidget(pointer),
         item = {
             id = "b",
             variant = "default",
@@ -57,11 +67,11 @@ local function newControl(clicks)
         },
     }
 end
-
 local function setup(touch)
     local clicks = { count = 0 }
     local pointer = newPointer(touch)
-    return newControl(clicks), newContext(pointer, clicks), pointer, clicks
+    Input.SetPointerMode(touch and "touch" or "mouse")
+    return newControl(pointer, clicks), newContext(), pointer, clicks
 end
 
 -- A press then a release over the button is one click, and it lands on the release tick.
@@ -123,4 +133,61 @@ do
     assert_eq("an expired latch fires no click", clicks.count, 0)
     pointer.hovered = false
     assert_true("the latch off the button is not consumed", Button.pollClick(ctrl, ctx) == false)
+end
+
+-- The fill helpers repaint the Border behind a transparent Button. A fake Border records the colour it
+-- was given, and a fake Button reports the pointer state, so no engine is needed.
+local okUmg, Umg = pcall(require, "ModMenu.core.umg")
+assert_true("core.umg loads under MoonSharp", okUmg)
+if okUmg then
+    local function newFill()
+        local fill = { color = nil }
+        function fill:SetBrushColor(color)
+            self.color = color
+        end
+        return fill
+    end
+    local function newButton()
+        local button = { hovered = false, pressed = false, background = nil }
+        function button:IsHovered()
+            return self.hovered
+        end
+        function button:IsPressed()
+            return self.pressed
+        end
+        function button:SetBackgroundColor(color)
+            self.background = color
+        end
+        return button
+    end
+    local normal = { R = 0.4, G = 0.4, B = 0.4, A = 1 }
+    local hover = { R = 0.6, G = 0.6, B = 0.6, A = 1 }
+    local pressed = { R = 0.2, G = 0.2, B = 0.2, A = 1 }
+
+    local ctrl = { widget = newButton(), fill = newFill() }
+    Umg.SetFillColors(ctrl, normal, hover, pressed)
+    assert_eq("SetFillColors paints the resting colour on the fill", ctrl.fill.color, normal)
+    assert_eq("SetFillColors makes the button transparent", ctrl.widget.background.A, 0)
+
+    ctrl.widget.hovered = true
+    Umg.TrackPointer(ctrl)
+    assert_eq("TrackPointer paints the hover colour", ctrl.fill.color, hover)
+    ctrl.widget.pressed = true
+    Umg.TrackPointer(ctrl)
+    assert_eq("TrackPointer paints the pressed colour", ctrl.fill.color, pressed)
+    ctrl.widget.hovered = false
+    ctrl.widget.pressed = false
+    Umg.TrackPointer(ctrl)
+    assert_eq("TrackPointer returns to the resting colour", ctrl.fill.color, normal)
+
+    local bare = { widget = newButton() }
+    bare.widget.hovered = true
+    Umg.TrackPointer(bare)
+    assert_eq("TrackPointer leaves a control with no fill alone", bare.lastState, nil)
+
+    local derived = { widget = newButton(), fill = newFill() }
+    Umg.SetFill(derived, normal)
+    derived.widget.hovered = true
+    Umg.TrackPointer(derived)
+    assert_true("SetFill derives a lighter hover colour", derived.fill.color.R > normal.R)
 end

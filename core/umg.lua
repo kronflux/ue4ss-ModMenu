@@ -401,14 +401,85 @@ end
 --- A text button inside a Border. The Border is the visible fill, because a Button's own brushes
 --- cannot be recoloured per state from Lua; widgets/button.lua makes the Button itself transparent
 --- and repaints the Border. Returns fill, button, label, and the caller adds `fill` to a parent.
-function M.CreateFilledButton(outer, namePrefix, caption)
+function M.CreateFilledButton(outer, namePrefix, caption, textColor, fontSize)
     local fill = M.Construct("/Script/UMG.Border", outer, namePrefix .. "_Fill")
-    local button, label = M.CreateTextButton(fill, namePrefix, caption)
+    local button, label = M.CreateTextButton(fill, namePrefix, caption, nil, textColor, fontSize)
     pcall(function()
         fill:SetPadding({ Left = 0, Top = 0, Right = 0, Bottom = 0 })
         fill:SetContent(button)
     end)
     return fill, button, label
+end
+
+--- Give a button-like control its colours for each pointer state. `ctrl.widget` is the Button and
+--- `ctrl.fill` the Border behind it. The Button is made fully transparent, so UMG's stock grey
+--- hovered brush draws nothing and the Border carries the resting colour and every state after it.
+---@param ctrl table
+---@param normal table
+---@param hover table
+---@param pressed table
+function M.SetFillColors(ctrl, normal, hover, pressed)
+    ctrl.stateColors = { normal = normal, hover = hover, pressed = pressed }
+    -- This paints the resting colour, so TrackPointer compares against the normal state from here.
+    ctrl.lastState = "normal"
+    pcall(function()
+        if ctrl.widget ~= nil then
+            ctrl.widget:SetBackgroundColor({ R = 1, G = 1, B = 1, A = 0 })
+        end
+        if ctrl.fill ~= nil then
+            ctrl.fill:SetBrushColor(normal)
+        end
+    end)
+end
+
+--- SetFillColors with the hover and pressed colours derived from the resting fill, for controls
+--- that have no button variant.
+---@param ctrl table
+---@param normal table
+function M.SetFill(ctrl, normal)
+    local hover, pressed = Theme.FillStates(normal)
+    M.SetFillColors(ctrl, normal, hover, pressed)
+end
+
+local function IsTrue(value)
+    return value == true or value == 1
+end
+
+--- Read the pointer state of the Button as "pressed", "hover" or "normal".
+---@param widget any
+---@return string
+function M.PointerState(widget)
+    local hovered, pressed = false, false
+    pcall(function()
+        hovered = IsTrue(widget:IsHovered())
+    end)
+    pcall(function()
+        pressed = IsTrue(widget:IsPressed())
+    end)
+    if pressed then
+        return "pressed"
+    end
+    if hovered then
+        return "hover"
+    end
+    return "normal"
+end
+
+--- Repaint the Border behind a button when its pointer state changed since the last call.
+--- A control with no fill or no colours is left alone.
+---@param ctrl table
+function M.TrackPointer(ctrl)
+    if ctrl.widget == nil or ctrl.fill == nil or ctrl.stateColors == nil then
+        return
+    end
+    local state = M.PointerState(ctrl.widget)
+    if state == ctrl.lastState then
+        return
+    end
+    ctrl.lastState = state
+    pcall(function()
+        ctrl.fill:SetBrushColor(ctrl.stateColors[state] or ctrl.stateColors.normal)
+    end)
 end
 
 return M

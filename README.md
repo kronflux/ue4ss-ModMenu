@@ -671,6 +671,8 @@ Use `SetButtonLabel` / `SetButtonEnabled` / `SetButtonVariant` / `SetButtonActiv
 
 An enabled button that is not active lightens its fill while the pointer is over it and darkens it while it is pressed. The menu polls `IsHovered` and `IsPressed` on the button and repaints only when that state changes. Disabled and active buttons keep their own fill. The state colours come from the theme; see **Theming & polish**.
 
+A mouse click fires when the button is released over it. The pressed colour stays while the button is held, and releasing after the pointer moved off the button fires nothing. A touch tap fires on press. Tabs, Close, section and fold headers, the confirm buttons, the keybind button and the dropdown header and options follow the same rule and show the same hover and pressed colours.
+
 ### `checkbox`
 
 ```lua

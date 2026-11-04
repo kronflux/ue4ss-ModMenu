@@ -129,7 +129,7 @@ local function CaptureCtx(extra)
         values = { ["Sec.jump"] = "F7", ["Sec.dash"] = "" },
         liveControls = {},
         config = { keyName = "F6" },
-        umg = { SetLabelText = function() end },
+        umg = { SetLabelText = function() end, SetFillColors = function() end, TrackPointer = function() end },
         IsValid = function(obj)
             return obj ~= nil
         end,
@@ -139,8 +139,11 @@ local function CaptureCtx(extra)
             end
         end,
         Input = {
-            WidgetPressedEdge = function()
+            ReleaseClick = function()
                 return false
+            end,
+            ArmClick = function()
+                return false, false
             end,
             MakeFKey = function(name)
                 return { KeyName = name }

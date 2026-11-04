@@ -3,6 +3,7 @@
 ]]
 
 local Input = require("ModMenu.core.input")
+local Umg = require("ModMenu.core.umg")
 
 local M = {}
 
@@ -13,20 +14,21 @@ local function Request(S, ctrl)
 end
 
 function M.Poll(S, ctrl)
-    if Input.WidgetPressedEdge(ctrl, ctrl.widget) then
-        Input.DebugClick("press-edge", ctrl, ctrl.widget)
+    Umg.TrackPointer(ctrl)
+    if Input.ReleaseClick(ctrl, ctrl.widget) then
+        Input.DebugClick("release", ctrl, ctrl.widget)
         Request(S, ctrl)
     end
 end
 
 ---@return boolean
 function M.PollClick(S, ctrl)
-    if not Input.WidgetHovered(ctrl.widget) then
-        return false
+    local consumed, fireNow = Input.ArmClick(ctrl, ctrl.widget)
+    if fireNow then
+        Input.DebugClick("latch-hover", ctrl, ctrl.widget)
+        Request(S, ctrl)
     end
-    Input.DebugClick("latch-hover", ctrl, ctrl.widget)
-    Request(S, ctrl)
-    return true
+    return consumed
 end
 
 return M

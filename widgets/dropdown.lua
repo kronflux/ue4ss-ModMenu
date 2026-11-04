@@ -56,22 +56,25 @@ local function RebuildRows(ctrl)
                 dropdownRowSerial = dropdownRowSerial + 1
                 local optValue = Util.ToPlainString(opt.value) or opt.value
                 local isSelected = selectedValue ~= nil and optValue == selectedValue
-                local btn, lbl = Umg.CreateTextButton(
+                local fill, btn, lbl = Umg.CreateFilledButton(
                     ctrl.listBox,
                     ctrl.namePrefix .. "_Opt" .. tostring(dropdownRowSerial),
                     opt.label,
-                    isSelected and selectedBg or optionBg,
                     isSelected and selectedText or optionText,
                     fontDropdown
                 )
-                ctrl.listBox:AddChildToVerticalBox(btn)
-                table.insert(ctrl.optionRows, {
+                ctrl.listBox:AddChildToVerticalBox(fill)
+                local row = {
                     button = btn,
+                    widget = btn,
+                    fill = fill,
                     label = lbl,
                     optLabel = opt.label,
                     optValue = opt.value,
                     wasPressed = false,
-                })
+                }
+                Umg.SetFill(row, isSelected and selectedBg or optionBg)
+                table.insert(ctrl.optionRows, row)
             end
         end
     end
@@ -158,9 +161,12 @@ local function CreatePicker(outer, namePrefix, options, selectedValue, dropOpts,
 
     local root = Umg.Construct("/Script/UMG.VerticalBox", outer, namePrefix .. "_Root")
 
-    local headerBtn = Umg.Construct("/Script/UMG.Button", root, namePrefix .. "_Header_Btn")
+    -- The Border is the visible fill, and the Button inside it is transparent (see Umg.SetFillColors).
+    local headerFill = Umg.Construct("/Script/UMG.Border", root, namePrefix .. "_Header_Fill")
+    local headerBtn = Umg.Construct("/Script/UMG.Button", headerFill, namePrefix .. "_Header_Btn")
     pcall(function()
-        headerBtn:SetBackgroundColor(colors.dropdownHeaderBg)
+        headerFill:SetPadding({ Left = 0, Top = 0, Right = 0, Bottom = 0 })
+        headerFill:SetContent(headerBtn)
         if headerBtn.SetClickMethod then
             headerBtn:SetClickMethod(1)
         end
@@ -193,7 +199,9 @@ local function CreatePicker(outer, namePrefix, options, selectedValue, dropOpts,
     pcall(function()
         headerBtn:SetContent(headerRow)
     end)
-    root:AddChildToVerticalBox(headerBtn)
+    root:AddChildToVerticalBox(headerFill)
+    local headerPaint = { widget = headerBtn, fill = headerFill }
+    Umg.SetFill(headerPaint, colors.dropdownHeaderBg)
 
     local optionsBox = Umg.Construct("/Script/UMG.VerticalBox", root, namePrefix .. "_Opts")
     pcall(function()
@@ -266,6 +274,8 @@ local function CreatePicker(outer, namePrefix, options, selectedValue, dropOpts,
         listBox = listBox,
         moreLabel = moreLabel,
         headerBtn = headerBtn,
+        headerFill = headerFill,
+        headerPaint = headerPaint,
         headerLabel = valueLabel,
         arrowLabel = arrowLabel,
         optionsBox = optionsBox,
@@ -371,6 +381,8 @@ function Dropdown.liveControl(picker, extra)
         listBox = picker.listBox,
         moreLabel = picker.moreLabel,
         headerBtn = picker.headerBtn,
+        headerFill = picker.headerFill,
+        headerPaint = picker.headerPaint,
         headerLabel = picker.headerLabel,
         arrowLabel = picker.arrowLabel,
         optionsBox = picker.optionsBox,
@@ -437,14 +449,18 @@ function Dropdown.poll(ctrl, ctx)
 
     if ctrl.expanded and ctrl.optionRows then
         for _, row in ipairs(ctrl.optionRows) do
-            if Input.WidgetPressedEdge(row, row.button) then
-                SelectOption(ctrl, ctx, row, "press-edge")
+            Umg.TrackPointer(row)
+            if Input.ReleaseClick(row, row.button) then
+                SelectOption(ctrl, ctx, row, "release")
                 return
             end
         end
     end
-    if Input.WidgetPressedEdge(ctrl, ctrl.headerBtn, "headerWasPressed") then
-        ToggleHeader(ctrl, ctx, "press-edge")
+    if ctrl.headerPaint ~= nil then
+        Umg.TrackPointer(ctrl.headerPaint)
+    end
+    if Input.ReleaseClick(ctrl, ctrl.headerBtn) then
+        ToggleHeader(ctrl, ctx, "release")
     end
 end
 
@@ -454,8 +470,11 @@ function Dropdown.pollOptionClick(ctrl, ctx)
         return false
     end
     for _, row in ipairs(ctrl.optionRows) do
-        if Input.WidgetHovered(row.button) then
-            SelectOption(ctrl, ctx, row, "latch-hover")
+        local consumed, fireNow = Input.ArmClick(row, row.button)
+        if consumed then
+            if fireNow then
+                SelectOption(ctrl, ctx, row, "latch-hover")
+            end
             return true
         end
     end
@@ -464,10 +483,17 @@ end
 
 --- Header toggle click. Returns true if consumed.
 function Dropdown.pollHeaderClick(ctrl, ctx)
-    if not (Input.WidgetHovered(ctrl.headerBtn) or Input.WidgetHovered(ctrl.headerLabel)) then
+    local consumed, fireNow = Input.ArmClick(ctrl, ctrl.headerBtn)
+    if not consumed then
+        consumed, fireNow = Input.ArmClick(ctrl, ctrl.headerLabel)
+    end
+    if not consumed then
         return false
     end
-    return ToggleHeader(ctrl, ctx, "latch-hover")
+    if fireNow then
+        return ToggleHeader(ctrl, ctx, "latch-hover")
+    end
+    return true
 end
 
 --- LMB latch: option rows first, then header.

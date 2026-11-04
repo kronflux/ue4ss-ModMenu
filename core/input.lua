@@ -543,4 +543,59 @@ function M.WidgetPressedEdge(state, widget, flagKey)
     return wentDown
 end
 
+-- The mouse-down latch can arrive a tick before IsPressed turns true, so an armed press waits this
+-- many polls to show as held before it is dropped.
+local ARM_TICKS = 5
+
+--- The mouse click rule every button-like control shares: the click fires on the tick the pointer
+--- is released over the widget after being held, so the pressed colour stays while it is held and
+--- dragging off cancels. A touch tap has no held phase and fires on the press edge instead.
+---@param state table the control's own table; this keeps holding, armed and armTicks on it
+---@param widget any
+---@return boolean fire true on the tick the click should run
+function M.ReleaseClick(state, widget)
+    if state == nil or widget == nil then
+        return false
+    end
+    if pointerTouch then
+        return M.WidgetPressedEdge(state, widget)
+    end
+    if M.WidgetIsDown(widget) then
+        state.holding = true
+        state.armTicks = 0
+        return false
+    end
+    if state.holding then
+        state.holding = false
+        state.armed = false
+        return M.WidgetHovered(widget)
+    end
+    -- Give up on an armed press that never shows as held, so a stale latch cannot fire a later click.
+    if state.armed then
+        state.armTicks = (state.armTicks or 0) + 1
+        if state.armTicks > ARM_TICKS then
+            state.armed = false
+        end
+    end
+    return false
+end
+
+--- The mouse-down latch half of the click rule. A mouse press over the widget is claimed and armed,
+--- and ReleaseClick fires it; a touch tap is claimed and fires now.
+---@param state table
+---@param widget any
+---@return boolean consumed true when the latch click belongs to this widget
+---@return boolean fireNow true when the caller runs the click on this tick (touch only)
+function M.ArmClick(state, widget)
+    if state == nil or not M.WidgetHovered(widget) then
+        return false, false
+    end
+    if pointerTouch then
+        return true, true
+    end
+    state.armed = true
+    state.armTicks = 0
+    return true, false
+end
+
 return M
