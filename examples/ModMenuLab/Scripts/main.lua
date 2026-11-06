@@ -78,14 +78,29 @@ end
 -- Autosave writes through the store, and the store writes Mods/ModMenuLab/config.json once it is initialised.
 pcall(ModMenu.ConfigManager.Init, { id = "ModMenuLab" })
 
+-- The lab starts in this theme, and the Theme test section switches from it.
+local START_THEME = "dark"
+
+-- These are Funnel Runners font assets, which some presets name as kanit, vcr, inconsolata and lekton.
+-- In another game the paths do not exist, so the library draws those presets in Roboto and logs each missing path once.
+local FONT_DIR = "/Game/StormEscape/UI/Foundation/Fonts/"
+local FONTS = {
+    kanit = FONT_DIR .. "Kanit/Kanit.Kanit",
+    vcr = FONT_DIR .. "vcr_osd_mono.vcr_osd_mono",
+    inconsolata = FONT_DIR .. "Inconsolata.Inconsolata",
+    lekton = FONT_DIR .. "Lekton.Lekton",
+}
+
 local okInit, initErr = pcall(ModMenu.Init, {
     title = "ModMenuLab",
     instanceId = "ModMenuLab",
     key = Key.F7,
     keyHint = "F7",
     dock = "right",
-    theme = "dark",
-    tabs = { "Buttons", "Inputs", "Widgets", "Layout", "Controls", "Multi" },
+    theme = START_THEME,
+    -- Fonts are merged across Init calls, so the theme switches below do not pass them again.
+    fonts = FONTS,
+    tabs = { "Theme", "Buttons", "Inputs", "Widgets", "Layout", "Controls", "Multi" },
     consoleCommand = "modmenulab",
     ignoreLook = true,
     autosave = true,
@@ -120,6 +135,85 @@ local function reg(section)
     local ok, err = pcall(ModMenu.Register, section)
     say(string.format("Register %s: %s", section.id, ok and "ok" or ("raised " .. tostring(err))))
 end
+
+-- Theme test: every switch calls Init with the new theme, and the library tears the shell down and builds it again.
+-- The menu stays open through the rebuild, so Next theme can be clicked through every preset.
+local themeIds = ModMenu.Themes()
+local themeIndex = 1
+for i, id in ipairs(themeIds) do
+    if id == START_THEME then
+        themeIndex = i
+    end
+end
+
+-- The theme Init runs on the next game-thread tick, so the shell is not torn down inside the click handler that
+-- asked for it. The menu is still open when Init runs, so the rebuild-while-open path (AC-9) is still exercised.
+-- One function held by this file-level local is reused for every switch, because UE4SS keeps only a registry
+-- reference to a delayed callback and a collected closure breaks the Lua tick hook.
+local pendingThemeId = nil
+local function runPendingTheme()
+    local id = pendingThemeId
+    pendingThemeId = nil
+    if id == nil then
+        return
+    end
+    local ok, err = pcall(ModMenu.Init, { theme = id })
+    if not ok then
+        say("theme " .. id .. " Init raised: " .. tostring(err))
+    end
+end
+
+local function applyTheme(index)
+    -- Lua's % is floored, so index 0 wraps to the last preset and index count + 1 wraps to the first.
+    themeIndex = ((index - 1) % #themeIds) + 1
+    local id = themeIds[themeIndex]
+    -- The dropdown's value is stored before the rebuild, so the new shell shows the theme it is drawn in.
+    pcall(ModMenu.Set, "LabTheme", "theme_pick", id)
+    say("theme -> " .. id)
+    -- Two clicks within one tick queue one Init, for the later theme.
+    local queued = pendingThemeId ~= nil
+    pendingThemeId = id
+    if not queued then
+        local ok, err = pcall(ExecuteInGameThreadWithDelay, 1, runPendingTheme)
+        if not ok then
+            pendingThemeId = nil
+            say("theme " .. id .. " could not be queued: " .. tostring(err))
+        end
+    end
+end
+
+local function pickTheme(id)
+    -- The dropdown has stored the value before this runs, so the local index is the record of the theme on screen.
+    if id == themeIds[themeIndex] then
+        return
+    end
+    for i, known in ipairs(themeIds) do
+        if known == id then
+            applyTheme(i)
+            return
+        end
+    end
+    say("theme pick ignored: unknown id " .. tostring(id))
+end
+
+reg({
+    id = "LabTheme", title = "Theme test", tab = "Theme",
+    description = "Each choice rebuilds the menu in that preset. Watch the log for a built theme line per switch.",
+    items = {
+        { type = "dropdown", id = "theme_pick", label = "Theme", options = themeIds, default = START_THEME,
+          onChange = pickTheme },
+        { type = "row", items = {
+            { type = "button", id = "theme_prev", label = "Previous theme", onClick = function()
+                applyTheme(themeIndex - 1)
+            end },
+            { type = "button", id = "theme_next", label = "Next theme", variant = "primary", onClick = function()
+                applyTheme(themeIndex + 1)
+            end },
+        } },
+    },
+})
+-- Autosave restores the dropdown's last value, but Init above drew START_THEME, so the dropdown is set back to match.
+pcall(ModMenu.Set, "LabTheme", "theme_pick", START_THEME)
 
 reg({
     id = "LabButtons", title = "Button variants", tab = "Buttons",

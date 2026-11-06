@@ -22,13 +22,13 @@ Record the result of each step as the log lines it produced. A step with no line
 
 | Step | Action | Expected log line |
 |---|---|---|
-| 1 | Launch the game, wait for the main menu | `Init ok`, four `Register ... ok` lines |
+| 1 | Launch the game, wait for the main menu | `Init ok`, nine `Register ... ok` lines, the first for `LabTheme` |
 | 2 | Press F7 | `[ModMenu] OPEN tag=ModMenuLab`, no crash |
-| 3 | Hover the `default` button, then move off | `button b_default pointer state hover`, then `normal`; note whether the fill changed colour or only showed the stock grey |
-| 4 | Click `default` | `click path=...`, `b_default -> nil` |
-| 5 | Click `Probe widgets` | one `probe ...` line per button with `bg=` and `hoverTint=`; compare `hoverTint` with the theme's hover colour |
-| 6 | Hover `with tooltip` and hold still for one second | tooltip visible and readable; note its size |
-| 7 | Click `confirm`, then the modal's confirm | `b_confirm -> nil` after the modal |
+| 3 | Buttons tab: hover the `default` button, then move off | `button b_default pointer state hover`, then `normal`; note whether the fill changed colour or only showed the stock grey |
+| 4 | Buttons tab: click `default` | `click path=...`, `b_default -> nil` |
+| 5 | Buttons tab: click `Probe widgets` | one `probe ...` line per button with `bg=` and `hoverTint=`; compare `hoverTint` with the theme's hover colour |
+| 6 | Buttons tab: hover `with tooltip` and hold still for one second | tooltip visible and readable; note its size |
+| 7 | Buttons tab: click `confirm`, then the modal's confirm | `b_confirm -> nil` after the modal |
 | 8 | Inputs tab: toggle, change the number, type text, pick `two` | `c_1 -> true`, `n_1 -> ...`, `t_1 -> ...`, `d_1 -> two` |
 | 9 | Widgets tab: drag the slider | `s_1 -> ...` values in steps of 5 |
 | 10 | Click `Crouch`, then `B` | `r_1 -> Crouch`, `r_2 -> B`, the chosen option painted green |
@@ -43,6 +43,28 @@ Record the result of each step as the log lines it produced. A step with no line
 | 17 | Controls tab: click `Rename progress label` | `pr_1 SetLabel found=true` and the label text changes |
 | 18 | Controls tab: drag a colour slider and release | one `cp_1 -> {A=...,B=...,G=...,R=...}` line per drag; the swatch follows the sliders; the second picker has no A slider |
 | 19 | Multi tab, last: click two options | `ms_1 -> {Beta,...}` style lines with the checked values in option order; the options sit in two columns |
+
+## Theme test steps
+
+The Theme tab comes first. Its dropdown lists every preset id from `ModMenu.Themes()`, and each
+choice calls `ModMenu.Init({ theme = id })`. The library then tears the shell down and builds it
+again in that preset, and keeps the menu open. The lab starts in `dark` every launch, and the
+first `Init` passes the Funnel Runners paths for the `kanit`, `vcr`, `inconsolata` and `lekton`
+fonts. In another game those paths do not exist, so the text falls back to Roboto.
+
+Each switch writes two lines. The lab writes `theme -> <id>`, and the library writes
+`[ModMenu] built theme=<id> items=<n> widgets=<n> ms=<n>` once the new shell is built.
+
+| Step | Action | Expected log line |
+|---|---|---|
+| T1 | Press F7, then click the Theme tab | `[ModMenu] OPEN tag=ModMenuLab`; the dropdown shows `dark` |
+| T2 | Click `Next theme` | `theme -> slate`, then `[ModMenu] built theme=slate ...`; the menu stays open in Slate and the dropdown shows `slate` |
+| T3 | Click `Next theme` until the dropdown shows `dark` again, taking a screenshot of each preset | one `theme -> <id>` and one `built theme=<id>` line per click, for all 29 ids in order; no crash |
+| T4 | Pick `light` in the dropdown first, then click `Previous theme` | `theme -> nord`; the list wraps to the last preset |
+| T5 | Pick `glass` in the dropdown | `theme -> glass`, then `built theme=glass ...` |
+| T6 | Pick `slate`, then `light`, and compare the two `built` lines | `ms` under 250 for slate; slate's `widgets` at most 3 times light's |
+| T7 | In each screenshot, check the buttons, toggles, choices and panel corners | no engine-default grey button, no light rim on a rounded shape, no blur outside the panel's corners |
+| T8 | In a preset that names a game font, such as `loadout`, read the log | at most one line per missing path per session, for any of the four paths the lab passes; none in Funnel Runners |
 
 ## Comparing runs
 

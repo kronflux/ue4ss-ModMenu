@@ -205,7 +205,9 @@ Configure and bind this mod’s shell. Safe to call more than once (updates conf
 | `fontScale` | `1` | Multiplies the default font sizes (same idea as UE4SS `GuiConsoleFontScaling`). Prefer this for per-game **desktop** tuning. Explicit `fontTitle` / … still win and are not scaled by this. |
 | `fontTitle` / `fontHint` / `fontItem` / `fontSection` / `fontDropdown` | 22 / 14 / 16 / 18 / 15 | Optional absolute sizes. Omit and use `fontScale` unless one role needs a one-off size. `fontDropdown` is header + option rows. |
 | `touchFontScale` | `1.75` | Used only when `pointerMode` is `"touch"`. Multiplies resolved fonts **and** desktop `widthFrac` (0.32 → ~0.56, cap 0.85). Mortal Shell 2 `fontItem = 10` becomes 18. Not stacked across later `Init` calls. |
-| `theme` | `"light"` | Author preset. `"light"` is the current look (navy panel, light fields). `"dark"` is charcoal panel, dark fields, teal/gold tokens. Not a player setting. |
+| `theme` | `"light"` | Author preset: a preset id such as `"slate"`, or a theme definition table. `"light"` is the current look (navy panel, light fields). `"dark"` is charcoal panel, dark fields, teal/gold tokens. An unknown id raises an error that lists every id. Not a player setting. See **Themes and styles**. |
+| `style` | `nil` | Optional per-object-type overrides over the theme, plus `palette`. Merged over the `style` of earlier `Init` calls. See **Themes and styles**. |
+| `fonts` | `nil` | Optional table of font id to object path, for game fonts such as `kanit`. Merged across `Init` calls. See **Themes and styles**. |
 | `colors` | from `theme` | Optional overrides: `{ panelBg = { R, G, B, A }, ... }`. Merged onto the preset. See **Theming**. |
 | `tabs` | `nil` | Optional `{ "Cheats", "Give", ... }`. Adds a tab strip; only the active tab's sections are built. Omit = current single-scroll menu. Duplicate / empty names error. |
 | `canOpen` | `nil` | Optional `function(): boolean` or `false, "reason"`. Gates **open** (key toggle + `ModMenu.Open`); close is never gated. Pass `false` on a later `Init` to clear. |
@@ -1113,6 +1115,205 @@ Touch mode: checkboxes are ON/OFF buttons (`press-edge`); delayed LMB latch igno
 
 ---
 
+## Themes and styles
+
+A theme sets the whole look of the menu: colours, corner radius, outlines, fonts and the shape of each control. You choose one preset in `Init`, and you can change any part of it with `style`. Players do not pick a theme; the author sets it.
+
+### Choosing a preset
+
+Pass the preset id as `theme`:
+
+```lua
+ModMenu.Init({
+    title = "My Cheats",
+    theme = "slate",
+})
+```
+
+`ModMenu.Themes()` returns every preset id in the order below. An unknown id makes `Init` raise an error that lists every id, and the menu keeps its previous theme.
+
+| Id | Name | Look |
+|----|------|------|
+| `light` | Light | The shipped ModMenu look |
+| `dark` | Dark | Charcoal with teal and gold |
+| `slate` | Slate | Modern dark |
+| `glass` | Glass | Frosted, over the game |
+| `storm` | Storm | Amber on slate |
+| `neon` | Neon | Synthwave |
+| `doppler` | Doppler | Radar scope |
+| `tornado-warning` | TORNADO WARNING | Take shelter now |
+| `night-drive` | Night Drive | Instrument cluster |
+| `loadout` | Loadout | Shooter HUD |
+| `cozy` | Cozy | Farm life |
+| `carbon` | Carbon | Sim racing |
+| `blueprint` | Blueprint | Engineering drawing |
+| `paper-blue` | Paper | Cool blue |
+| `field-kit` | Field Kit | Rescue gear |
+| `ink` | Ink | Black and white |
+| `aurora` | Aurora | Night sky |
+| `midnight` | Midnight | Calm and low contrast |
+| `storm-front` | Storm Front | Lightning on violet |
+| `sakura` | Sakura | Soft and light |
+| `ocean` | Ocean | Deep water |
+| `steel` | Steel | Brushed metal |
+| `paper-sage` | Paper | Sage green |
+| `dracula` | Dracula | The Dracula palette |
+| `catppuccin-mocha` | Catppuccin Mocha | Soothing pastel, dark |
+| `catppuccin-latte` | Catppuccin Latte | Soothing pastel, light |
+| `material` | Material | Material Design, dark |
+| `monokai` | Monokai | The classic editor theme |
+| `nord` | Nord | Arctic, north-bluish |
+
+Ten more presets come in stage 2: Terminal, Hologram, Frost and the operating-system looks (Windows 11, macOS, Windows XP and Windows Classic). They need gradients, bevels and window chrome that stage 1 does not draw.
+
+`theme` also takes a theme definition table with the same shape as a preset file, so you can write a custom theme in code. `ModMenu.ResolveStyle(theme, style, colors)` returns the complete style that `Init` would draw, without building any widget, for tests and tools.
+
+### Object types
+
+A theme is split into object types. Each type styles one kind of part, and `style` changes one type at a time.
+
+| Type | Read by |
+|------|---------|
+| `panel` | The dock panel, its blur, shadow, rim and corner brackets |
+| `header` | The title row and the Close button |
+| `title`, `body`, `hint`, `data` | Text styles: the title, every label and caption, hints, and value readouts |
+| `tabs` | The tab strip |
+| `section` | Section headers and fold headers |
+| `button` | `button` items, the confirm dialog's buttons and the stepper's buttons |
+| `toggle` | `checkbox` items |
+| `slider` | `slider` items and the colour picker's channels |
+| `progress` | `progress` items |
+| `choice` | `radio` and `multiselect` items |
+| `field` | `textinput`, `number` and `keybind` items, and the `dropdown` header |
+| `list` | The dropdown's option list |
+| `stepper` | `stepper` items |
+| `tooltip` | The tooltip card |
+| `confirm` | The confirm card and the dim overlay behind it |
+| `motion` | Animations, which come in stage 2 |
+
+The field names and kinds of every type are listed once, in `themes/fields.json`. An unknown type or field makes `Init` raise an error that names it.
+
+### Borrowing an object type from another preset
+
+Set a type to a preset id to take its shape from that preset. The borrowed type drops the other preset's colours and takes the colours of your theme's palette, so it fits in.
+
+```lua
+ModMenu.Init({
+    theme = "slate",
+    style = { button = "neon" },
+})
+```
+
+Add `from` to borrow a type and change some of its fields in the same table:
+
+```lua
+ModMenu.Init({
+    theme = "slate",
+    style = { button = { from = "neon", radius = 4 } },
+})
+```
+
+This mix borrows five types from four presets over Slate:
+
+```lua
+ModMenu.Init({
+    theme = "slate",
+    style = {
+        title = "glass",
+        button = "neon",
+        toggle = "cozy",
+        choice = "cozy",
+        progress = "doppler",
+    },
+})
+```
+
+### Changing fields
+
+Set a type to a table to change some of its fields and keep the rest:
+
+```lua
+ModMenu.Init({
+    theme = "storm",
+    style = { toggle = { trackOn = "#22F1FF" } },
+})
+```
+
+A colour is a hex string in sRGB, `"#RRGGBB"` or `"#RRGGBBAA"`, or a table `{ R, G, B, A }` in linear values as before.
+
+### Changing the palette
+
+`style.palette` replaces colours in the theme's palette before anything else is worked out from it. Every part that takes its colour from the palette follows.
+
+```lua
+ModMenu.Init({
+    theme = "slate",
+    style = { palette = { accent = "#FF7A1A", accentText = "#1A1A1A" } },
+})
+```
+
+The palette keys are `bg`, `text`, `muted`, `accent`, `accentText`, `danger`, `dangerText`, `surface`, `line`, `track`, `secondaryText`, `success`, `warning` and `info`.
+
+### Styling one item
+
+Give an item a `look` table to change its object type's fields for that item only. An unknown field makes `Register` raise an error that names the section, the item's position and the field, such as `Register(Cheats) items[2].look: button.glow is not a known field`.
+
+```lua
+{ type = "button", id = "heal", label = "Heal", look = { radius = 0 } }
+```
+
+A `label` item reads the `body` type, a `checkbox` reads `toggle`, and every other item reads the type in the table above. `row`, `fold` and `separator` items take no `look`.
+
+`pill` wins over `radius`. On a theme whose buttons are pills, such as `neon`, a square button needs both fields:
+
+```lua
+{ type = "button", id = "heal", label = "Heal", look = { radius = 0, pill = false } }
+```
+
+### Game fonts
+
+Some presets name game fonts by id, such as `kanit`, `vcr`, `inconsolata` and `lekton`. The library knows only `roboto` and `mono` by itself, so you pass the object path of each game font in `fonts`:
+
+```lua
+local FONT_DIR = "/Game/StormEscape/UI/Foundation/Fonts/"
+
+ModMenu.Init({
+    theme = "loadout",
+    fonts = {
+        kanit = FONT_DIR .. "Kanit/Kanit.Kanit",
+        vcr = FONT_DIR .. "vcr_osd_mono.vcr_osd_mono",
+        inconsolata = FONT_DIR .. "Inconsolata.Inconsolata",
+        lekton = FONT_DIR .. "Lekton.Lekton",
+    },
+})
+```
+
+These paths are Funnel Runners assets. A font that does not load is skipped for the next font in the chain, and every chain ends in Roboto, so text always draws. The library logs each missing path once per session. When a preset names a font id that has no path in `fonts`, the library logs `font id <id> has no path; add it to Init's fonts option` once and uses the next font in the chain. A text style's `font` field takes one id or a list of ids, such as `style = { title = { font = { "kanit", "roboto" } } }`.
+
+### Light, dark and colors
+
+`light` and `dark` draw the same widgets in the same colours as before, and `colors` works as before. A `colors` token is applied after the theme and `style`, with any theme, so `colors = { panelBg = ... }` still sets the panel fill. The token list is under **Theming & polish** below.
+
+### Changing the theme later
+
+A later `Init` merges its `style` over the earlier `style`, and its `fonts` over the earlier `fonts`. When a later `Init` changes `theme`, `style`, `colors` or `fonts`, the library tears the menu down and builds it again in the new look. If the menu is open, it reopens at once; if it is closed, the new look shows on the next open. An `Init` that changes none of these keeps the menu as it is. After each build the log has one line like this, with the counts and the build time in milliseconds:
+
+```text
+[ModMenu] built theme=slate items=62 widgets=840 ms=120
+```
+
+### Adding or editing a preset
+
+Each preset is a JSON file in `themes/presets/<id>.json`. The library and the builder read generated copies, so after you change a file, run the generator:
+
+```sh
+node tools/gen-themes.mjs
+```
+
+It writes `core/presets.lua`, `core/stylefields.lua` and the builder's generated theme files. `node tools/gen-themes.mjs --check` writes nothing; it exits 1 and names each generated file that no longer matches the JSON.
+
+---
+
 ## Theming & polish
 
 Author-facing (set once in `Init`). Players do not pick a theme.
@@ -1155,7 +1356,7 @@ ModMenu.Init({
 })
 ```
 
-North-star look is the README hero shots (`ModMenuHero.png` / `ModMenuHero2.png`). Constructed UMG is flat colors, not bevels. 2-column grids and hover glow are optional leftovers in `vision.md`.
+North-star look is the README hero shots (`ModMenuHero.png` / `ModMenuHero2.png`). `light` and `dark` draw flat colours; the other presets add rounded corners, outlines and blur (see **Themes and styles**), and bevels come in stage 2. 2-column grids and hover glow are optional leftovers in `vision.md`.
 
 Collapsible sections: `Register({ collapsible = true, collapsed = true })`. Nested groups: `{ type = "fold", id, label, items = { ... } }`. Tabs: `Init({ tabs = { "Cheats", "Give" } })` + `Register({ tab = "Cheats", ... })`.
 
