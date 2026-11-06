@@ -125,16 +125,54 @@ local function FindClass(path)
     return cls
 end
 
+-- Widgets constructed since the module loaded, so the build log can report how many a build made.
+local constructCount = 0
+
 function M.Construct(classPath, outer, name)
     local cls = FindClass(classPath)
     local obj = StaticConstructObject(cls, outer, FName(name))
     if not Util.IsValid(obj) then
         error("StaticConstructObject failed: " .. classPath .. " as " .. name)
     end
+    constructCount = constructCount + 1
     return obj
 end
 
-function M.StyleText(textBlock, size, color)
+--- The number of widgets Construct has made since the module loaded. Paint.CountWidgets reads it.
+---@return integer
+function M.ConstructCount()
+    return constructCount
+end
+
+--- A colour of the active legacy colour set by key, such as "buttonText", for code that styles a
+--- widget the way this module's own controls do.
+---@param key string
+---@return table|nil
+function M.Color(key)
+    return Colors()[key]
+end
+
+--- Size and colour a TextBlock. With a text style from the resolved theme, Paint.Text writes it:
+--- an explicit size wins, because callers compute it with Paint.TextSize, which already applies
+--- the theme size, fontScale and touch scaling; with no size the style's size, then fontItem, is
+--- used. An explicit color wins over the style's colour. With no text style this is the library's
+--- original styling.
+---@param textBlock any
+---@param size number|nil
+---@param color table|nil
+---@param textSpec table|nil
+function M.StyleText(textBlock, size, color, textSpec)
+    if textSpec ~= nil then
+        -- Paint requires this module, so it is loaded here at call time rather than at the top.
+        local Paint = require("ModMenu.core.paint")
+        local spec = {}
+        for k, v in pairs(textSpec) do
+            spec[k] = v
+        end
+        spec.color = color or textSpec.color or Colors().textPrimary
+        Paint.Text(textBlock, spec, size or textSpec.size or defaults.fontItem)
+        return
+    end
     color = color or Colors().textPrimary
     pcall(function()
         if textBlock.Font then
@@ -250,12 +288,112 @@ function M.AddItemPad(ctx, name, size)
     return spacer
 end
 
+--- True when a resolved field style asks for the library's own field look. A missing style, as
+--- under the spec runner or from a caller that passes none, is stock too.
+---@param field table|nil
+---@return boolean
+function M.IsStockField(field)
+    return field == nil or field.variant == nil or field.variant == "stock"
+end
+
+--- The themed field look for an item: its field style with the item's look merged in, the body
+--- text style, and the text size to write. A config with no resolved theme, or a stock field,
+--- gives nil, nil and the config's fontItem, so the caller draws the library's own field.
+---@param config table
+---@param look table|nil
+---@param sizeKey string|nil the config size key, fontItem when nil
+---@return table|nil field, table|nil textSpec, number size
+function M.FieldLook(config, look, sizeKey)
+    local key = sizeKey or "fontItem"
+    local resolved = config and config.resolved
+    if resolved == nil then
+        return nil, nil, config and config[key] or defaults.fontItem
+    end
+    local Style = require("ModMenu.core.style")
+    local field = Style.ForItem(resolved, "field", look)
+    if M.IsStockField(field) then
+        return nil, nil, config[key]
+    end
+    local Paint = require("ModMenu.core.paint")
+    local textSpec = resolved.body
+    return field, textSpec, Paint.TextSize(config, textSpec and textSpec.size, key)
+end
+
+--- Write a themed field's text and hint styles into an EditableTextBox, field by field into the
+--- struct it owns and before it is first shown (field note 29).
+local function StyleThemedEditable(edit, fontSize, field, textSpec)
+    local fill = field.fill
+    local slateFill = { SpecifiedColor = fill, ColorUseRule = 0 }
+    local slateText = { SpecifiedColor = field.text, ColorUseRule = 0 }
+    local slateHint = { SpecifiedColor = field.hint, ColorUseRule = 0 }
+    local font = nil
+    if textSpec ~= nil and textSpec.font ~= nil then
+        local Paint = require("ModMenu.core.paint")
+        font = Paint.Font(textSpec.font)
+    end
+    local typeface = textSpec ~= nil and textSpec.typeface or nil
+    pcall(function()
+        edit:SetForegroundColor(field.text)
+    end)
+    local style = nil
+    pcall(function()
+        style = edit.WidgetStyle
+    end)
+    if style == nil then
+        return
+    end
+    pcall(function()
+        style.ForegroundColor = slateText
+    end)
+    pcall(function()
+        style.FocusedForegroundColor = slateText
+    end)
+    pcall(function()
+        style.BackgroundColor = slateFill
+    end)
+    -- The wrapping Border is the visible field, so the box's own brushes draw nothing.
+    for _, key in ipairs({ "BackgroundImageNormal", "BackgroundImageHovered", "BackgroundImageFocused",
+        "BackgroundImageReadOnly" }) do
+        pcall(function()
+            local brush = style[key]
+            brush.TintColor = slateFill
+            brush.DrawAs = 0
+        end)
+    end
+    for _, pair in ipairs({ { "TextStyle", slateText }, { "HintTextStyle", slateHint } }) do
+        pcall(function()
+            local ts = style[pair[1]]
+            ts.ColorAndOpacity = pair[2]
+            if fontSize then
+                ts.Font.Size = fontSize
+            end
+            if font ~= nil then
+                ts.Font.FontObject = font
+            end
+            if type(typeface) == "string" and typeface ~= "" then
+                ts.Font.TypefaceFontName = FName(typeface)
+            end
+        end)
+    end
+    -- In-place writes are verified on Border, Button, Slider and ProgressBar but not on an
+    -- EditableTextBox, so the struct is also assigned back, as the stock path has always done.
+    pcall(function()
+        edit.WidgetStyle = style
+    end)
+end
+
 --- Style an EditableTextBox from theme field tokens.
 --- The engine's default slate box is light-grey; WidgetStyle.BackgroundColor
 --- often does not tint it. Hide those brushes and let the wrapping Border
 --- (CreateLabeledEditable / dropdown search) be the visible fill.
-function M.StyleEditableTextBox(edit, fontSize)
+--- field (optional) is a resolved field style and textSpec its text style. A stock or missing
+--- field keeps the library's own styling from the legacy colours.
+function M.StyleEditableTextBox(edit, fontSize, field, textSpec)
     if edit == nil then
+        return
+    end
+    if not M.IsStockField(field) then
+        StyleThemedEditable(edit, fontSize, field, textSpec)
         return
     end
     local colors = Colors()
@@ -320,18 +458,30 @@ end
 
 --- Labeled single-line field: HorizontalBox(label + SizeBox(Border(EditableTextBox))).
 --- Field chrome follows the active theme (light fields on light, dark on dark).
+--- opts.field (optional) is the item's resolved field style and opts.textSpec its text style. A
+--- frame field draws its Border from the field's fill, outline, width and radius; a stock or
+--- missing field keeps the library's own look.
 --- @return root, editBox, label
 function M.CreateLabeledEditable(outer, namePrefix, caption, initialText, opts)
     opts = opts or {}
     local fontSize = opts.fontSize or defaults.fontItem
     local fieldWidth = opts.fieldWidth or 96
     local hint = opts.hint
+    local field = not M.IsStockField(opts.field) and opts.field or nil
+    local textSpec = field ~= nil and opts.textSpec or nil
+    -- Paint requires this module, so it is loaded here at call time rather than at the top.
+    local Paint = require("ModMenu.core.paint")
 
     local root = M.Construct("/Script/UMG.HorizontalBox", outer, namePrefix .. "_Row")
 
     local label = M.Construct("/Script/UMG.TextBlock", root, namePrefix .. "_Label")
-    M.StyleText(label, fontSize)
-    M.SetLabelText(label, caption or "")
+    if textSpec ~= nil then
+        M.StyleText(label, fontSize, nil, textSpec)
+        M.SetLabelText(label, Paint.Caption(caption or "", textSpec))
+    else
+        M.StyleText(label, fontSize)
+        M.SetLabelText(label, caption or "")
+    end
 
     local labelHost = label
     if type(opts.labelWidth) == "number" and opts.labelWidth > 0 then
@@ -355,11 +505,24 @@ function M.CreateLabeledEditable(outer, namePrefix, caption, initialText, opts)
         sizeBox:SetWidthOverride(fieldWidth)
     end)
 
-    local border = M.Construct("/Script/UMG.Border", sizeBox, namePrefix .. "_Border")
-    pcall(function()
-        border:SetBrushColor(Colors().fieldBg)
-        border:SetPadding({ Left = 8, Top = 4, Right = 8, Bottom = 4 })
-    end)
+    local border
+    if field ~= nil then
+        -- A rounded or outlined frame is written into the Border's own brush; only a flat one is
+        -- recoloured, inside Paint.Box (field note 30).
+        border = Paint.Box(sizeBox, namePrefix .. "_Border", {
+            fill = field.fill,
+            outline = field.outline,
+            width = field.width,
+            radius = field.radius,
+            pill = field.pill,
+        }, { 8, 4, 8, 4 })
+    else
+        border = M.Construct("/Script/UMG.Border", sizeBox, namePrefix .. "_Border")
+        pcall(function()
+            border:SetBrushColor(Colors().fieldBg)
+            border:SetPadding({ Left = 8, Top = 4, Right = 8, Bottom = 4 })
+        end)
+    end
 
     local edit = M.Construct("/Script/UMG.EditableTextBox", border, namePrefix .. "_Edit")
     pcall(function()
@@ -368,7 +531,7 @@ function M.CreateLabeledEditable(outer, namePrefix, caption, initialText, opts)
             edit:SetHintText(FText(tostring(hint)))
         end
     end)
-    M.StyleEditableTextBox(edit, fontSize)
+    M.StyleEditableTextBox(edit, fontSize, field, textSpec)
     -- A short text inside the field, before the entry such as a currency sign or after it such as a unit.
     -- The field colours apply to it, because it sits on the field's own fill.
     local hasNote = (opts.prefix ~= nil and opts.prefix ~= "") or (opts.suffix ~= nil and opts.suffix ~= "")
@@ -377,7 +540,11 @@ function M.CreateLabeledEditable(outer, namePrefix, caption, initialText, opts)
         content = M.Construct("/Script/UMG.HorizontalBox", border, namePrefix .. "_FieldRow")
         local function AddNote(noteName, text, padLeft, padRight)
             local note = M.Construct("/Script/UMG.TextBlock", content, namePrefix .. noteName)
-            M.StyleText(note, fontSize, Colors().fieldHint)
+            if field ~= nil then
+                M.StyleText(note, fontSize, field.hint, textSpec)
+            else
+                M.StyleText(note, fontSize, Colors().fieldHint)
+            end
             M.SetLabelText(note, text)
             local noteSlot = content:AddChildToHorizontalBox(note)
             pcall(function()
