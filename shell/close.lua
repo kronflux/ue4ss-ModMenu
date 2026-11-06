@@ -3,7 +3,7 @@
 ]]
 
 local Input = require("ModMenu.core.input")
-local Umg = require("ModMenu.core.umg")
+local Paint = require("ModMenu.core.paint")
 
 local M = {}
 
@@ -14,7 +14,8 @@ local function Request(S, ctrl)
 end
 
 function M.Poll(S, ctrl)
-    Umg.TrackPointer(ctrl)
+    -- Paint.TrackPointer swaps the shapes of a rounded Close and calls Umg.TrackPointer for a flat one.
+    Paint.TrackPointer(ctrl)
     if Input.ReleaseClick(ctrl, ctrl.widget) then
         Input.DebugClick("release", ctrl, ctrl.widget)
         Request(S, ctrl)
