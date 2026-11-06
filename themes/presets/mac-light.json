@@ -1,0 +1,81 @@
+{
+  "id": "mac-light",
+  "stage": 2,
+  "name": "macOS Light",
+  "subtitle": "System Settings",
+  "footer": "A light macOS window: traffic lights that show their symbols on hover, gradient icon tiles, a segmented control.",
+  "palette": {
+    "bg": "#F6F6F6EB",
+    "text": "#1D1D1F",
+    "muted": "#6E6E73",
+    "accent": "#007AFF",
+    "accentText": "#FFFFFF",
+    "danger": "#FF3B30",
+    "surface": "#FFFFFF",
+    "line": "#D9D9DE",
+    "track": "#C8C8CC"
+  },
+  "panel": {
+    "radius": 12,
+    "blur": 12,
+    "outline": "#D1D1D6",
+    "shadowColor": "#000000",
+    "shadowLayers": [[0.12, 4], [0.07, 10], [0.04, 18]]
+  },
+  "header": {
+    "variant": "mac"
+  },
+  "button": {
+    "radius": 6,
+    "secondaryEdge": "#D1D1D6",
+    "hoverToward": "#000000",
+    "hoverAmount": 0.06
+  },
+  "title": {
+    "font": "roboto",
+    "typeface": "Bold",
+    "size": 15
+  },
+  "body": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 14
+  },
+  "data": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 22,
+    "color": "#1D1D1F"
+  },
+  "toggle": {
+    "trackOff": "#D1D1D6"
+  },
+  "slider": {
+    "size": 20,
+    "thumbFill": "#FFFFFF",
+    "thumbEdge": "#B4B4B9",
+    "thumbHover": "#FFFFFF",
+    "thumbWidth": 1
+  },
+  "progress": {
+    "height": 6,
+    "radius": 3,
+    "track": "#DCDCE0"
+  },
+  "choice": {
+    "variant": "joined",
+    "radius": 6,
+    "trackFill": "#E3E3E8",
+    "markFill": "#FFFFFF",
+    "markText": "#1D1D1F",
+    "markEdge": "#D1D1D6"
+  },
+  "field": {
+    "fill": "#FFFFFF",
+    "outline": "#D1D1D6",
+    "radius": 6
+  },
+  "section": {
+    "color": "#6E6E73"
+  }
+}

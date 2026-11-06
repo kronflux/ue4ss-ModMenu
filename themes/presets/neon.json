@@ -55,5 +55,8 @@
   },
   "section": {
     "color": "#FF2BD6"
+  },
+  "motion": {
+    "pulse": true
   }
 }

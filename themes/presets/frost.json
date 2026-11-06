@@ -1,0 +1,77 @@
+{
+  "id": "frost",
+  "stage": 2,
+  "name": "Frost",
+  "subtitle": "Ice over glass",
+  "footer": "Frosted ice-blue glass with a white rim, a glacier ramp and glints that come and go.",
+  "palette": {
+    "bg": "#EAF6FFD6",
+    "text": "#04263D",
+    "muted": "#24506E",
+    "accent": "#0E7FC0",
+    "accentText": "#FFFFFF",
+    "danger": "#C8323F",
+    "surface": "#FFFFFFBF",
+    "line": "#FFFFFFF2",
+    "track": "#C3DFF1"
+  },
+  "panel": {
+    "radius": 14,
+    "blur": 16,
+    "rim": true,
+    "rimLight": "#FFFFFFF2",
+    "rimDark": "#7FB8DA99"
+  },
+  "button": {
+    "radius": 10,
+    "secondaryEdge": "#FFFFFFF2",
+    "hoverToward": "#FFFFFF",
+    "hoverAmount": 0.2
+  },
+  "title": {
+    "font": "roboto",
+    "typeface": "Light",
+    "size": 26,
+    "spacing": 30
+  },
+  "body": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 14
+  },
+  "data": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 30,
+    "color": "#075C8E"
+  },
+  "toggle": {
+    "trackOff": "#C3DFF1",
+    "knobOff": "#4F86AD"
+  },
+  "slider": {
+    "thumbEdge": "#0E7FC0"
+  },
+  "progress": {
+    "variant": "segments",
+    "segments": 14,
+    "gap": 2,
+    "height": 10,
+    "radius": 2,
+    "track": "#D3E9F6",
+    "ramp": ["#9ADCF7", "#4CB8EA", "#1593D6", "#0B6FA8"]
+  },
+  "choice": {
+    "variant": "chips",
+    "pill": true,
+    "radius": 1,
+    "edge": "#9CC9E6"
+  },
+  "field": {
+    "fill": "#FFFFFFCC",
+    "outline": "#9CC9E6"
+  },
+  "motion": {
+    "sparkle": true
+  }
+}

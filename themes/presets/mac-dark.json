@@ -1,0 +1,80 @@
+{
+  "id": "mac-dark",
+  "stage": 2,
+  "name": "macOS Dark",
+  "subtitle": "System Settings, dark",
+  "footer": "The macOS window in dark mode: graphite vibrancy, gradient icon tiles, a grey segmented control.",
+  "palette": {
+    "bg": "#1E1E1EDB",
+    "text": "#F5F5F7",
+    "muted": "#98989D",
+    "accent": "#0A84FF",
+    "accentText": "#FFFFFF",
+    "danger": "#FF453A",
+    "surface": "#3A3A3C",
+    "line": "#38383A",
+    "track": "#5A5A5E"
+  },
+  "panel": {
+    "radius": 12,
+    "blur": 12,
+    "outline": "#4A4A4C",
+    "shadowColor": "#000000",
+    "shadowLayers": [[0.3, 4], [0.18, 10], [0.08, 18]]
+  },
+  "header": {
+    "variant": "mac"
+  },
+  "button": {
+    "radius": 6,
+    "secondaryEdge": "#545458",
+    "hoverToward": "#FFFFFF",
+    "hoverAmount": 0.08
+  },
+  "title": {
+    "font": "roboto",
+    "typeface": "Bold",
+    "size": 15
+  },
+  "body": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 14
+  },
+  "data": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 22,
+    "color": "#F5F5F7"
+  },
+  "toggle": {
+    "trackOff": "#48484C"
+  },
+  "slider": {
+    "size": 20,
+    "thumbFill": "#D8D8DC",
+    "thumbEdge": "#636366",
+    "thumbHover": "#FFFFFF",
+    "thumbWidth": 1
+  },
+  "progress": {
+    "height": 6,
+    "radius": 3,
+    "track": "#3A3A3C"
+  },
+  "choice": {
+    "variant": "joined",
+    "radius": 6,
+    "trackFill": "#2C2C2E",
+    "markFill": "#636366",
+    "markText": "#F5F5F7"
+  },
+  "field": {
+    "fill": "#2C2C2E",
+    "outline": "#48484A",
+    "radius": 6
+  },
+  "section": {
+    "color": "#98989D"
+  }
+}

@@ -144,5 +144,6 @@
     "dim": { "R": 0.04, "G": 0.04, "B": 0.05, "A": 0.62 },
     "divider": { "R": 0.3, "G": 0.3, "B": 0.32, "A": 1 },
     "radius": 0
-  }
+  },
+  "motion": { "open": false, "pop": false, "shake": false }
 }

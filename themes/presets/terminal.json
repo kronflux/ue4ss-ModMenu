@@ -1,0 +1,82 @@
+{
+  "id": "terminal",
+  "stage": 2,
+  "name": "Terminal",
+  "subtitle": "Phosphor console",
+  "footer": "An inverted header with a blinking cursor, a soft phosphor glow and a block gauge.",
+  "palette": {
+    "bg": "#07100AF2",
+    "text": "#A8FFBF",
+    "muted": "#4FA866",
+    "accent": "#5CFF85",
+    "accentText": "#07100A",
+    "danger": "#FF6B5C",
+    "dangerText": "#07100A",
+    "surface": "#5CFF8500",
+    "line": "#5CFF8573",
+    "track": "#143A20"
+  },
+  "panel": {
+    "radius": 2,
+    "scanlines": 0.38
+  },
+  "header": {
+    "variant": "bar"
+  },
+  "button": {
+    "variant": "soft",
+    "radius": 0,
+    "hoverAmount": 0.2
+  },
+  "title": {
+    "font": ["vcr", "mono", "roboto"],
+    "typeface": "",
+    "size": 20,
+    "spacing": 60,
+    "shadow": { "x": 0, "y": 0, "color": "#5CFF8573" }
+  },
+  "body": {
+    "font": ["vcr", "inconsolata", "mono", "roboto"],
+    "typeface": "",
+    "size": 14,
+    "shadow": { "x": 0, "y": 0, "color": "#5CFF8573" }
+  },
+  "hint": {
+    "shadow": { "x": 0, "y": 0, "color": "#5CFF8573" }
+  },
+  "data": {
+    "font": ["vcr", "mono", "roboto"],
+    "typeface": "",
+    "size": 22,
+    "shadow": { "x": 0, "y": 0, "color": "#5CFF8573" }
+  },
+  "toggle": {
+    "variant": "text",
+    "radius": 0
+  },
+  "slider": {
+    "variant": "square",
+    "size": 12,
+    "thickness": 2,
+    "thumbFill": "#5CFF85",
+    "thumbEdge": "#5CFF85"
+  },
+  "progress": {
+    "variant": "segments",
+    "segments": 20,
+    "gap": 2,
+    "height": 8,
+    "radius": 0
+  },
+  "choice": {
+    "variant": "tabs"
+  },
+  "section": {
+    "text": {
+      "shadow": { "x": 0, "y": 0, "color": "#5CFF8573" }
+    }
+  },
+  "motion": {
+    "cursor": true
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "id": "hologram",
+  "stage": 2,
+  "name": "Hologram",
+  "subtitle": "Projected light",
+  "footer": "A projection sweep, fine scanlines, and a glitch that splits the title into colour.",
+  "palette": {
+    "bg": "#0310188C",
+    "text": "#BFF7FF",
+    "muted": "#5FC4D6",
+    "accent": "#48E5FF",
+    "accentText": "#002A33",
+    "danger": "#FF5C8A",
+    "surface": "#48E5FF14",
+    "line": "#48E5FF8C",
+    "track": "#48E5FF26"
+  },
+  "panel": {
+    "radius": 6,
+    "blur": 6,
+    "scanlines": 0.32,
+    "sweep": true
+  },
+  "button": {
+    "variant": "ghost",
+    "radius": 6
+  },
+  "title": {
+    "font": ["kanit", "roboto"],
+    "typeface": "Semibold",
+    "size": 24,
+    "spacing": 60,
+    "color": "#E0FBFF",
+    "shadow": { "x": 0, "y": 0, "color": "#48E5FF99" }
+  },
+  "body": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 14,
+    "shadow": { "x": 0, "y": 0, "color": "#48E5FF99" }
+  },
+  "hint": {
+    "shadow": { "x": 0, "y": 0, "color": "#48E5FF99" }
+  },
+  "data": {
+    "font": ["kanit", "roboto"],
+    "typeface": "Semibold",
+    "size": 26,
+    "shadow": { "x": 0, "y": 0, "color": "#48E5FF99" }
+  },
+  "toggle": {
+    "trackOff": "#48E5FF2E",
+    "knobOn": "#002A33"
+  },
+  "slider": {
+    "thumbFill": "#002A33"
+  },
+  "progress": {
+    "height": 5,
+    "radius": 2
+  },
+  "section": {
+    "text": {
+      "shadow": { "x": 0, "y": 0, "color": "#48E5FF99" }
+    }
+  },
+  "motion": {
+    "glitch": true
+  }
+}
