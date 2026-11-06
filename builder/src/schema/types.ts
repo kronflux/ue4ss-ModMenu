@@ -1,6 +1,22 @@
+import { PRESET_ORDER } from "../theme/presets.generated";
+
 export const DOCUMENT_VERSION = 1 as const;
 
-export type ThemeName = "light" | "dark";
+// A theme is any preset id from themes/presets/; validateDocument checks it against PRESET_ORDER.
+export type ThemeName = string;
+
+// A style colour is an sRGB hex string, "#RRGGBB" or "#RRGGBBAA", or a linear { R, G, B, A } table.
+export type StyleColor = string | { R: number; G: number; B: number; A?: number };
+
+// One object type's override: a preset id to borrow from without its colours, or fields merged over
+// the theme's entry, optionally after borrowing from the preset named by `from`.
+export type StyleTypeOverride = string | ({ from?: string } & Record<string, unknown>);
+
+// Init's style option: a partial map of object type to override, plus palette colours.
+export type StyleOverrides = {
+  palette?: Record<string, StyleColor>;
+  [objectType: string]: StyleTypeOverride | Record<string, StyleColor> | undefined;
+};
 export type DockSide = "left" | "right" | "top" | "bottom";
 
 export type ButtonVariant =
@@ -44,7 +60,8 @@ export type ConfirmSpec = {
 // The registry checks tooltip, enabled and visible on every item type, so every item shape carries them.
 // The runtime shows the tooltip 400 ms after the pointer starts hovering the item. A disabled item draws
 // dim and ignores input, and a hidden item takes no space but keeps its value.
-type ItemCommon = { tooltip?: string; enabled?: boolean; visible?: boolean };
+// A look holds style fields merged over the item's object type (LOOK_OBJECT_TYPE) for that item only.
+type ItemCommon = { tooltip?: string; enabled?: boolean; visible?: boolean; look?: Record<string, unknown> };
 
 export type LabelAlign = "left" | "center" | "right";
 export type LabelStyle = "normal" | "muted" | "heading" | "warning";
@@ -300,6 +317,7 @@ export type InitSpec = {
   showClose?: boolean;
   cursorScale?: number;
   spacing?: Partial<Record<SpacingKey, number>>;
+  style?: StyleOverrides;
 };
 
 export type MenuDocument = {
@@ -355,7 +373,25 @@ export const BUTTON_VARIANTS: ReadonlySet<string> = new Set([
 ]);
 
 export const DOCK_SIDES: ReadonlySet<string> = new Set(["left", "right", "top", "bottom"]);
-export const THEMES: ReadonlySet<string> = new Set(["light", "dark"]);
+export const THEMES: ReadonlySet<string> = new Set(PRESET_ORDER);
+
+// The style object type each item type reads its look from, as LOOK_TYPE in shell/registry.lua.
+// Row, fold and separator have no entry, because they draw no styled part of their own.
+export const LOOK_OBJECT_TYPE: Readonly<Partial<Record<ItemType, string>>> = {
+  button: "button",
+  checkbox: "toggle",
+  slider: "slider",
+  colorpicker: "slider",
+  progress: "progress",
+  radio: "choice",
+  multiselect: "choice",
+  textinput: "field",
+  number: "field",
+  keybind: "field",
+  dropdown: "field",
+  label: "body",
+  stepper: "stepper",
+};
 export const LABEL_ALIGNS: ReadonlySet<string> = new Set(["left", "center", "right"]);
 export const LABEL_STYLES: ReadonlySet<string> = new Set(["normal", "muted", "heading", "warning"]);
 export const ITEM_TYPES: ReadonlySet<string> = new Set([

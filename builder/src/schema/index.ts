@@ -26,6 +26,9 @@ export type {
   SliderItem,
   ProgressItem,
   StepperItem,
+  StyleColor,
+  StyleOverrides,
+  StyleTypeOverride,
   TextInputItem,
   ThemeName,
 } from "./types";
@@ -36,6 +39,7 @@ export {
   ITEM_TYPES,
   LABEL_ALIGNS,
   LABEL_STYLES,
+  LOOK_OBJECT_TYPE,
   ROW_CHILD_TYPES,
   SPACING_KEYS,
   THEMES,

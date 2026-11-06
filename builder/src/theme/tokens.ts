@@ -1,4 +1,6 @@
 import type { ThemeName } from "../schema";
+import { PRESET_ORDER } from "./presets.generated";
+import { legacyColors, resolve } from "./resolve";
 
 /** Same 0–1 RGB as core/theme.lua. */
 export type Color = { R: number; G: number; B: number; A: number };
@@ -193,10 +195,32 @@ export const DARK: ThemeColors = {
   confirmDivider: C(0.3, 0.3, 0.32, 1.0),
 };
 
-export const PANEL_PAD = {
+export type PanelPad = { left: number; top: number; right: number; bottom: number };
+
+// A resolved pad is one number for every side, or 4 numbers in left, top, right, bottom order.
+function panelPad(name: string): PanelPad {
+  const pad: unknown = resolve(name).panel.pad;
+  if (Array.isArray(pad)) {
+    return { left: pad[0], top: pad[1], right: pad[2], bottom: pad[3] };
+  }
+  const n = typeof pad === "number" ? pad : 0;
+  return { left: n, top: n, right: n, bottom: n };
+}
+
+const PANEL_PAD_ENTRIES: Record<string, PanelPad> = {
   light: { left: 20, top: 18, right: 20, bottom: 18 },
   dark: { left: 16, top: 14, right: 16, bottom: 14 },
-} as const;
+};
+
+// Light and dark keep their literal values; every other preset reads its resolved panel.pad when first
+// asked, because resolve.ts imports this module and cannot run while it loads.
+for (const id of PRESET_ORDER) {
+  if (!Object.hasOwn(PANEL_PAD_ENTRIES, id)) {
+    Object.defineProperty(PANEL_PAD_ENTRIES, id, { enumerable: true, get: () => panelPad(id) });
+  }
+}
+
+export const PANEL_PAD: Readonly<Record<string, PanelPad>> = PANEL_PAD_ENTRIES;
 
 /** Dense desktop look (Host dummy / hero shots), not raw UMG default 22/16. */
 export const PREVIEW_FONTS = {
@@ -207,6 +231,24 @@ export const PREVIEW_FONTS = {
   dropdown: 13,
 } as const;
 
+const DERIVED = new Map<string, ThemeColors>();
+
+/**
+ * The legacy colour tokens of a preset. Light and dark return their literal tables; any other preset id
+ * is resolved and read back through legacyColors, as Style.LegacyColors fills config.colors in the library.
+ * An unknown id falls back to light, as before.
+ */
 export function preset(name: ThemeName): ThemeColors {
-  return name === "dark" ? DARK : LIGHT;
+  if (name === "dark") {
+    return DARK;
+  }
+  if (name === "light" || !PRESET_ORDER.includes(name)) {
+    return LIGHT;
+  }
+  let colors = DERIVED.get(name);
+  if (colors === undefined) {
+    colors = legacyColors(resolve(name)) as ThemeColors;
+    DERIVED.set(name, colors);
+  }
+  return colors;
 }

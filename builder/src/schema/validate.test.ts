@@ -479,3 +479,88 @@ describe("validateDocument for the Init options the library reads", () => {
     expect(messages(doc)).toContain("Register(Main) items[0]: showState must be a boolean");
   });
 });
+describe("validateDocument for themes, style overrides and item looks", () => {
+  function withInit(patch: Record<string, unknown>) {
+    const doc = emptyDocument();
+    Object.assign(doc.init, patch);
+    return messages(doc);
+  }
+
+  it("accepts any preset id, a style table and a look on an item", () => {
+    expect(withInit({ theme: "slate" })).toEqual([]);
+    expect(
+      withInit({
+        theme: "dark",
+        style: {
+          button: "slate",
+          panel: { from: "slate", radius: 6, fill: "#102030" },
+          toggle: { trackOn: "#22F1FF", w: 40 },
+          palette: { accent: "#FF0000" },
+        },
+      }),
+    ).toEqual([]);
+    const doc = widgetDoc([
+      { type: "button", id: "go", label: "Go", look: { radius: 0, roles: { primary: { fill: "#00FF00" } } } },
+      { type: "label", label: "Hi", style: "muted", look: { size: 14, color: "#FFFFFF" } },
+      { type: "row", items: [{ type: "checkbox", id: "c", label: "C", look: { variant: "check" } }] },
+    ]);
+    expect(messages(doc)).toEqual([]);
+  });
+
+  it("still accepts a document without style or look", () => {
+    expect(validateDocument(hostFixture)).toEqual([]);
+    expect(hostFixture.init.style).toBeUndefined();
+  });
+
+  it("treats a null style, style entry or look as absent", () => {
+    expect(withInit({ style: null })).toEqual([]);
+    expect(withInit({ style: { button: null } })).toEqual([]);
+    expect(messages(widgetDoc([{ type: "button", id: "go", label: "Go", look: null }]))).toEqual([]);
+  });
+
+  it("reports an unknown preset id as the theme", () => {
+    expect(withInit({ theme: "nope" })).toEqual(["init.theme: unknown preset nope"]);
+  });
+
+  it("reports an unknown object type, an unknown field and a wrong kind in init.style", () => {
+    expect(withInit({ style: { wobble: {} } })).toEqual(["init.style.wobble: unknown object type"]);
+    expect(withInit({ style: { button: { wobble: 1 } } })).toEqual(["init.style.button.wobble: unknown field"]);
+    expect(withInit({ style: { button: { radius: "big" } } })).toEqual(["init.style.button.radius: must be radius"]);
+    expect(withInit({ style: { toggle: { trackOn: "#12" } } })).toEqual(["init.style.toggle.trackOn: must be color"]);
+    expect(withInit({ style: { button: "nope" } })).toEqual(["init.style.button: unknown preset nope"]);
+    expect(withInit({ style: { panel: { from: "nope" } } })).toEqual(["init.style.panel.from: unknown preset nope"]);
+    expect(withInit({ style: { palette: { glow: "#FFFFFF" } } })).toEqual(["init.style.palette.glow: unknown field"]);
+    expect(withInit({ style: { button: { roles: { primary: { glow: "#FFFFFF" } } } } })).toEqual([
+      "init.style.button.roles.primary.glow: unknown field",
+    ]);
+  });
+
+  it("reports an unknown field in an item look against the item's object type", () => {
+    const doc = widgetDoc([
+      { type: "button", id: "go", label: "Go", look: { wobble: 1 } },
+      { type: "checkbox", id: "c", label: "C", look: { thickness: 4 } },
+      { type: "slider", id: "s", label: "S", min: 0, max: 1, look: { thickness: "thin" } },
+    ]);
+    expect(messages(doc)).toEqual([
+      "Register(Main) items[0].look.wobble: unknown field",
+      "Register(Main) items[1].look.thickness: unknown field",
+      "Register(Main) items[2].look.thickness: must be number",
+    ]);
+  });
+
+  it("rejects from in an item look", () => {
+    const doc = widgetDoc([{ type: "button", id: "go", label: "Go", look: { from: "neon" } }]);
+    expect(messages(doc)).toEqual(["Register(Main) items[0].look.from: unknown field"]);
+  });
+
+  it("reports a look on an item type that draws no styled part, and a look inside a fold", () => {
+    const doc = widgetDoc([
+      { type: "separator", look: {} },
+      { type: "fold", id: "f", label: "F", items: [{ type: "number", id: "n", label: "N", look: { wobble: 1 } }] },
+    ]);
+    expect(messages(doc)).toEqual([
+      "Register(Main) items[0].look: is not supported on a separator item",
+      "Register(Main) items[1].items[0].look.wobble: unknown field",
+    ]);
+  });
+});

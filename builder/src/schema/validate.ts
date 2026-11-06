@@ -6,11 +6,13 @@ import {
   ITEM_TYPES,
   LABEL_ALIGNS,
   LABEL_STYLES,
+  LOOK_OBJECT_TYPE,
   ROW_CHILD_TYPES,
   SPACING_KEYS,
   THEMES,
 } from "./types";
 import { parseKeybind } from "./keys";
+import { lookIssues, styleIssues } from "../theme/resolve";
 import type {
   ButtonItem,
   ColorpickerItem,
@@ -20,6 +22,7 @@ import type {
   InitSpec,
   Issue,
   Item,
+  ItemType,
   KeybindItem,
   MenuDocument,
   MultiselectItem,
@@ -404,6 +407,17 @@ function validateItem(path: string, item: unknown, issues: Issue[]) {
   checkBoolean(path, "enabled", item.enabled, issues);
   checkBoolean(path, "visible", item.visible, issues);
 
+  // The look is checked after the type, as shell/registry.lua's ValidateLook does.
+  // A null look counts as absent, as a null style or style entry does.
+  if (item.look !== undefined && item.look !== null) {
+    const objectType = LOOK_OBJECT_TYPE[typeName as ItemType];
+    if (objectType === undefined) {
+      issues.push(issue(`${path}.look`, `is not supported on a ${typeName} item`));
+    } else {
+      issues.push(...lookIssues(objectType, item.look, `${path}.look`));
+    }
+  }
+
   if (typeName === "separator") {
     return;
   }
@@ -548,9 +562,13 @@ function validateInit(init: unknown, issues: Issue[]): string[] | undefined {
   if (typeof spec.dock !== "string" || !DOCK_SIDES.has(spec.dock)) {
     issues.push(issue("init.dock", 'must be "left" | "right" | "top" | "bottom"'));
   }
-  if (typeof spec.theme !== "string" || !THEMES.has(spec.theme)) {
-    issues.push(issue("init.theme", 'must be "light" | "dark"'));
+  if (typeof spec.theme !== "string") {
+    issues.push(issue("init.theme", "must be a preset id string"));
+  } else if (!THEMES.has(spec.theme)) {
+    issues.push(issue("init.theme", `unknown preset ${spec.theme}`));
   }
+  // The style rules follow Style.Validate in core/style.lua, which ModMenu.Init runs on the style option.
+  issues.push(...styleIssues(spec.style, "init.style"));
   // The rules and messages follow core/config.lua, which raises them from ModMenu.Init.
   if (spec.tooltipDelayMs !== undefined && (typeof spec.tooltipDelayMs !== "number" || spec.tooltipDelayMs < 0)) {
     issues.push(issue("init.tooltipDelayMs", "must be a number of zero or more"));
