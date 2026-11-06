@@ -1,0 +1,55 @@
+{
+  "id": "storm",
+  "stage": 1,
+  "name": "Storm",
+  "subtitle": "Amber on slate",
+  "footer": "Kanit, a font the game ships, with amber accents on cool slate and small corners.",
+  "palette": {
+    "bg": "#141A22F5",
+    "text": "#EDEFF2",
+    "muted": "#9AA6B2",
+    "accent": "#F2B33D",
+    "accentText": "#1A1206",
+    "danger": "#D9473F",
+    "surface": "#26303C",
+    "line": "#2B3542",
+    "track": "#26303C"
+  },
+  "panel": {
+    "radius": 4
+  },
+  "button": {
+    "radius": 2
+  },
+  "title": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Bold",
+    "size": 22,
+    "spacing": 60
+  },
+  "body": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Default",
+    "size": 14
+  },
+  "data": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Bold",
+    "size": 24
+  },
+  "toggle": {
+    "trackOff": "#323D4A"
+  },
+  "progress": {
+    "radius": 2
+  }
+}

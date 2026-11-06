@@ -1,0 +1,59 @@
+{
+  "id": "dracula",
+  "stage": 1,
+  "name": "Dracula",
+  "subtitle": "The Dracula palette",
+  "footer": "Dracula's background and comment blue-grey, purple as the accent, pink, cyan and green beside it.",
+  "palette": {
+    "bg": "#282A36F7",
+    "text": "#F8F8F2",
+    "muted": "#6272A4",
+    "accent": "#BD93F9",
+    "accentText": "#282A36",
+    "danger": "#FF5555",
+    "dangerText": "#282A36",
+    "surface": "#44475A",
+    "line": "#44475A",
+    "track": "#44475A"
+  },
+  "panel": {
+    "radius": 10
+  },
+  "title": {
+    "font": "roboto",
+    "typeface": "Bold",
+    "size": 22
+  },
+  "body": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 14
+  },
+  "data": {
+    "font": "roboto",
+    "typeface": "Bold",
+    "size": 22,
+    "color": "#FF79C6"
+  },
+  "toggle": {
+    "trackOff": "#44475A",
+    "knobOn": "#282A36"
+  },
+  "progress": {
+    "variant": "segments",
+    "segments": 16,
+    "gap": 2,
+    "height": 10,
+    "radius": 2,
+    "ramp": [
+      "#8BE9FD",
+      "#50FA7B",
+      "#F1FA8C",
+      "#FF79C6",
+      "#BD93F9"
+    ]
+  },
+  "section": {
+    "color": "#FF79C6"
+  }
+}

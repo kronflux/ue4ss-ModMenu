@@ -1,0 +1,80 @@
+{
+  "id": "blueprint",
+  "stage": 1,
+  "name": "Blueprint",
+  "subtitle": "Engineering drawing",
+  "footer": "White linework on blueprint blue. Nothing is filled until it is active.",
+  "palette": {
+    "bg": "#1D4E89F7",
+    "text": "#FFFFFF",
+    "muted": "#BFD3EA",
+    "accent": "#FFFFFF",
+    "accentText": "#1D4E89",
+    "danger": "#FFB3B3",
+    "surface": "#FFFFFF00",
+    "line": "#FFFFFF99",
+    "track": "#FFFFFF40"
+  },
+  "panel": {
+    "radius": 0
+  },
+  "button": {
+    "variant": "ghost",
+    "radius": 0
+  },
+  "title": {
+    "font": [
+      "lekton",
+      "inconsolata",
+      "mono",
+      "roboto"
+    ],
+    "typeface": "",
+    "size": 22,
+    "spacing": 60
+  },
+  "body": {
+    "font": [
+      "inconsolata",
+      "mono",
+      "roboto"
+    ],
+    "typeface": "Inconsolata Regular",
+    "size": 14
+  },
+  "data": {
+    "font": [
+      "inconsolata",
+      "mono",
+      "roboto"
+    ],
+    "typeface": "Inconsolata SemiBold",
+    "size": 24,
+    "color": "#FFFFFF"
+  },
+  "toggle": {
+    "variant": "check"
+  },
+  "slider": {
+    "variant": "square",
+    "thumbFill": "#1D4E89",
+    "thumbEdge": "#FFFFFF",
+    "thumbHover": "#FFFFFF"
+  },
+  "progress": {
+    "height": 6,
+    "radius": 0
+  },
+  "choice": {
+    "variant": "joined",
+    "radius": 0
+  },
+  "section": {
+    "variant": "rule",
+    "color": "#FFFFFF"
+  },
+  "field": {
+    "fill": "#FFFFFF0F",
+    "outline": "#FFFFFF99"
+  }
+}

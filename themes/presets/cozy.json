@@ -1,0 +1,93 @@
+{
+  "id": "cozy",
+  "stage": 1,
+  "name": "Cozy",
+  "subtitle": "Farm life",
+  "footer": "Lavender, mint and peach, every shape a pill, with a soft lilac shadow.",
+  "palette": {
+    "bg": "#EDE7FF",
+    "text": "#3B2F5C",
+    "muted": "#7D71A3",
+    "accent": "#7ED9B5",
+    "accentText": "#1F3B30",
+    "danger": "#FF8C7A",
+    "dangerText": "#3B1F1A",
+    "surface": "#FFFFFF",
+    "line": "#D9CEFF",
+    "track": "#DCD3FA"
+  },
+  "panel": {
+    "radius": 28,
+    "width": 0,
+    "shadowColor": "#7D5FD8",
+    "shadowLayers": [
+      [
+        0.3,
+        4
+      ],
+      [
+        0.18,
+        9
+      ],
+      [
+        0.08,
+        15
+      ]
+    ]
+  },
+  "button": {
+    "pill": true,
+    "radius": 1,
+    "height": 38,
+    "hoverToward": "#000000",
+    "hoverAmount": 0.06
+  },
+  "title": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Bold",
+    "size": 26
+  },
+  "body": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Default",
+    "size": 14
+  },
+  "data": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Bold",
+    "size": 28,
+    "color": "#3B2F5C"
+  },
+  "toggle": {
+    "w": 44,
+    "h": 24,
+    "trackOff": "#D3C8F5"
+  },
+  "slider": {
+    "size": 20,
+    "thickness": 8,
+    "thumbEdge": "#7ED9B5"
+  },
+  "progress": {
+    "height": 12,
+    "radius": 6,
+    "fill": "#FFB4A2"
+  },
+  "choice": {
+    "variant": "chips",
+    "pill": true,
+    "radius": 1
+  },
+  "field": {
+    "fill": "#FFFFFF"
+  }
+}

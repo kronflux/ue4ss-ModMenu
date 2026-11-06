@@ -1,0 +1,91 @@
+{
+  "id": "material",
+  "stage": 1,
+  "name": "Material",
+  "subtitle": "Material Design, dark",
+  "footer": "Material's dark surface, purple primary and teal secondary, capital button labels, tabs.",
+  "palette": {
+    "bg": "#1E1E1EFA",
+    "text": "#E1E1E1",
+    "muted": "#9E9E9E",
+    "accent": "#BB86FC",
+    "accentText": "#000000",
+    "danger": "#CF6679",
+    "dangerText": "#000000",
+    "surface": "#2C2C2C",
+    "line": "#333333",
+    "track": "#3A3A3A"
+  },
+  "panel": {
+    "radius": 4,
+    "width": 0,
+    "shadowColor": "#000000",
+    "shadowLayers": [
+      [
+        0.35,
+        2
+      ],
+      [
+        0.22,
+        6
+      ],
+      [
+        0.12,
+        12
+      ]
+    ]
+  },
+  "button": {
+    "radius": 4,
+    "upper": true,
+    "spacing": 90,
+    "typeface": "Bold",
+    "roles": {
+      "primary": {
+        "variant": "fill"
+      },
+      "secondary": {
+        "variant": "ghost"
+      },
+      "danger": {
+        "variant": "ghost"
+      }
+    }
+  },
+  "title": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 22
+  },
+  "body": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 14
+  },
+  "data": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 24,
+    "color": "#03DAC6"
+  },
+  "toggle": {
+    "trackOn": "#BB86FC80",
+    "knobOn": "#BB86FC",
+    "trackOff": "#5C5C5C",
+    "knobOff": "#BDBDBD"
+  },
+  "slider": {
+    "thumbFill": "#BB86FC",
+    "thumbEdge": "#BB86FC"
+  },
+  "progress": {
+    "height": 4,
+    "radius": 0
+  },
+  "choice": {
+    "variant": "tabs"
+  },
+  "section": {
+    "color": "#BB86FC"
+  }
+}

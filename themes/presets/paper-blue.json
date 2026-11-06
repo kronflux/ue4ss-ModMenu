@@ -1,0 +1,65 @@
+{
+  "id": "paper-blue",
+  "stage": 1,
+  "name": "Paper",
+  "subtitle": "Cool blue",
+  "footer": "The light Paper layout in cool white and ink blue, with a navy offset shadow.",
+  "palette": {
+    "bg": "#F4F6FA",
+    "text": "#1F2733",
+    "muted": "#5D6878",
+    "accent": "#2F5BEA",
+    "accentText": "#FFFFFF",
+    "danger": "#C0392B",
+    "surface": "#E4E9F2",
+    "line": "#D3DAE6",
+    "track": "#DCE2EC"
+  },
+  "panel": {
+    "radius": 6,
+    "shadowColor": "#1E2A44",
+    "shadowLayers": [
+      [
+        0.3,
+        3
+      ],
+      [
+        0.18,
+        7
+      ],
+      [
+        0.08,
+        12
+      ]
+    ]
+  },
+  "button": {
+    "radius": 4,
+    "hoverToward": "#000000",
+    "hoverAmount": 0.08
+  },
+  "title": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Semibold",
+    "size": 24
+  },
+  "body": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 14
+  },
+  "data": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Bold",
+    "size": 22
+  },
+  "toggle": {
+    "trackOff": "#CDD5E2"
+  }
+}

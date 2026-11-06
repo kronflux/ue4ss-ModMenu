@@ -1,0 +1,61 @@
+{
+  "id": "aurora",
+  "stage": 1,
+  "name": "Aurora",
+  "subtitle": "Night sky",
+  "footer": "Deep night blue, with aurora green to violet across the intensity bar.",
+  "palette": {
+    "bg": "#0B1026F5",
+    "text": "#E6ECFF",
+    "muted": "#8A94C2",
+    "accent": "#5EF2C2",
+    "accentText": "#06231B",
+    "danger": "#FF6B8B",
+    "surface": "#1A2147",
+    "line": "#26306A",
+    "track": "#1A2147"
+  },
+  "panel": {
+    "radius": 16
+  },
+  "button": {
+    "radius": 10
+  },
+  "title": {
+    "font": "roboto",
+    "typeface": "Light",
+    "size": 24,
+    "spacing": 20
+  },
+  "body": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 14
+  },
+  "data": {
+    "font": "roboto",
+    "typeface": "Light",
+    "size": 28
+  },
+  "toggle": {
+    "knobOn": "#06231B"
+  },
+  "progress": {
+    "variant": "segments",
+    "segments": 18,
+    "gap": 2,
+    "height": 10,
+    "radius": 2,
+    "ramp": [
+      "#5EF2C2",
+      "#4FD1E8",
+      "#8B7CFF",
+      "#C77DFF"
+    ]
+  },
+  "choice": {
+    "variant": "chips",
+    "pill": true,
+    "radius": 1
+  }
+}

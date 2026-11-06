@@ -1,0 +1,66 @@
+{
+  "id": "carbon",
+  "stage": 1,
+  "name": "Carbon",
+  "subtitle": "Sim racing",
+  "footer": "Italic type for speed, a red strip along the top and thin red indicators.",
+  "palette": {
+    "bg": "#16181BF7",
+    "text": "#F4F4F4",
+    "muted": "#8C9096",
+    "accent": "#E10B1F",
+    "accentText": "#FFFFFF",
+    "danger": "#E10B1F",
+    "surface": "#22262A",
+    "line": "#2C3035",
+    "track": "#22262A"
+  },
+  "panel": {
+    "radius": 2
+  },
+  "header": {
+    "variant": "strip",
+    "strip": 4
+  },
+  "button": {
+    "radius": 2,
+    "roles": {
+      "primary": {
+        "variant": "fill"
+      },
+      "secondary": {
+        "variant": "fill"
+      },
+      "danger": {
+        "variant": "underline"
+      }
+    }
+  },
+  "title": {
+    "font": "roboto",
+    "typeface": "Bold Italic",
+    "size": 24,
+    "skew": 0.1
+  },
+  "body": {
+    "font": "roboto",
+    "typeface": "Italic",
+    "size": 14
+  },
+  "data": {
+    "font": "roboto",
+    "typeface": "Bold Italic",
+    "size": 26
+  },
+  "slider": {
+    "variant": "bar",
+    "thickness": 3
+  },
+  "progress": {
+    "height": 4,
+    "radius": 0
+  },
+  "choice": {
+    "variant": "tabs"
+  }
+}

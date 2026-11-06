@@ -1,0 +1,77 @@
+{
+  "id": "field-kit",
+  "stage": 1,
+  "name": "Field Kit",
+  "subtitle": "Rescue gear",
+  "footer": "High-visibility yellow on graphite, a thin hazard strip and reflective silver lines.",
+  "palette": {
+    "bg": "#1E2124F7",
+    "text": "#F4F5F6",
+    "muted": "#A3A9B0",
+    "accent": "#F5D90A",
+    "accentText": "#1E2124",
+    "danger": "#FF5A3C",
+    "surface": "#2B2F33",
+    "line": "#C9CDD259",
+    "track": "#2B2F33"
+  },
+  "panel": {
+    "radius": 6
+  },
+  "header": {
+    "variant": "tape",
+    "tape": 6
+  },
+  "button": {
+    "radius": 4
+  },
+  "title": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Semibold",
+    "size": 22,
+    "spacing": 20
+  },
+  "body": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Default",
+    "size": 14
+  },
+  "data": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Semibold",
+    "size": 24
+  },
+  "toggle": {
+    "variant": "square",
+    "w": 40,
+    "h": 22,
+    "knobOn": "#1E2124",
+    "trackOff": "#3A3F45"
+  },
+  "slider": {
+    "variant": "square",
+    "size": 16,
+    "thumbFill": "#F5D90A",
+    "thumbEdge": "#1E2124"
+  },
+  "progress": {
+    "variant": "segments",
+    "segments": 12,
+    "gap": 3,
+    "height": 10,
+    "radius": 1
+  },
+  "choice": {
+    "variant": "chips",
+    "radius": 4
+  }
+}

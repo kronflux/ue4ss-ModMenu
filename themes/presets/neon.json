@@ -1,0 +1,59 @@
+{
+  "id": "neon",
+  "stage": 1,
+  "name": "Neon",
+  "subtitle": "Synthwave",
+  "footer": "Pill outline buttons, a 2 px panel outline, a glowing title outline and a slow pulse.",
+  "palette": {
+    "bg": "#0A0612F5",
+    "text": "#FFFFFF",
+    "muted": "#B39DDB",
+    "accent": "#22F1FF",
+    "accentText": "#05141A",
+    "danger": "#FF2B6E",
+    "surface": "#22F1FF00",
+    "line": "#FF2BD6",
+    "track": "#2A1A3D"
+  },
+  "panel": {
+    "radius": 20,
+    "width": 2
+  },
+  "button": {
+    "variant": "ghost",
+    "pill": true,
+    "radius": 1,
+    "width": 2,
+    "hoverAmount": 0.2
+  },
+  "title": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Bold",
+    "size": 24,
+    "spacing": 80,
+    "outline": 2,
+    "outlineColor": "#FF2BD6"
+  },
+  "body": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 14
+  },
+  "data": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Bold",
+    "size": 26
+  },
+  "toggle": {
+    "trackOff": "#3A2752"
+  },
+  "section": {
+    "color": "#FF2BD6"
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "id": "night-drive",
+  "stage": 1,
+  "name": "Night Drive",
+  "subtitle": "Instrument cluster",
+  "footer": "A dashboard at night: an amber segmented gauge and a seven-segment readout.",
+  "palette": {
+    "bg": "#0A0D10F7",
+    "text": "#F0E6D8",
+    "muted": "#7A6F62",
+    "accent": "#FF9F1C",
+    "accentText": "#1A0F00",
+    "danger": "#FF4A3D",
+    "surface": "#161B20",
+    "line": "#222A31",
+    "track": "#161B20"
+  },
+  "panel": {
+    "radius": 16
+  },
+  "button": {
+    "variant": "soft",
+    "radius": 10
+  },
+  "title": {
+    "font": "roboto",
+    "typeface": "Bold Italic",
+    "size": 21
+  },
+  "body": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 14
+  },
+  "data": {
+    "font": [
+      "vcr",
+      "mono",
+      "roboto"
+    ],
+    "typeface": "",
+    "size": 28
+  },
+  "slider": {
+    "variant": "bar",
+    "thickness": 3
+  },
+  "progress": {
+    "variant": "segments",
+    "segments": 24,
+    "gap": 2,
+    "height": 12,
+    "radius": 1
+  },
+  "choice": {
+    "variant": "tabs"
+  }
+}

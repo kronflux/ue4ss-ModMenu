@@ -1,0 +1,67 @@
+{
+  "id": "monokai",
+  "stage": 1,
+  "name": "Monokai",
+  "subtitle": "The classic editor theme",
+  "footer": "Monokai's olive-black background with its green, blue, yellow and pink, readings in Inconsolata.",
+  "palette": {
+    "bg": "#272822F7",
+    "text": "#F8F8F2",
+    "muted": "#75715E",
+    "accent": "#A6E22E",
+    "accentText": "#272822",
+    "danger": "#F92672",
+    "surface": "#3E3D32",
+    "line": "#49483E",
+    "track": "#3E3D32"
+  },
+  "panel": {
+    "radius": 6
+  },
+  "button": {
+    "radius": 4
+  },
+  "title": {
+    "font": "roboto",
+    "typeface": "Bold",
+    "size": 20
+  },
+  "body": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 14
+  },
+  "data": {
+    "font": [
+      "inconsolata",
+      "mono",
+      "roboto"
+    ],
+    "typeface": "Inconsolata SemiBold",
+    "size": 24,
+    "color": "#E6DB74"
+  },
+  "toggle": {
+    "knobOn": "#272822"
+  },
+  "progress": {
+    "variant": "segments",
+    "segments": 15,
+    "gap": 2,
+    "height": 10,
+    "radius": 1,
+    "ramp": [
+      "#66D9EF",
+      "#A6E22E",
+      "#E6DB74",
+      "#FD971F",
+      "#F92672"
+    ]
+  },
+  "choice": {
+    "variant": "tabs"
+  },
+  "section": {
+    "color": "#66D9EF"
+  }
+}

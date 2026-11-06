@@ -1,0 +1,105 @@
+{
+  "id": "glass",
+  "stage": 1,
+  "name": "Glass",
+  "subtitle": "Frosted, over the game",
+  "footer": "A blur under a translucent rounded panel, outline buttons, text shadows, Roboto Light.",
+  "palette": {
+    "bg": "#0F142061",
+    "text": "#FFFFFF",
+    "muted": "#C9D3E3",
+    "accent": "#7CC8FF",
+    "accentText": "#06121C",
+    "danger": "#FF6B7A",
+    "surface": "#FFFFFF1A",
+    "line": "#FFFFFF47",
+    "track": "#FFFFFF2E"
+  },
+  "panel": {
+    "radius": 18,
+    "blur": 18
+  },
+  "button": {
+    "variant": "ghost",
+    "radius": 10,
+    "hoverAmount": 0.18
+  },
+  "title": {
+    "font": "roboto",
+    "typeface": "Light",
+    "size": 24,
+    "spacing": 40,
+    "shadow": {
+      "x": 1,
+      "y": 1,
+      "color": {
+        "R": 0,
+        "G": 0,
+        "B": 0,
+        "A": 0.65
+      }
+    }
+  },
+  "body": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 14,
+    "shadow": {
+      "x": 1,
+      "y": 1,
+      "color": {
+        "R": 0,
+        "G": 0,
+        "B": 0,
+        "A": 0.65
+      }
+    }
+  },
+  "hint": {
+    "shadow": {
+      "x": 1,
+      "y": 1,
+      "color": {
+        "R": 0,
+        "G": 0,
+        "B": 0,
+        "A": 0.65
+      }
+    }
+  },
+  "data": {
+    "font": "roboto",
+    "typeface": "Light",
+    "size": 26,
+    "shadow": {
+      "x": 1,
+      "y": 1,
+      "color": {
+        "R": 0,
+        "G": 0,
+        "B": 0,
+        "A": 0.65
+      }
+    }
+  },
+  "toggle": {
+    "trackOff": "#FFFFFF38"
+  },
+  "field": {
+    "fill": "#FFFFFF14"
+  },
+  "section": {
+    "text": {
+      "shadow": {
+        "x": 1,
+        "y": 1,
+        "color": {
+          "R": 0,
+          "G": 0,
+          "B": 0,
+          "A": 0.65
+        }
+      }
+    }
+  }
+}

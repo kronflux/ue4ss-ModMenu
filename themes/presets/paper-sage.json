@@ -1,0 +1,65 @@
+{
+  "id": "paper-sage",
+  "stage": 1,
+  "name": "Paper",
+  "subtitle": "Sage green",
+  "footer": "The light Paper layout in pale sage and deep green, with a green offset shadow.",
+  "palette": {
+    "bg": "#F2F5F1",
+    "text": "#1F2A24",
+    "muted": "#5F6E64",
+    "accent": "#2E7D5B",
+    "accentText": "#FFFFFF",
+    "danger": "#B23A3A",
+    "surface": "#E2E9E1",
+    "line": "#D0DACF",
+    "track": "#D7E0D6"
+  },
+  "panel": {
+    "radius": 6,
+    "shadowColor": "#20352A",
+    "shadowLayers": [
+      [
+        0.28,
+        3
+      ],
+      [
+        0.16,
+        7
+      ],
+      [
+        0.07,
+        12
+      ]
+    ]
+  },
+  "button": {
+    "radius": 4,
+    "hoverToward": "#000000",
+    "hoverAmount": 0.08
+  },
+  "title": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Semibold",
+    "size": 24
+  },
+  "body": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 14
+  },
+  "data": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Bold",
+    "size": 22
+  },
+  "toggle": {
+    "trackOff": "#C8D3C7"
+  }
+}

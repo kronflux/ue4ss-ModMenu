@@ -1,0 +1,47 @@
+{
+  "id": "nord",
+  "stage": 1,
+  "name": "Nord",
+  "subtitle": "Arctic, north-bluish",
+  "footer": "Nord's polar night greys, snow storm text and frost blues, with aurora red for danger.",
+  "palette": {
+    "bg": "#2E3440F7",
+    "text": "#ECEFF4",
+    "muted": "#9AA5B8",
+    "accent": "#88C0D0",
+    "accentText": "#2E3440",
+    "danger": "#BF616A",
+    "surface": "#3B4252",
+    "line": "#434C5E",
+    "track": "#434C5E"
+  },
+  "panel": {
+    "radius": 8
+  },
+  "button": {
+    "radius": 6
+  },
+  "title": {
+    "font": "roboto",
+    "typeface": "Bold",
+    "size": 20
+  },
+  "body": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 14
+  },
+  "data": {
+    "font": "roboto",
+    "typeface": "Bold",
+    "size": 22,
+    "color": "#8FBCBB"
+  },
+  "toggle": {
+    "knobOn": "#2E3440",
+    "trackOff": "#4C566A"
+  },
+  "section": {
+    "color": "#81A1C1"
+  }
+}

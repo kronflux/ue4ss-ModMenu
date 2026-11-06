@@ -1,0 +1,74 @@
+{
+  "id": "catppuccin-latte",
+  "stage": 1,
+  "name": "Catppuccin Latte",
+  "subtitle": "Soothing pastel, light",
+  "footer": "Latte, Catppuccin's light flavour: its base and surfaces, mauve, pink and blue.",
+  "palette": {
+    "bg": "#EFF1F5",
+    "text": "#4C4F69",
+    "muted": "#6C6F85",
+    "accent": "#8839EF",
+    "accentText": "#EFF1F5",
+    "danger": "#D20F39",
+    "surface": "#CCD0DA",
+    "line": "#BCC0CC",
+    "track": "#CCD0DA"
+  },
+  "panel": {
+    "radius": 14,
+    "shadowColor": "#4C4F69",
+    "shadowLayers": [
+      [
+        0.18,
+        3
+      ],
+      [
+        0.1,
+        7
+      ],
+      [
+        0.05,
+        12
+      ]
+    ]
+  },
+  "button": {
+    "radius": 10,
+    "hoverToward": "#000000",
+    "hoverAmount": 0.08
+  },
+  "title": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Semibold",
+    "size": 22
+  },
+  "body": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 14
+  },
+  "data": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Semibold",
+    "size": 24,
+    "color": "#1E66F5"
+  },
+  "toggle": {
+    "trackOff": "#BCC0CC"
+  },
+  "choice": {
+    "variant": "chips",
+    "pill": true,
+    "radius": 1
+  },
+  "section": {
+    "color": "#7287FD"
+  }
+}

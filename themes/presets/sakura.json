@@ -1,0 +1,75 @@
+{
+  "id": "sakura",
+  "stage": 1,
+  "name": "Sakura",
+  "subtitle": "Soft and light",
+  "footer": "Blush white and cherry pink, pill shapes and a rose shadow.",
+  "palette": {
+    "bg": "#FFF5F7",
+    "text": "#3A2430",
+    "muted": "#8C6B7A",
+    "accent": "#E85D8A",
+    "accentText": "#FFFFFF",
+    "danger": "#C0392B",
+    "surface": "#FBE3EA",
+    "line": "#F3D3DD",
+    "track": "#F6DCE4"
+  },
+  "panel": {
+    "radius": 16,
+    "width": 0,
+    "shadowColor": "#B0476A",
+    "shadowLayers": [
+      [
+        0.22,
+        3
+      ],
+      [
+        0.12,
+        7
+      ],
+      [
+        0.06,
+        12
+      ]
+    ]
+  },
+  "button": {
+    "pill": true,
+    "radius": 1,
+    "hoverToward": "#000000",
+    "hoverAmount": 0.06
+  },
+  "title": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Semibold",
+    "size": 24
+  },
+  "body": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 14
+  },
+  "data": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Semibold",
+    "size": 26
+  },
+  "toggle": {
+    "trackOff": "#EFCFDA"
+  },
+  "choice": {
+    "variant": "chips",
+    "pill": true,
+    "radius": 1
+  },
+  "field": {
+    "fill": "#FFFFFF"
+  }
+}

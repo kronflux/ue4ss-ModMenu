@@ -1,0 +1,72 @@
+{
+  "id": "catppuccin-mocha",
+  "stage": 1,
+  "name": "Catppuccin Mocha",
+  "subtitle": "Soothing pastel, dark",
+  "footer": "Mocha's base, surfaces and text, mauve as the accent, and the blue to pink pastels.",
+  "palette": {
+    "bg": "#1E1E2EF7",
+    "text": "#CDD6F4",
+    "muted": "#A6ADC8",
+    "accent": "#CBA6F7",
+    "accentText": "#11111B",
+    "danger": "#F38BA8",
+    "dangerText": "#11111B",
+    "surface": "#313244",
+    "line": "#45475A",
+    "track": "#313244"
+  },
+  "panel": {
+    "radius": 14
+  },
+  "button": {
+    "radius": 10
+  },
+  "title": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Semibold",
+    "size": 22
+  },
+  "body": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 14
+  },
+  "data": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Semibold",
+    "size": 24,
+    "color": "#89B4FA"
+  },
+  "toggle": {
+    "trackOff": "#45475A",
+    "knobOn": "#11111B"
+  },
+  "progress": {
+    "variant": "segments",
+    "segments": 16,
+    "gap": 2,
+    "height": 10,
+    "radius": 3,
+    "ramp": [
+      "#89B4FA",
+      "#B4BEFE",
+      "#CBA6F7",
+      "#F5C2E7"
+    ]
+  },
+  "choice": {
+    "variant": "chips",
+    "pill": true,
+    "radius": 1
+  },
+  "section": {
+    "color": "#B4BEFE"
+  }
+}

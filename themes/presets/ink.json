@@ -1,0 +1,85 @@
+{
+  "id": "ink",
+  "stage": 1,
+  "name": "Ink",
+  "subtitle": "Black and white",
+  "footer": "No colour at all: a heavy title, pill buttons and white-on-black switches.",
+  "palette": {
+    "bg": "#000000F7",
+    "text": "#FFFFFF",
+    "muted": "#8F8F8F",
+    "accent": "#FFFFFF",
+    "accentText": "#000000",
+    "danger": "#FFFFFF",
+    "dangerText": "#000000",
+    "surface": "#000000",
+    "line": "#FFFFFFD9",
+    "track": "#333333"
+  },
+  "panel": {
+    "radius": 18,
+    "width": 2
+  },
+  "button": {
+    "pill": true,
+    "radius": 1,
+    "roles": {
+      "primary": {
+        "variant": "fill"
+      },
+      "secondary": {
+        "variant": "ghost"
+      },
+      "danger": {
+        "variant": "ghost"
+      }
+    },
+    "hoverToward": "#000000",
+    "hoverAmount": 0.2
+  },
+  "title": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Bold",
+    "size": 30
+  },
+  "body": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Default",
+    "size": 14
+  },
+  "data": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Bold",
+    "size": 28,
+    "color": "#FFFFFF"
+  },
+  "toggle": {
+    "knobOn": "#000000",
+    "trackOff": "#333333",
+    "knobOff": "#9A9A9A"
+  },
+  "slider": {
+    "thumbFill": "#FFFFFF",
+    "thumbEdge": "#FFFFFF",
+    "thumbHover": "#BBBBBB"
+  },
+  "progress": {
+    "height": 6,
+    "radius": 3,
+    "fill": "#FFFFFF"
+  },
+  "choice": {
+    "variant": "chips",
+    "pill": true,
+    "radius": 1
+  }
+}

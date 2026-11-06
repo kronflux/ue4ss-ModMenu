@@ -1,0 +1,74 @@
+{
+  "id": "steel",
+  "stage": 1,
+  "name": "Steel",
+  "subtitle": "Brushed metal",
+  "footer": "Light metal grey with a bevel, outlined buttons and a blue accent.",
+  "palette": {
+    "bg": "#C9CED4",
+    "text": "#1C232B",
+    "muted": "#4B5560",
+    "accent": "#2B6CB0",
+    "accentText": "#FFFFFF",
+    "danger": "#B83232",
+    "surface": "#DDE1E6",
+    "line": "#8E969F",
+    "track": "#AEB5BD"
+  },
+  "panel": {
+    "radius": 6,
+    "rim": true
+  },
+  "button": {
+    "radius": 4,
+    "edge": "#6E767F",
+    "width": 1,
+    "hoverToward": "#FFFFFF",
+    "hoverAmount": 0.25
+  },
+  "title": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Semibold",
+    "size": 22
+  },
+  "body": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 14
+  },
+  "data": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Semibold",
+    "size": 24
+  },
+  "toggle": {
+    "variant": "square",
+    "trackOff": "#9EA6AF"
+  },
+  "slider": {
+    "variant": "square",
+    "thumbFill": "#DDE1E6",
+    "thumbEdge": "#6E767F"
+  },
+  "progress": {
+    "variant": "segments",
+    "segments": 12,
+    "gap": 2,
+    "height": 10,
+    "radius": 1
+  },
+  "choice": {
+    "variant": "joined",
+    "radius": 4
+  },
+  "field": {
+    "fill": "#E6E9ED",
+    "outline": "#8E969F"
+  }
+}

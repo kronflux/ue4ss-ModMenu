@@ -1,0 +1,52 @@
+{
+  "id": "ocean",
+  "stage": 1,
+  "name": "Ocean",
+  "subtitle": "Deep water",
+  "footer": "Deep teal with aqua, soft tinted buttons and large light numerals.",
+  "palette": {
+    "bg": "#0B2A33F7",
+    "text": "#E3F6F5",
+    "muted": "#7FA9AD",
+    "accent": "#3FE0D0",
+    "accentText": "#062226",
+    "danger": "#FF5D73",
+    "surface": "#123A45",
+    "line": "#1A4A56",
+    "track": "#123A45"
+  },
+  "panel": {
+    "radius": 18
+  },
+  "button": {
+    "variant": "soft",
+    "radius": 12
+  },
+  "title": {
+    "font": "roboto",
+    "typeface": "Light",
+    "size": 24,
+    "spacing": 30
+  },
+  "body": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 14
+  },
+  "data": {
+    "font": "roboto",
+    "typeface": "Light",
+    "size": 30
+  },
+  "toggle": {
+    "knobOn": "#062226"
+  },
+  "progress": {
+    "height": 10,
+    "radius": 5
+  },
+  "choice": {
+    "variant": "joined",
+    "radius": 12
+  }
+}

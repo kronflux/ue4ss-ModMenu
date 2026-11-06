@@ -1,0 +1,81 @@
+{
+  "id": "loadout",
+  "stage": 1,
+  "name": "Loadout",
+  "subtitle": "Shooter HUD",
+  "footer": "Corner brackets, thin cyan lines and a blurred dark glass, as in a loadout screen.",
+  "palette": {
+    "bg": "#0C1218B3",
+    "text": "#E8F6FF",
+    "muted": "#7FA3B8",
+    "accent": "#00B4FF",
+    "accentText": "#001A26",
+    "danger": "#FF3B4E",
+    "surface": "#00B4FF14",
+    "line": "#00B4FF59",
+    "track": "#13202B"
+  },
+  "panel": {
+    "radius": 0,
+    "blur": 10,
+    "corners": true
+  },
+  "button": {
+    "variant": "ghost",
+    "radius": 0,
+    "upper": true
+  },
+  "title": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Semibold",
+    "size": 22,
+    "spacing": 120,
+    "upper": true
+  },
+  "body": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Default",
+    "size": 14,
+    "spacing": 40,
+    "upper": true
+  },
+  "hint": {
+    "upper": true
+  },
+  "data": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Semibold",
+    "size": 26
+  },
+  "toggle": {
+    "variant": "square"
+  },
+  "slider": {
+    "variant": "bar"
+  },
+  "progress": {
+    "variant": "segments",
+    "segments": 20,
+    "gap": 2,
+    "height": 8,
+    "radius": 0
+  },
+  "choice": {
+    "radius": 0
+  },
+  "section": {
+    "color": "#00B4FF",
+    "text": {
+      "upper": true
+    }
+  }
+}

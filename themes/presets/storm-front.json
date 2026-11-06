@@ -1,0 +1,69 @@
+{
+  "id": "storm-front",
+  "stage": 1,
+  "name": "Storm Front",
+  "subtitle": "Lightning on violet",
+  "footer": "Lightning yellow on storm violet, with pill buttons and a violet-to-yellow bar.",
+  "palette": {
+    "bg": "#1C1B2EF7",
+    "text": "#ECEAF7",
+    "muted": "#9A96B8",
+    "accent": "#FFE45C",
+    "accentText": "#1C1B2E",
+    "danger": "#FF5C7A",
+    "surface": "#2A2842",
+    "line": "#34314F",
+    "track": "#2A2842"
+  },
+  "panel": {
+    "radius": 14
+  },
+  "button": {
+    "pill": true,
+    "radius": 1
+  },
+  "title": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Bold",
+    "size": 24
+  },
+  "body": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Default",
+    "size": 14
+  },
+  "data": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Bold",
+    "size": 26
+  },
+  "toggle": {
+    "knobOn": "#1C1B2E"
+  },
+  "progress": {
+    "variant": "segments",
+    "segments": 16,
+    "gap": 2,
+    "height": 10,
+    "radius": 2,
+    "ramp": [
+      "#6F5CE0",
+      "#9D8CFF",
+      "#FFE45C"
+    ]
+  },
+  "choice": {
+    "variant": "chips",
+    "pill": true,
+    "radius": 1
+  }
+}

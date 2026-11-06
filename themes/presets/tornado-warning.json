@@ -1,0 +1,65 @@
+{
+  "id": "tornado-warning",
+  "stage": 1,
+  "name": "TORNADO WARNING",
+  "subtitle": "Take shelter now",
+  "footer": "A warning bulletin: a full-width red header, square edges and checkboxes.",
+  "palette": {
+    "bg": "#F4F6F8",
+    "text": "#101418",
+    "muted": "#5B6570",
+    "accent": "#C8102E",
+    "accentText": "#FFFFFF",
+    "danger": "#C8102E",
+    "surface": "#E3E7EB",
+    "line": "#C9D0D6",
+    "track": "#D5DBE0"
+  },
+  "panel": {
+    "radius": 0
+  },
+  "header": {
+    "variant": "bar"
+  },
+  "button": {
+    "radius": 0,
+    "hoverToward": "#000000",
+    "hoverAmount": 0.1
+  },
+  "title": {
+    "font": [
+      "kanit",
+      "roboto"
+    ],
+    "typeface": "Bold",
+    "size": 22,
+    "spacing": 40
+  },
+  "body": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 14
+  },
+  "data": {
+    "font": "roboto",
+    "typeface": "Bold",
+    "size": 22
+  },
+  "toggle": {
+    "variant": "check"
+  },
+  "progress": {
+    "radius": 0,
+    "height": 10
+  },
+  "choice": {
+    "radius": 0
+  },
+  "section": {
+    "variant": "rule",
+    "color": "#101418"
+  },
+  "field": {
+    "fill": "#FFFFFF"
+  }
+}

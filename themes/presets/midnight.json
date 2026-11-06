@@ -1,0 +1,52 @@
+{
+  "id": "midnight",
+  "stage": 1,
+  "name": "Midnight",
+  "subtitle": "Calm and low contrast",
+  "footer": "Blue-black with soft periwinkle and pink, the palette of a late-night code editor.",
+  "palette": {
+    "bg": "#0D1117F7",
+    "text": "#C9D1E3",
+    "muted": "#6E7894",
+    "accent": "#7AA2F7",
+    "accentText": "#0D1117",
+    "danger": "#F7768E",
+    "dangerText": "#0D1117",
+    "surface": "#1A2030",
+    "line": "#232A3B",
+    "track": "#1A2030"
+  },
+  "panel": {
+    "radius": 12
+  },
+  "title": {
+    "font": "roboto",
+    "typeface": "Bold",
+    "size": 20
+  },
+  "body": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 14
+  },
+  "data": {
+    "font": [
+      "inconsolata",
+      "mono",
+      "roboto"
+    ],
+    "typeface": "Inconsolata SemiBold",
+    "size": 24
+  },
+  "toggle": {
+    "knobOn": "#0D1117",
+    "trackOff": "#2A3247"
+  },
+  "progress": {
+    "height": 4,
+    "radius": 2
+  },
+  "choice": {
+    "variant": "tabs"
+  }
+}
