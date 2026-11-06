@@ -194,6 +194,15 @@ if init ~= nil and config ~= nil then
     assert_eq("a fold keeps visible true as a field it did not write", byId.fold.visible, nil)
 end
 
+-- The AC-11 document: theme storm, the button borrowed from neon, a toggle colour and one button's look.
+local themeInit, themeSections, themeConfig = checkExport("theme document", "builder_theme_export.lua", 1)
+if themeInit ~= nil and themeConfig ~= nil then
+    assert_eq("Init passes the theme to the config", themeConfig.theme, "storm")
+    assert_eq("the borrowed button resolves to neon's ghost variant", themeConfig.resolved.button.variant, "ghost")
+    assert_eq("the borrowed button resolves as a pill", themeConfig.resolved.button.pill, true)
+    assert_eq("the button keeps its look", themeSections[1].items[1].look, { radius = 0, pill = false })
+end
+
 -- The library rejects a field the builder would reject, with the same words. This is the other direction:
 -- the builder's messages for these cases are in builder/src/schema/validate.test.ts.
 local function registerError(item)

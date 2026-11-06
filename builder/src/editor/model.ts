@@ -1,5 +1,6 @@
 import {
   FOLD_CHILD_TYPES,
+  LOOK_OBJECT_TYPE,
   ROW_CHILD_TYPES,
 } from "../schema";
 import type {
@@ -7,7 +8,10 @@ import type {
   ItemType,
   MenuDocument,
   Section,
+  StyleOverrides,
 } from "../schema";
+import { forItem, resolve } from "../theme/resolve";
+import type { ResolvedStyle } from "../theme/resolve";
 
 export type AcceptParent = "section" | "fold" | "row";
 
@@ -626,6 +630,243 @@ export function patchItem(doc: MenuDocument, sel: Extract<NodeRef, { kind: "item
     }
     assignItemId(section, item, prev);
   });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Style differences
+//
+// The document keeps only what differs from the resolved preset. Each setter writes the value, then
+// drops the edited field (or the borrow) when its removal leaves the resolved style the same, then
+// removes emptied tables. A style that does not resolve, such as one with a bad value
+// typed by hand, is stored as given, and validation reports it.
+// ---------------------------------------------------------------------------------------------
+
+type Dict = Record<string, unknown>;
+type ItemRef = Extract<NodeRef, { kind: "item" }>;
+
+function isDict(v: unknown): v is Dict {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) {
+    return true;
+  }
+  if (typeof a === "number" && typeof b === "number") {
+    return Math.abs(a - b) < 1e-9;
+  }
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((v, i) => sameValue(v, b[i]));
+  }
+  if (!isDict(a) || !isDict(b)) {
+    return false;
+  }
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const key of keys) {
+    if (!sameValue(a[key], b[key])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function tryResolve(theme: string, style: StyleOverrides | undefined): ResolvedStyle | null {
+  try {
+    return resolve(theme, style ?? null);
+  } catch {
+    return null;
+  }
+}
+
+/** The resolved style of a document, or null when its theme or style does not resolve. */
+export function resolveDocument(doc: MenuDocument): ResolvedStyle | null {
+  return tryResolve(doc.init.theme, doc.init.style);
+}
+
+/** One object type's override split into its borrow and its fields. */
+export function styleEntry(style: StyleOverrides | undefined, type: string): { from?: string; fields: Dict } {
+  const value = style?.[type];
+  if (typeof value === "string") {
+    return { from: value, fields: {} };
+  }
+  if (!isDict(value)) {
+    return { fields: {} };
+  }
+  const fields: Dict = {};
+  let from: string | undefined;
+  for (const [key, inner] of Object.entries(value)) {
+    if (key === "from" && type !== "palette") {
+      from = typeof inner === "string" ? inner : undefined;
+    } else if (inner !== undefined && inner !== null) {
+      fields[key] = inner;
+    }
+  }
+  return { from, fields };
+}
+
+// A borrow alone is written as the preset id; fields make a table, with `from` when there is a borrow.
+function writeEntry(style: StyleOverrides, type: string, from: string | undefined, fields: Dict) {
+  const hasFields = Object.keys(fields).length > 0;
+  if (!hasFields && from === undefined) {
+    delete style[type];
+  } else if (!hasFields) {
+    style[type] = from;
+  } else {
+    style[type] = from === undefined ? { ...fields } : { from, ...fields };
+  }
+}
+
+// Drop the edited field, or the borrow when the edit was to the borrow, if it leaves the resolved style
+// the same. The type's other stored fields are left alone: one may equal a derived value only by chance,
+// such as a colour that matches a changed palette entry, and must not move when the palette moves again.
+function pruneEdit(theme: string, style: StyleOverrides, type: string, edited: { field: string } | "borrow") {
+  const full = tryResolve(theme, style);
+  if (full === null) {
+    return;
+  }
+  const entry = styleEntry(style, type);
+  if (edited !== "borrow" && edited.field in entry.fields) {
+    const fields = { ...entry.fields };
+    delete fields[edited.field];
+    const trial: StyleOverrides = { ...style };
+    writeEntry(trial, type, entry.from, fields);
+    const without = tryResolve(theme, trial);
+    if (without !== null && sameValue(without, full)) {
+      entry.fields = fields;
+    }
+  }
+  if (edited === "borrow" && entry.from !== undefined) {
+    const trial: StyleOverrides = { ...style };
+    writeEntry(trial, type, undefined, entry.fields);
+    const without = tryResolve(theme, trial);
+    if (without !== null && sameValue(without, full)) {
+      entry.from = undefined;
+    }
+  }
+  writeEntry(style, type, entry.from, entry.fields);
+}
+
+function changeStyle(
+  doc: MenuDocument,
+  type: string,
+  edited: { field: string } | "borrow",
+  change: (entry: { from?: string; fields: Dict }) => void,
+): MenuDocument {
+  return draft(doc, (copy) => {
+    const style: StyleOverrides = { ...copy.init.style };
+    const entry = styleEntry(style, type);
+    change(entry);
+    writeEntry(style, type, entry.from, entry.fields);
+    pruneEdit(copy.init.theme, style, type, edited);
+    if (Object.keys(style).length > 0) {
+      copy.init.style = style;
+    } else {
+      delete copy.init.style;
+    }
+  });
+}
+
+/**
+ * Set one field of an object type, or of `palette`, in the document's style. The value is kept only
+ * when it changes the resolved style; undefined removes the field.
+ */
+export function setStyleField(doc: MenuDocument, type: string, field: string, value: unknown): MenuDocument {
+  const pillOff = turnsPillOff(field, value, resolveDocument(doc)?.[type as keyof ResolvedStyle]);
+  return changeStyle(doc, type, { field }, (entry) => {
+    if (value === undefined) {
+      delete entry.fields[field];
+    } else {
+      entry.fields[field] = value;
+    }
+    if (pillOff) {
+      entry.fields.pill = false;
+    }
+  });
+}
+
+// A pill wins over radius in the library, so a new radius typed on a type or look that resolves as a
+// pill also turns the pill off, and the result is the radius the user typed. Typing the radius it
+// already resolves to changes nothing, as for any other field.
+function turnsPillOff(field: string, value: unknown, resolvedType: unknown): boolean {
+  return (
+    field === "radius" &&
+    value !== undefined &&
+    isDict(resolvedType) &&
+    resolvedType.pill === true &&
+    !sameValue(resolvedType.radius, value)
+  );
+}
+
+/** Remove one field from the document's style. */
+export function resetStyleField(doc: MenuDocument, type: string, field: string): MenuDocument {
+  return setStyleField(doc, type, field, undefined);
+}
+
+/** Borrow an object type from a preset, without its colours, or stop borrowing with null. */
+export function setStyleBorrow(doc: MenuDocument, type: string, presetId: string | null): MenuDocument {
+  return changeStyle(doc, type, "borrow", (entry) => {
+    entry.from = presetId ?? undefined;
+  });
+}
+
+/** The style object type an item reads its look from, or undefined for a row, fold or separator. */
+export function lookTypeOf(item: Item): string | undefined {
+  return LOOK_OBJECT_TYPE[item.type];
+}
+
+/**
+ * Set one field of an item's look. The value is kept only when it changes the item's resolved
+ * object type; undefined removes it, and an emptied look is removed.
+ */
+export function setItemLook(doc: MenuDocument, sel: ItemRef, field: string, value: unknown): MenuDocument {
+  return draft(doc, (copy) => {
+    const section = copy.sections[sel.sectionIndex];
+    const item = section ? locate(section, sel.path).item : undefined;
+    const type = item ? lookTypeOf(item) : undefined;
+    if (!item || type === undefined) {
+      return;
+    }
+    const look: Dict = isDict(item.look) ? { ...item.look } : {};
+    const resolved = tryResolve(copy.init.theme, copy.init.style);
+    const lookOf = (t: Dict) => {
+      try {
+        return resolved === null ? null : forItem(resolved, type, t);
+      } catch {
+        return null;
+      }
+    };
+    const pillOff = turnsPillOff(field, value, lookOf(look));
+    if (value === undefined) {
+      delete look[field];
+    } else {
+      look[field] = value;
+    }
+    if (pillOff) {
+      look.pill = false;
+    }
+    if (resolved !== null) {
+      // Only the edited field is tested, as for the document's style.
+      if (field in look) {
+        const full = lookOf(look);
+        const trial = { ...look };
+        delete trial[field];
+        const without = lookOf(trial);
+        if (full !== null && without !== null && sameValue(without, full)) {
+          delete look[field];
+        }
+      }
+    }
+    if (Object.keys(look).length > 0) {
+      item.look = look;
+    } else {
+      delete item.look;
+    }
+  });
+}
+
+/** Remove one field from an item's look. */
+export function resetItemLook(doc: MenuDocument, sel: ItemRef, field: string): MenuDocument {
+  return setItemLook(doc, sel, field, undefined);
 }
 
 export function idCollision(section: Section, id: string, exceptPath: number[]): boolean {

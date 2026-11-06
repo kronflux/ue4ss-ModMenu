@@ -13,6 +13,11 @@ import {
   patchItem,
   removeNode,
   renameTab,
+  resetItemLook,
+  resetStyleField,
+  setItemLook,
+  setStyleBorrow,
+  setStyleField,
   slugId,
   uniqueItemId,
 } from "./model";
@@ -145,6 +150,12 @@ describe("editor model", () => {
     expect(itemId(doc, added.selection)).toBe("main_revive");
   });
 
+  it("leaves a document without style or look untouched until a style is set", () => {
+    const doc = emptyDocument();
+    const reset = resetStyleField(doc, "button", "radius");
+    expect("style" in reset.init).toBe(false);
+  });
+
   it("idCollision ignores the item being edited", () => {
     const section = emptyDocument().sections[0];
     section.items = [
@@ -153,5 +164,109 @@ describe("editor model", () => {
     ];
     expect(idCollision(section, "heal", [0])).toBe(false);
     expect(idCollision(section, "heal", [1])).toBe(true);
+  });
+});
+
+// The expected values come from themes/presets: storm's accent is #F2B33D and its button radius 2;
+// neon's button is a ghost pill with radius 1.
+describe("style differences", () => {
+  function storm() {
+    const doc = emptyDocument();
+    doc.init.theme = "storm";
+    doc.sections[0].items.push({ type: "button", id: "go", label: "Go" });
+    return doc;
+  }
+  const button: Extract<Parameters<typeof getItem>[1], { kind: "item" }> = { kind: "item", sectionIndex: 0, path: [1] };
+
+  it("stores nothing when a field is set to the preset's own value", () => {
+    const doc = setStyleField(storm(), "toggle", "trackOn", "#F2B33D");
+    expect("style" in doc.init).toBe(false);
+  });
+
+  it("stores a field that differs, and removes it when set back to the preset's value", () => {
+    const changed = setStyleField(storm(), "toggle", "trackOn", "#22F1FF");
+    expect(changed.init.style).toEqual({ toggle: { trackOn: "#22F1FF" } });
+    const back = setStyleField(changed, "toggle", "trackOn", "#F2B33D");
+    expect("style" in back.init).toBe(false);
+  });
+
+  it("resets a field and removes the emptied tables", () => {
+    const changed = setStyleField(storm(), "button", "radius", 5);
+    expect(changed.init.style).toEqual({ button: { radius: 5 } });
+    expect("style" in resetStyleField(changed, "button", "radius").init).toBe(false);
+  });
+
+  it("stores a borrow as the preset id, and drops a field the borrowed preset already has", () => {
+    const borrowed = setStyleBorrow(storm(), "button", "neon");
+    expect(borrowed.init.style).toEqual({ button: "neon" });
+    expect(setStyleField(borrowed, "button", "radius", 1).init.style).toEqual({ button: "neon" });
+    const withField = setStyleField(borrowed, "button", "radius", 5);
+    // Neon's button is a pill, so the new radius also stores pill = false (the pill ruling).
+    expect(withField.init.style).toEqual({ button: { from: "neon", radius: 5, pill: false } });
+    expect(setStyleBorrow(withField, "button", null).init.style).toEqual({ button: { radius: 5, pill: false } });
+  });
+
+  it("stores no borrow that resolves the same as the theme", () => {
+    // Storm's button has only a radius and no colours, so borrowing it from storm changes nothing.
+    expect("style" in setStyleBorrow(storm(), "button", "storm").init).toBe(false);
+  });
+
+  it("keeps an earlier field when a later edit makes it equal its derived value", () => {
+    // Storm's toggle.trackOn is derived from palette.accent. After accent changes to the same colour,
+    // editing another toggle field must not drop trackOn, or a later accent change would move it.
+    let doc = setStyleField(storm(), "toggle", "trackOn", "#22F1FF");
+    doc = setStyleField(doc, "palette", "accent", "#22F1FF");
+    doc = setStyleField(doc, "toggle", "knobOn", "#000000");
+    expect(doc.init.style).toEqual({ palette: { accent: "#22F1FF" }, toggle: { trackOn: "#22F1FF", knobOn: "#000000" } });
+  });
+
+  it("keeps an earlier look field when another look field is edited", () => {
+    let doc = setItemLook(storm(), button, "radius", 0);
+    doc = setItemLook(doc, button, "height", 50);
+    doc = setStyleField(doc, "button", "radius", 0);
+    doc = setItemLook(doc, button, "height", 60);
+    expect(getItem(doc, button)?.look).toEqual({ radius: 0, height: 60 });
+  });
+
+  it("turns pill off when radius is edited on a type that resolves as a pill", () => {
+    // Neon's button is a pill, and a pill wins over radius, so the edit also stores pill = false.
+    const borrowed = setStyleBorrow(storm(), "button", "neon");
+    expect(setStyleField(borrowed, "button", "radius", 6).init.style).toEqual({ button: { from: "neon", radius: 6, pill: false } });
+    // Storm's own button is no pill, so pill is left alone.
+    expect(setStyleField(storm(), "button", "radius", 6).init.style).toEqual({ button: { radius: 6 } });
+  });
+
+  it("turns pill off when a look's radius is edited on an item that resolves as a pill", () => {
+    const borrowed = setStyleBorrow(storm(), "button", "neon");
+    expect(getItem(setItemLook(borrowed, button, "radius", 0), button)?.look).toEqual({ radius: 0, pill: false });
+    expect(getItem(setItemLook(storm(), button, "radius", 0), button)?.look).toEqual({ radius: 0 });
+  });
+
+  it("stores palette colours that differ", () => {
+    expect("style" in setStyleField(storm(), "palette", "accent", "#F2B33D").init).toBe(false);
+    expect(setStyleField(storm(), "palette", "accent", "#FF0000").init.style).toEqual({ palette: { accent: "#FF0000" } });
+  });
+
+  it("stores an item look only where it differs from the item's resolved type", () => {
+    const borrowed = setStyleBorrow(storm(), "button", "neon");
+    expect(getItem(setItemLook(borrowed, button, "radius", 1), button)?.look).toBeUndefined();
+    const looked = setItemLook(borrowed, button, "radius", 0);
+    expect(getItem(looked, button)?.look).toEqual({ radius: 0, pill: false });
+    // Resetting radius leaves the pill field the edit stored; resetting that too removes the look.
+    const resetRadius = resetItemLook(looked, button, "radius");
+    expect(getItem(resetRadius, button)?.look).toEqual({ pill: false });
+    const reset = resetItemLook(resetRadius, button, "pill");
+    expect(getItem(reset, button) && "look" in (getItem(reset, button) as object)).toBe(false);
+  });
+
+  it("builds the AC-11 document with only the three differences, and it validates", () => {
+    let doc = setStyleBorrow(storm(), "button", "neon");
+    doc = setStyleField(doc, "toggle", "trackOn", "#22F1FF");
+    doc = setItemLook(doc, button, "radius", 0);
+    expect(doc.init.theme).toBe("storm");
+    expect(doc.init.style).toEqual({ button: "neon", toggle: { trackOn: "#22F1FF" } });
+    // Neon's button is a pill, so the radius edit also stores pill = false (the pill ruling).
+    expect(getItem(doc, button)).toEqual({ type: "button", id: "go", label: "Go", look: { radius: 0, pill: false } });
+    expect(validateDocument(doc)).toEqual([]);
   });
 });

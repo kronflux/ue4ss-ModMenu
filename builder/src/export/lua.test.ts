@@ -332,6 +332,80 @@ describe("printLua keeps the order of an existing button", () => {
     expect(lua.indexOf("enabled = false")).toBeLessThan(lua.indexOf("active = true"));
   });
 });
+// AC-11 and AC-12: the theme, the style differences and each item's look reach Init and Register.
+describe("printLua for themes, styles and looks", () => {
+  function themed() {
+    const doc = emptyDocument();
+    doc.init.theme = "storm";
+    // Written in reverse order, so the test shows the export sorts the keys.
+    doc.init.style = { toggle: { trackOn: "#22F1FF" }, button: "neon" };
+    doc.sections[0].items = [{ type: "button", id: "go", label: "Go", look: { radius: 0, pill: false } }] as Item[];
+    return doc;
+  }
+
+  it("the AC-11 document is valid for the builder", () => {
+    expect(validateDocument(themed())).toEqual([]);
+  });
+
+  it("writes the theme, the style table and the item look", () => {
+    const lua = printLua(themed());
+    expect(lua).toContain('    theme = "storm",\n');
+    expect(lua).toContain(
+      ['    style = {', '        button = "neon",', '        toggle = { trackOn = "#22F1FF" },', "    },"].join("\n"),
+    );
+    expect(lua).toContain('        look = { pill = false, radius = 0 },\n');
+  });
+
+  // The Lua suite runs this file through Config.ApplyInit and Registry.Register (builder_export_spec.lua).
+  it("exports the AC-11 document to the Lua suite's fixture", async () => {
+    await expect(printLua(themed())).toMatchFileSnapshot("../../../tooling/lua/fixtures/builder_theme_export.lua");
+  });
+
+  it("writes the item look after the item's other fields, before it closes", () => {
+    const lua = printLua(themed());
+    expect(lua.indexOf("onClick = function()")).toBeLessThan(lua.indexOf("look = { pill = false, radius = 0 }"));
+  });
+
+  it("writes a borrow with fields, a palette, nested tables, lists and colour tables", () => {
+    const doc = emptyDocument();
+    doc.init.style = {
+      palette: { accent: "#FF0000", bg: { R: 0.1, G: 0.2, B: 0.3, A: 1 } },
+      button: { from: "neon", radius: [1, 2, 3, 4], roles: { primary: { fill: "#00FF00" } }, upper: true },
+      title: { font: ["kanit", "roboto"], shadow: false },
+    };
+    const lua = printLua(doc);
+    expect(lua).toContain('        button = { from = "neon", radius = { 1, 2, 3, 4 }, roles = { primary = { fill = "#00FF00" } }, upper = true },');
+    expect(lua).toContain('        palette = { accent = "#FF0000", bg = { R = 0.1, G = 0.2, B = 0.3, A = 1 } },');
+    expect(lua).toContain('        title = { font = { "kanit", "roboto" }, shadow = false },');
+  });
+
+  it("writes nothing for an empty style or look", () => {
+    const doc = emptyDocument();
+    doc.init.style = {};
+    doc.sections[0].items = [{ type: "button", id: "go", label: "Go", look: {} }] as Item[];
+    const lua = printLua(doc);
+    expect(lua).not.toContain("style =");
+    expect(lua).not.toContain("look =");
+  });
+
+  it("writes no text from an imported style as code", () => {
+    const doc = emptyDocument();
+    const code = "1, onChange = os.execute('x')";
+    doc.init.style = {
+      button: { radius: Number.NaN, width: Infinity, edge: `"${code}`, [`a"] = os.execute('y') --`]: 1 },
+    } as unknown as typeof doc.init.style;
+    doc.sections[0].items = [{ type: "button", id: "go", label: "Go", look: { height: code, end: 2 } }] as unknown as Item[];
+    const lua = printLua(doc);
+    // Three occurrences, each inside one of the quoted strings checked below.
+    expect(lua.match(/os\.execute/g)?.length).toBe(3);
+    expect(lua).toContain('["a\\"] = os.execute(\'y\') --"] = 1');
+    expect(lua).toContain('edge = "\\"1, onChange = os.execute(\'x\')"');
+    expect(lua).toContain('look = { ["end"] = 2, height = "1, onChange = os.execute(\'x\')" },');
+    expect(lua).not.toContain("radius =");
+    expect(lua).not.toContain("width =");
+  });
+});
+
 // The Lua suite loads these two files and runs them through the library's own checks, so they are written
 // from the builder here and a change to either export shows up as a changed file in the diff.
 describe("printLua output for the library's own checks", () => {

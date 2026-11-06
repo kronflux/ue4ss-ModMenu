@@ -19,7 +19,6 @@ import type {
   SliderItem,
   StepperItem,
   TextInputItem,
-  ThemeName,
 } from "../schema";
 import {
   BUTTON_VARIANTS,
@@ -28,13 +27,13 @@ import {
   LABEL_ALIGNS,
   LABEL_STYLES,
   SPACING_KEYS,
-  THEMES,
   isToggleKey,
   validateDocument,
 } from "../schema";
 import type { NodeRef } from "./model";
 import { canMove, getItem, idCollision } from "./model";
 import { formatOptions, parseOptions } from "./optionsText";
+import { LookPanel, StylePanel } from "./StylePanel";
 
 const VARIANTS = [...BUTTON_VARIANTS] as ButtonVariant[];
 
@@ -172,20 +171,6 @@ function InitFields({
           ))}
         </select>
       </Field>
-      <Field label="Theme">
-        <select
-          value={init.theme}
-          onChange={(event) => {
-            onPatchInit({ theme: event.target.value as ThemeName });
-          }}
-        >
-          {[...THEMES].map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </select>
-      </Field>
       <OptNumber label="Tooltip delay (ms, blank for 400)" value={init.tooltipDelayMs} onChange={(tooltipDelayMs) => onPatchInit({ tooltipDelayMs })} />
       <OptToggle label="Show the Close button" value={init.showClose} onChange={(showClose) => onPatchInit({ showClose })} />
       <OptNumber label="Cursor scale (1 or more, blank for 1)" value={init.cursorScale} onChange={(cursorScale) => onPatchInit({ cursorScale })} />
@@ -204,6 +189,7 @@ function InitFields({
           }}
         />
       ))}
+      <StylePanel document={document} onPatchInit={onPatchInit} />
     </>
   );
 }
@@ -785,6 +771,7 @@ export function Inspector({
             <ItemFields item={item} section={section} path={selection.path} onPatch={(patch) => onPatchItem(selection, patch)} />
             <TooltipField item={item} onPatch={(patch) => onPatchItem(selection, patch)} />
             <StateFields item={item} onPatch={(patch) => onPatchItem(selection, patch)} />
+            <LookPanel document={document} selection={selection} item={item} onPatchItem={(patch) => onPatchItem(selection, patch)} />
           </>
         );
       })()}

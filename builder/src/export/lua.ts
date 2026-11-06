@@ -128,6 +128,70 @@ function numberField(value: unknown): string | undefined {
 
 const COLOR_CHANNELS = ["R", "G", "B", "A"] as const;
 
+const LUA_KEYWORDS = new Set([
+  "and", "break", "do", "else", "elseif", "end", "false", "for", "function", "goto", "if", "in",
+  "local", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while",
+]);
+
+function luaKey(key: string): string {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(key) && !LUA_KEYWORDS.has(key) ? key : `[${luaString(key)}]`;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+// A colour table keeps the R, G, B, A order the colour picker's default uses.
+function colorOrder(keys: string[]): string[] | null {
+  const order = COLOR_CHANNELS.filter((key) => keys.includes(key));
+  return keys.length >= 3 && order.length === keys.length && keys.includes("R") ? order : null;
+}
+
+// A style value written as a one-line Lua constructor: strings quoted, finite numbers, booleans, lists,
+// and tables with their keys sorted so the export is stable. A value of any other shape, such as text
+// where a number should be or a non-finite number, is left out rather than written as code.
+function luaValue(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    return luaString(value);
+  }
+  if (typeof value === "number") {
+    return numberField(value);
+  }
+  if (typeof value === "boolean") {
+    return value ? "true" : "false";
+  }
+  if (Array.isArray(value)) {
+    const parts = value.map(luaValue);
+    if (parts.some((part) => part === undefined)) {
+      return undefined;
+    }
+    return parts.length === 0 ? "{}" : `{ ${parts.join(", ")} }`;
+  }
+  if (!isPlainObject(value)) {
+    return undefined;
+  }
+  const fields = luaFields(value);
+  return fields.length === 0 ? "{}" : `{ ${fields.join(", ")} }`;
+}
+
+function luaFields(table: Record<string, unknown>): string[] {
+  const keys = Object.keys(table);
+  const order = colorOrder(keys) ?? [...keys].sort();
+  return order.flatMap((key) => {
+    const text = luaValue(table[key]);
+    return text === undefined ? [] : [`${luaKey(key)} = ${text}`];
+  });
+}
+
+// An item's look, written only when it has a field to write.
+function lookField(item: Item): string | undefined {
+  if (!isPlainObject(item.look)) {
+    return undefined;
+  }
+  const fields = luaFields(item.look);
+  return fields.length > 0 ? `{ ${fields.join(", ")} }` : undefined;
+}
+
 function emitItem(item: Item, sectionId: string, level: number): string {
   const pad = indent(level);
   const inner = indent(level + 1);
@@ -337,6 +401,8 @@ function emitItem(item: Item, sectionId: string, level: number): string {
     }
   }
 
+  // The look comes last, so an item without one exports the same text as before.
+  emitFieldLines(lines, inner, [["look", lookField(item)]]);
   lines.push(`${pad}},`);
   return lines.join("\n");
 }
@@ -448,6 +514,17 @@ export function printLua(document: MenuDocument): string {
       lines.push(`    spacing = {`);
       for (const [key, value] of tokens) {
         lines.push(`        ${key} = ${value},`);
+      }
+      lines.push(`    },`);
+    }
+  }
+  // Each object type on its own line, sorted, so a document without style exports the same text as before.
+  if (isPlainObject(init.style)) {
+    const types = luaFields(init.style);
+    if (types.length > 0) {
+      lines.push(`    style = {`);
+      for (const line of types) {
+        lines.push(`        ${line},`);
       }
       lines.push(`    },`);
     }
