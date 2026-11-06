@@ -17,6 +17,21 @@ import type {
   TextInputItem,
 } from "../schema";
 import { buttonChrome } from "./chrome";
+import {
+  buttonLook,
+  choiceLook,
+  fieldVariant,
+  lookVars,
+  progressLook,
+  segmentsLit,
+  sliderVariant,
+  stepperButtonLook,
+  textLookStyle,
+  toggleVariant,
+  usePreviewStyle,
+  variantClass,
+  type ChoiceLook,
+} from "./look";
 import { normalizeOptions, optionLabel } from "./options";
 import { sliderText, sliderValue } from "./slider";
 
@@ -43,17 +58,33 @@ function MmButton({
   fill?: boolean;
   onClick?: () => void;
 }) {
-  const chrome = buttonChrome(item);
+  const look = buttonLook(usePreviewStyle(), item);
   return (
     <button
       type="button"
-      className={`mm-btn${fill === false ? " mm-btn-inline" : ""}`}
-      style={chrome}
+      className={`mm-btn${fill === false ? " mm-btn-inline" : ""} ${look.className}`}
+      style={look.style}
       disabled={item.enabled === false}
       onClick={onClick}
     >
       {item.label}
     </button>
+  );
+}
+
+// The themed toggle shapes, as widgets/checkbox.lua builds them: a switch or square track with a knob,
+// a check box with a mark, or an On and Off chip.
+function ToggleControl({ variant, on }: { variant: string; on: boolean }) {
+  if (variant === "check") {
+    return <span className={`mm-tg-check${on ? " is-on" : ""}`}>{on ? "✓" : ""}</span>;
+  }
+  if (variant === "text") {
+    return <span className={`mm-tg-text${on ? " is-on" : ""}`}>{on ? "On" : "Off"}</span>;
+  }
+  return (
+    <span className={`mm-tg-switch${on ? " is-on" : ""}`}>
+      <span className="mm-tg-knob" />
+    </span>
   );
 }
 
@@ -66,9 +97,29 @@ function MmCheckbox({
   valueKey: string;
   actions: PreviewActions;
 }) {
+  const ps = usePreviewStyle();
   const on = actions.checks[valueKey] ?? item.default === true;
+  const variant = toggleVariant(ps, item.look);
+  if (variant !== "stock") {
+    // The control shows the state, so the caption is the label alone, without ": ON" or ": OFF".
+    return (
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        className={`mm-toggle ${variantClass("toggle", variant)}`}
+        style={lookVars(ps, "toggle", item.look)}
+        onClick={() => {
+          actions.toggleCheck(valueKey);
+        }}
+      >
+        <span className="mm-toggle-label">{item.label}</span>
+        <ToggleControl variant={variant} on={on} />
+      </button>
+    );
+  }
   return (
-    <label className="mm-check">
+    <label className={`mm-check ${variantClass("toggle", "stock")}`}>
       <input
         type="checkbox"
         checked={on}
@@ -86,16 +137,22 @@ function MmField({
   labelWidth,
   fieldWidth,
   fill,
+  look,
   children,
 }: {
   label: string;
   labelWidth?: number;
   fieldWidth?: number;
   fill?: boolean;
+  look?: Record<string, unknown>;
   children: ReactNode;
 }) {
+  const ps = usePreviewStyle();
   return (
-    <div className={`mm-field${fill ? " mm-field-fill" : ""}`}>
+    <div
+      className={`mm-field${fill ? " mm-field-fill" : ""} ${variantClass("field", fieldVariant(ps, look))}`}
+      style={lookVars(ps, "field", look)}
+    >
       <span className="mm-field-label" style={labelWidth ? { width: labelWidth, flex: "0 0 auto" } : undefined}>
         {label}
       </span>
@@ -108,10 +165,11 @@ function MmField({
 
 // The prefix and suffix sit inside the field, as the runtime draws them. The step buttons follow the field.
 function MmNumber({ item, fill }: { item: NumberItem; fill?: boolean }) {
+  const step = buttonLook(usePreviewStyle(), {});
   const width = item.fieldWidth ?? (fill === false ? 72 : 96);
   return (
     <div className="mm-number">
-      <MmField label={item.label} labelWidth={item.labelWidth} fieldWidth={width} fill={fill !== false}>
+      <MmField label={item.label} labelWidth={item.labelWidth} fieldWidth={width} fill={fill !== false} look={item.look}>
         {item.prefix && <span className="mm-note">{item.prefix}</span>}
         <input
           className="mm-edit"
@@ -124,10 +182,10 @@ function MmNumber({ item, fill }: { item: NumberItem; fill?: boolean }) {
       </MmField>
       {item.step !== undefined && (
         <>
-          <button type="button" className="mm-btn mm-btn-inline mm-step" style={buttonChrome({})}>
+          <button type="button" className={`mm-btn mm-btn-inline mm-step ${step.className}`} style={step.style}>
             -
           </button>
-          <button type="button" className="mm-btn mm-btn-inline mm-step" style={buttonChrome({})}>
+          <button type="button" className={`mm-btn mm-btn-inline mm-step ${step.className}`} style={step.style}>
             +
           </button>
         </>
@@ -139,7 +197,7 @@ function MmNumber({ item, fill }: { item: NumberItem; fill?: boolean }) {
 function MmText({ item, fill }: { item: TextInputItem; fill?: boolean }) {
   const width = item.fieldWidth ?? (fill === false ? 72 : undefined);
   return (
-    <MmField label={item.label} labelWidth={item.labelWidth} fieldWidth={width} fill={fill !== false}>
+    <MmField label={item.label} labelWidth={item.labelWidth} fieldWidth={width} fill={fill !== false} look={item.look}>
       <input className="mm-edit" type="text" defaultValue={item.default ?? ""} placeholder={item.placeholder} readOnly />
     </MmField>
   );
@@ -154,6 +212,7 @@ function MmDropdown({
   dropKey: string;
   actions: PreviewActions;
 }) {
+  const ps = usePreviewStyle();
   const [filter, setFilter] = useState("");
   const open = actions.openDropdown === dropKey;
   const list = normalizeOptions(item.options);
@@ -165,7 +224,7 @@ function MmDropdown({
   const extra = matched.length - shown.length;
 
   return (
-    <div className="mm-drop">
+    <div className={`mm-drop ${variantClass("field", fieldVariant(ps, item.look))}`} style={lookVars(ps, "field", item.look)}>
       <button
         type="button"
         className="mm-drop-header"
@@ -206,12 +265,45 @@ function MmDropdown({
   );
 }
 
+// A themed slider rail, as widgets/slider.lua styles the engine slider: a rounded track of the
+// slider's thickness and a round, square or bar thumb at the value. A tint fills the track up to the
+// thumb, as the colour picker's channels show their colour.
+function SliderRail({ fraction, tint }: { fraction: number; tint?: string }) {
+  const at = `${Math.min(1, Math.max(0, fraction)) * 100}%`;
+  return (
+    <div className="mm-sl-rail">
+      <div className="mm-sl-track">
+        {tint !== undefined && <span className="mm-sl-tint" style={{ width: at, background: tint }} />}
+        <span className="mm-sl-thumb" style={{ left: at }} />
+      </div>
+    </div>
+  );
+}
+
 function MmSlider({ item, fill }: { item: SliderItem; fill?: boolean }) {
+  const ps = usePreviewStyle();
+  const variant = sliderVariant(ps, item.look);
   const span = item.max - item.min;
   const value = sliderValue(item);
   const fraction = span > 0 ? (value - item.min) / span : 0;
+  if (variant !== "stock") {
+    return (
+      <div
+        className={`mm-slider${fill === false ? " mm-slider-inline" : ""} ${variantClass("slider", variant)}`}
+        style={lookVars(ps, "slider", item.look)}
+      >
+        <div className="mm-slider-head">
+          <span className="mm-slider-label" style={item.labelWidth ? { width: item.labelWidth, flex: "0 0 auto" } : undefined}>
+            {item.label}
+          </span>
+          {item.showValue !== false && <span className="mm-slider-value">{sliderText(value, item)}</span>}
+        </div>
+        <SliderRail fraction={fraction} />
+      </div>
+    );
+  }
   return (
-    <div className={`mm-slider${fill === false ? " mm-slider-inline" : ""}`}>
+    <div className={`mm-slider${fill === false ? " mm-slider-inline" : ""} ${variantClass("slider", "stock")}`}>
       <div className="mm-slider-head">
         <span className="mm-slider-label" style={item.labelWidth ? { width: item.labelWidth, flex: "0 0 auto" } : undefined}>
           {item.label}
@@ -234,12 +326,23 @@ function MmStepper({ item }: { item: StepperItem }) {
   const high = item.max ?? Number.POSITIVE_INFINITY;
   const value = Math.min(high, Math.max(low, item.default ?? item.min ?? 0));
   const shaped = { ...item, min: item.min ?? 0, max: item.max ?? 0 } as unknown as SliderItem;
+  // The minus and plus buttons take the stepper's role, radius and pill over the button style, as
+  // widgets/stepper.lua does. A flat look keeps today's plain spans.
+  const ps = usePreviewStyle();
+  const btn = stepperButtonLook(ps, item.look);
+  const flat = btn.flat;
+  const btnClass = flat ? "mm-stepper-btn" : `mm-stepper-btn ${btn.className}`;
+  const btnStyle = flat ? undefined : btn.style;
   return (
-    <div className="mm-stepper">
+    <div className={`mm-stepper${flat ? "" : " mm-stepper-themed"}`}>
       <span className="mm-stepper-label">{item.label}</span>
-      <span className="mm-stepper-btn">-</span>
+      <span className={btnClass} style={btnStyle}>
+        -
+      </span>
       <span className="mm-stepper-readout">{sliderText(value, shaped)}</span>
-      <span className="mm-stepper-btn">+</span>
+      <span className={btnClass} style={btnStyle}>
+        +
+      </span>
     </div>
   );
 }
@@ -257,10 +360,33 @@ function MmProgress({ item }: { item: ProgressItem }) {
     item.format !== undefined
       ? sliderText(value, { ...item, min: low, max: high } as unknown as SliderItem)
       : `${Math.round(fraction * 100)}%`;
+  const ps = usePreviewStyle();
+  const pr = progressLook(ps, item);
+  if (pr.variant === "bar" || pr.variant === "segments") {
+    const n = pr.segmentColors.length;
+    const lit = segmentsLit(value, low, high, n);
+    return (
+      <div className={`mm-progress ${variantClass("progress", pr.variant)}`} style={lookVars(ps, "progress", item.look)}>
+        <span className="mm-progress-label">{item.label}</span>
+        {pr.variant === "bar" ? (
+          <span className="mm-pr-bar">
+            <span className="mm-pr-fill" style={{ width: `${fraction * 100}%`, background: pr.fill }} />
+          </span>
+        ) : (
+          <span className="mm-pr-segments">
+            {pr.segmentColors.map((color, i) => (
+              <span key={i} className="mm-pr-seg" style={i < lit ? { background: color } : undefined} />
+            ))}
+          </span>
+        )}
+        <span className="mm-progress-readout">{text}</span>
+      </div>
+    );
+  }
   // The default variant and an unset one use the accent, as the runtime does.
   const fill = item.variant && item.variant !== "default" ? buttonChrome({ variant: item.variant }).background : undefined;
   return (
-    <div className="mm-progress">
+    <div className={`mm-progress ${variantClass("progress", "stock")}`}>
       <span className="mm-progress-label">{item.label}</span>
       <span className="mm-progress-bar">
         <span className="mm-progress-fill" style={{ width: `${fraction * 100}%`, background: fill }} />
@@ -270,11 +396,66 @@ function MmProgress({ item }: { item: ProgressItem }) {
   );
 }
 
+export type ChoiceOption = { key: string; label: string; on: boolean; onClick?: () => void };
+
+/**
+ * A themed choice strip: radio and multiselect options in the choice style, and the shell's tabs in
+ * the tabs style. Joined options sit in one frame, chips are outlined shapes, tabs underline the
+ * chosen option, and radio draws a ring with a dot. columns lays the options out in a grid.
+ */
+export function ChoiceStrip({
+  look,
+  options,
+  columns,
+  stacked,
+}: {
+  look: ChoiceLook;
+  options: ChoiceOption[];
+  columns?: number;
+  stacked?: boolean;
+}) {
+  const layout = columns !== undefined && columns > 1 ? { gridTemplateColumns: `repeat(${columns}, 1fr)` } : undefined;
+  return (
+    <div
+      className={`mm-choice mm-choice-${look.variant}${stacked ? " mm-choice-stacked" : ""}${layout ? " mm-choice-grid" : ""}`}
+      style={{ ...look.style, ...layout }}
+    >
+      {options.map((opt) => (
+        <button
+          key={opt.key}
+          type="button"
+          className={`mm-choice-opt${opt.on ? " is-on" : ""}`}
+          style={{ color: opt.on ? look.textOn : look.textOff }}
+          aria-pressed={opt.on}
+          onClick={opt.onClick}
+        >
+          {look.variant === "radio" && <span className="mm-choice-ring" />}
+          <span className="mm-choice-text">{opt.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function MmRadio({ item, inline }: { item: RadioItem; inline: boolean }) {
+  const ps = usePreviewStyle();
   const list = normalizeOptions(item.options);
   const chosen = item.default ?? null;
+  const look = choiceLook(ps, "choice", item.look);
+  if (look.variant !== "stock") {
+    return (
+      <div className={`mm-radio ${variantClass("choice", look.variant)}`}>
+        <span className="mm-radio-label">{item.label}</span>
+        <ChoiceStrip
+          look={look}
+          stacked={look.variant === "radio" && !inline}
+          options={list.map((opt) => ({ key: opt.value, label: opt.label, on: opt.value === chosen }))}
+        />
+      </div>
+    );
+  }
   return (
-    <div className="mm-radio">
+    <div className={`mm-radio ${variantClass("choice", "stock")}`}>
       <span className="mm-radio-label">{item.label}</span>
       <div className={`mm-radio-group${inline ? " mm-radio-inline" : ""}`}>
         {list.map((opt) => (
@@ -295,10 +476,25 @@ function MmRadio({ item, inline }: { item: RadioItem; inline: boolean }) {
 // The runtime draws one button per option in a uniform grid, with "[x] " or "[ ] " before the label and
 // the checked options painted active, as Multiselect._caption in widgets/multiselect.lua does.
 function MmMultiselect({ item }: { item: MultiselectItem }) {
+  const ps = usePreviewStyle();
   const list = normalizeOptions(item.options);
   const checked = item.default ?? [];
+  const look = choiceLook(ps, "choice", item.look);
+  if (look.variant !== "stock") {
+    // Several marks can be on at once; the options keep the item's column count.
+    return (
+      <div className={`mm-multi ${variantClass("choice", look.variant)}`}>
+        <span className="mm-multi-label">{item.label}</span>
+        <ChoiceStrip
+          look={look}
+          columns={item.columns ?? 1}
+          options={list.map((opt) => ({ key: opt.value, label: opt.label, on: checked.includes(opt.value) }))}
+        />
+      </div>
+    );
+  }
   return (
-    <div className="mm-multi">
+    <div className={`mm-multi ${variantClass("choice", "stock")}`}>
       <span className="mm-multi-label">{item.label}</span>
       <div className="mm-multi-grid" style={{ gridTemplateColumns: `repeat(${item.columns ?? 1}, 1fr)` }}>
         {list.map((opt) => {
@@ -320,13 +516,36 @@ function MmMultiselect({ item }: { item: MultiselectItem }) {
 const COLOR_TINTS: Record<string, string> = { R: "#e64040", G: "#4dcc4d", B: "#4d80ff" };
 
 function MmColorpicker({ item }: { item: ColorpickerItem }) {
+  const ps = usePreviewStyle();
+  const variant = sliderVariant(ps, item.look);
   const color = item.default ?? { R: 1, G: 1, B: 1, A: 1 };
   const keys = item.alpha === false ? (["R", "G", "B"] as const) : (["R", "G", "B", "A"] as const);
   const alpha = item.alpha === false ? 1 : color.A;
   const channel = (key: "R" | "G" | "B" | "A") => Math.min(1, Math.max(0, key === "A" ? alpha : color[key]));
   const swatch = `rgba(${Math.round(channel("R") * 255)}, ${Math.round(channel("G") * 255)}, ${Math.round(channel("B") * 255)}, ${channel("A")})`;
+  // A themed picker reuses the themed slider for each channel, as widgets/colorpicker.lua does.
+  if (variant !== "stock") {
+    return (
+      <div className={`mm-color ${variantClass("slider", variant)}`} style={lookVars(ps, "slider", item.look)}>
+        <span className="mm-color-label">{item.label}</span>
+        <div className="mm-color-swatch" style={{ background: swatch }} />
+        {keys.map((key) => {
+          const value = channel(key);
+          return (
+            <div key={key} className="mm-color-row">
+              <span className="mm-color-key">{key}</span>
+              <div className="mm-color-track">
+                <SliderRail fraction={value} tint={COLOR_TINTS[key]} />
+              </div>
+              <span className="mm-color-value">{value.toFixed(2)}</span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
   return (
-    <div className="mm-color">
+    <div className={`mm-color ${variantClass("slider", "stock")}`}>
       <span className="mm-color-label">{item.label}</span>
       <div className="mm-color-swatch" style={{ background: swatch }} />
       {keys.map((key) => {
@@ -349,9 +568,16 @@ function MmColorpicker({ item }: { item: ColorpickerItem }) {
 
 // The runtime button reads "Label: F7", or "Label: None" without a binding, as Caption in widgets/keybind.lua writes it.
 function MmKeybind({ item }: { item: KeybindItem }) {
+  const ps = usePreviewStyle();
   const bound = item.default !== undefined && item.default !== "";
+  const btn = buttonLook(ps, {});
+  // The key chip takes the field style when the field variant is frame.
   return (
-    <button type="button" className="mm-btn mm-keybind" style={buttonChrome({})}>
+    <button
+      type="button"
+      className={`mm-btn mm-keybind ${btn.className} ${variantClass("field", fieldVariant(ps, item.look))}`}
+      style={{ ...btn.style, ...lookVars(ps, "field", item.look) }}
+    >
       {item.label}: <span className={`mm-key-chip${bound ? "" : " is-unbound"}`}>{bound ? item.default : "None"}</span>
     </button>
   );
@@ -455,6 +681,7 @@ export function PreviewItem(props: PreviewItemProps) {
 }
 
 function PreviewItemBody({ item, sectionId, actions, index, layout = "vertical" }: PreviewItemProps) {
+  const ps = usePreviewStyle();
   const horizontal = layout === "horizontal";
   if (item.type === "separator") {
     return <div className="mm-sep" />;
@@ -466,7 +693,11 @@ function PreviewItemBody({ item, sectionId, actions, index, layout = "vertical" 
     return (
       <p
         className={`mm-label${item.style && item.style !== "normal" ? ` mm-label-${item.style}` : ""}`}
-        style={{ textAlign: item.align, whiteSpace: item.wrap === false || horizontal ? "nowrap" : undefined }}
+        style={{
+          ...textLookStyle(ps, "body", item.look),
+          textAlign: item.align,
+          whiteSpace: item.wrap === false || horizontal ? "nowrap" : undefined,
+        }}
       >
         {item.label}
       </p>

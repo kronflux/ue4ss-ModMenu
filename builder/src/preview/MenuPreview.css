@@ -27,7 +27,13 @@
   background: var(--mm-panel-bg);
   border: 1px solid var(--mm-panel-border);
   color: var(--mm-text-primary);
-  font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+  /* A theme's body text style sets these; without one they are the stock look. */
+  font-family: var(--mm-body-font, system-ui, "Segoe UI", Roboto, sans-serif);
+  font-weight: var(--mm-body-weight, normal);
+  font-style: var(--mm-body-style, normal);
+  letter-spacing: var(--mm-body-spacing, normal);
+  text-transform: var(--mm-body-transform, none);
+  text-shadow: var(--mm-body-shadow, none);
   overflow: hidden;
 }
 
@@ -163,6 +169,9 @@
   padding: 4px 10px;
 }
 
+/* Known preview difference: a stock normal label draws in textMuted here, while the library's
+   Label._style draws it in textPrimary. It stays so the light and dark preview do not change in
+   this milestone. */
 .mm-label {
   margin: 0;
   font-size: var(--mm-font-hint);
@@ -657,4 +666,685 @@
 .mm-row > .mm-disabled {
   display: flex;
   align-items: center;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Themes. Every rule below is selected by a theme class or a variant class, so light and dark,
+   whose panel, header, sections, toggles, sliders, progress bars, choices and fields are stock,
+   draw exactly as before. The variables come from styleVars in theme/css.ts.
+   --------------------------------------------------------------------------------------------- */
+
+/* The themed panel (Build.Panel): fill, outline, radius and shadow; blur under it; a rim of a light
+   line inside the top edge and a dark one inside the bottom, kept clear of the corners. */
+.mm-panel.mm-panel-themed {
+  background: var(--mm-panel-fill);
+  border: var(--mm-panel-width) solid var(--mm-panel-outline);
+  border-radius: var(--mm-panel-radius);
+  box-shadow: var(--mm-panel-shadow);
+}
+
+.mm-panel.mm-blur {
+  backdrop-filter: var(--mm-panel-blur);
+}
+
+.mm-panel.mm-rim::before,
+.mm-panel.mm-rim::after {
+  content: "";
+  position: absolute;
+  left: var(--mm-panel-rim-inset);
+  right: var(--mm-panel-rim-inset);
+  height: 1px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.mm-panel.mm-rim::before {
+  top: 1px;
+  background: var(--mm-panel-rim-light);
+}
+
+.mm-panel.mm-rim::after {
+  bottom: 1px;
+  background: var(--mm-panel-rim-dark);
+}
+
+/* Corner brackets: an 18 by 18 L of 2-unit accent lines in each corner. */
+.mm-corner {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  border: 0 solid var(--mm-accent);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.mm-corner-tl {
+  left: 0;
+  top: 0;
+  border-left-width: 2px;
+  border-top-width: 2px;
+}
+
+.mm-corner-tr {
+  right: 0;
+  top: 0;
+  border-right-width: 2px;
+  border-top-width: 2px;
+}
+
+.mm-corner-bl {
+  left: 0;
+  bottom: 0;
+  border-left-width: 2px;
+  border-bottom-width: 2px;
+}
+
+.mm-corner-br {
+  right: 0;
+  bottom: 0;
+  border-right-width: 2px;
+  border-bottom-width: 2px;
+}
+
+/* Header variants (Build.Header). Any header but stock draws the title and hint in their text styles;
+   the stock header draws its title in the title text style when the document overrides title. */
+.mm-panel:not(.mm-header-stock) .mm-title,
+.mm-panel.mm-title-themed .mm-title {
+  color: var(--mm-title-color, var(--mm-text-primary));
+  font-family: var(--mm-title-font, inherit);
+  font-weight: var(--mm-title-weight, 500);
+  font-style: var(--mm-title-style, normal);
+  letter-spacing: var(--mm-title-spacing, normal);
+  text-transform: var(--mm-title-transform, none);
+  text-shadow: var(--mm-title-shadow, none);
+  -webkit-text-stroke: var(--mm-title-stroke, 0 transparent);
+  paint-order: stroke fill;
+  transform: var(--mm-title-skew, none);
+  transform-origin: left center;
+}
+
+.mm-panel:not(.mm-header-stock) .mm-hint {
+  color: var(--mm-hint-color, var(--mm-text-muted));
+  font-family: var(--mm-hint-font, inherit);
+  font-weight: var(--mm-hint-weight, inherit);
+  font-style: var(--mm-hint-style, normal);
+  letter-spacing: var(--mm-hint-spacing, normal);
+  text-transform: var(--mm-hint-transform, none);
+  text-shadow: var(--mm-hint-shadow, none);
+}
+
+.mm-badge {
+  flex: 0 0 36px;
+  height: 36px;
+  margin-right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--mm-header-badge-radius);
+  background: var(--mm-header-badge-fill);
+  color: var(--mm-accent);
+  font-family: var(--mm-title-font, inherit);
+  font-weight: var(--mm-title-weight, 500);
+  font-size: var(--mm-font-title);
+}
+
+.mm-header-rule {
+  width: 56px;
+  height: 6px;
+  margin: 6px 0;
+  background: var(--mm-accent);
+}
+
+.mm-header-line {
+  height: 1px;
+  margin-top: 10px;
+  background: var(--mm-header-line);
+}
+
+/* Bands across the top of the panel: hazard tape of thirty blocks, an accent strip, or the bar that
+   holds the title, hint and Close in the accent colours. */
+.mm-band-tape {
+  flex: 0 0 var(--mm-header-tape);
+  background: repeating-linear-gradient(
+    90deg,
+    var(--mm-accent) 0 calc(100% / 30),
+    var(--mm-header-tape-alt) calc(100% / 30) calc(200% / 30)
+  );
+}
+
+.mm-band-strip {
+  flex: 0 0 var(--mm-header-strip);
+  background: var(--mm-accent);
+}
+
+.mm-band-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px max(0px, calc(var(--mm-pad-right) - 6px)) 12px var(--mm-pad-left);
+  background: var(--mm-header-bar-fill);
+}
+
+.mm-band-titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.mm-panel .mm-band-bar .mm-title {
+  color: var(--mm-header-bar-text);
+}
+
+.mm-panel .mm-band-bar .mm-hint {
+  margin-top: 2px;
+  color: var(--mm-header-bar-hint);
+}
+
+/* Shaped buttons (Button.States): the hover and pressed colours sit in variables, because the normal
+   colours are inline. Underline draws a 2-unit bar in the button's tone under the caption. */
+.mm-btn-shaped:hover:not(:disabled) {
+  background: var(--mm-btn-hover) !important;
+}
+
+.mm-btn-shaped:active:not(:disabled) {
+  background: var(--mm-btn-pressed) !important;
+}
+
+.mm-variant-button-underline {
+  padding-left: 12px;
+  padding-right: 12px;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 5px;
+  text-decoration-color: var(--mm-btn-underline);
+}
+
+/* Toggles (widgets/checkbox.lua): a clear row that washes in on hover, the label, then the control. */
+.mm-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  border-radius: var(--mm-button-radius);
+  padding: 4px 6px;
+  background: transparent;
+  color: var(--mm-text-primary);
+  font: inherit;
+  font-size: var(--mm-font-item);
+  text-align: left;
+  cursor: pointer;
+}
+
+.mm-toggle:hover {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.mm-toggle-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.mm-tg-switch {
+  position: relative;
+  flex: 0 0 var(--mm-toggle-w);
+  height: var(--mm-toggle-h);
+  border-radius: 999px;
+  background: var(--mm-toggle-track-off);
+  box-shadow: var(--mm-toggle-off-edge, none);
+}
+
+.mm-tg-switch.is-on {
+  background: var(--mm-toggle-track-on);
+  box-shadow: none;
+}
+
+.mm-tg-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: calc(var(--mm-toggle-h) - 6px);
+  height: calc(var(--mm-toggle-h) - 6px);
+  border-radius: 50%;
+  background: var(--mm-toggle-knob-off);
+}
+
+.mm-tg-switch.is-on .mm-tg-knob {
+  left: auto;
+  right: 3px;
+  background: var(--mm-toggle-knob-on);
+}
+
+.mm-variant-toggle-square .mm-tg-switch {
+  border-radius: 3px;
+}
+
+.mm-variant-toggle-square .mm-tg-knob {
+  border-radius: 2px;
+}
+
+.mm-tg-check {
+  flex: 0 0 20px;
+  height: 20px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--mm-toggle-box-radius);
+  background: var(--mm-toggle-check-off);
+  box-shadow: inset 0 0 0 var(--mm-toggle-check-edge-width) var(--mm-toggle-check-edge);
+  color: var(--mm-toggle-check-mark);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.mm-tg-check.is-on {
+  background: var(--mm-toggle-check-on);
+  box-shadow: inset 0 0 0 var(--mm-toggle-check-edge-width) var(--mm-toggle-check-edge-on);
+}
+
+.mm-tg-text {
+  flex: 0 0 48px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--mm-toggle-box-radius);
+  background: var(--mm-track);
+  color: var(--mm-muted);
+  font-size: calc(var(--mm-font-item) - 1px);
+}
+
+.mm-tg-text.is-on {
+  background: var(--mm-accent);
+  color: var(--mm-accent-text);
+}
+
+/* Themed sliders (widgets/slider.lua): a rounded track of the slider's thickness and a round, square
+   or bar thumb with an edge, filled with the hover colour under the pointer. */
+.mm-sl-rail {
+  display: flex;
+  align-items: center;
+  height: calc(var(--mm-slider-size) + 6px);
+  padding: 0 calc(var(--mm-slider-size) / 2);
+}
+
+.mm-sl-track {
+  position: relative;
+  flex: 1;
+  height: var(--mm-slider-thickness);
+  border-radius: calc(var(--mm-slider-thickness) / 2);
+  background: var(--mm-slider-track);
+}
+
+.mm-sl-tint {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: inherit;
+}
+
+.mm-sl-thumb {
+  position: absolute;
+  top: 50%;
+  width: var(--mm-slider-size);
+  height: var(--mm-slider-size);
+  box-sizing: border-box;
+  transform: translate(-50%, -50%);
+  background: var(--mm-slider-thumb-fill);
+  box-shadow: inset 0 0 0 var(--mm-slider-thumb-width) var(--mm-slider-thumb-edge);
+}
+
+.mm-sl-thumb:hover {
+  background: var(--mm-slider-thumb-hover);
+}
+
+.mm-variant-slider-round .mm-sl-thumb {
+  border-radius: 50%;
+}
+
+.mm-variant-slider-square .mm-sl-thumb {
+  border-radius: 2px;
+}
+
+.mm-variant-slider-bar .mm-sl-thumb {
+  width: 6px;
+  height: calc(var(--mm-slider-size) + 4px);
+  border-radius: 2px;
+}
+
+/* Readouts of themed sliders, progress bars and steppers use the data text style. */
+.mm-slider:not(.mm-variant-slider-stock) .mm-slider-value,
+.mm-progress:not(.mm-variant-progress-stock) .mm-progress-readout,
+.mm-stepper-themed .mm-stepper-readout {
+  color: var(--mm-data-color, var(--mm-text-muted));
+  font-family: var(--mm-data-font, inherit);
+  font-weight: var(--mm-data-weight, inherit);
+  font-style: var(--mm-data-style, normal);
+  font-size: var(--mm-data-size, inherit);
+  letter-spacing: var(--mm-data-spacing, normal);
+  text-shadow: var(--mm-data-shadow, none);
+}
+
+/* Themed progress bars (widgets/progress.lua): a rounded track and fill, or blocks with a gap. */
+.mm-pr-bar {
+  display: flex;
+  flex: 0 0 200px;
+  height: var(--mm-progress-height);
+  overflow: hidden;
+  border-radius: var(--mm-progress-radius);
+  background: var(--mm-progress-track);
+}
+
+.mm-pr-fill {
+  border-radius: var(--mm-progress-radius);
+}
+
+.mm-pr-segments {
+  display: flex;
+  flex: 0 0 200px;
+  gap: var(--mm-progress-gap);
+  height: var(--mm-progress-height);
+}
+
+.mm-pr-seg {
+  flex: 1;
+  border-radius: var(--mm-progress-radius);
+  background: var(--mm-progress-track);
+}
+
+/* Choice strips (widgets/radio.lua, shell/tabs.lua): joined options inside one frame, outlined chips,
+   tabs with a bar under the chosen one, or radio rings with a dot. */
+.mm-choice {
+  display: flex;
+  gap: 2px;
+}
+
+.mm-choice-grid {
+  display: grid;
+}
+
+.mm-choice-stacked {
+  flex-direction: column;
+}
+
+.mm-choice-joined {
+  padding: 3px;
+  border-radius: var(--mm-ch-frame-radius);
+  background: var(--mm-ch-frame-fill);
+  box-shadow: var(--mm-ch-frame-edge);
+}
+
+.mm-choice-chips {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mm-choice-opt {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  border: 0;
+  border-radius: var(--mm-ch-radius);
+  padding: 5px 8px;
+  background: transparent;
+  font: inherit;
+  font-size: calc(var(--mm-font-item) - 1px);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.mm-choice-opt:hover {
+  background: var(--mm-ch-wash);
+}
+
+.mm-choice-chips .mm-choice-opt {
+  flex: 1 1 auto;
+  box-shadow: var(--mm-ch-chip-edge);
+}
+
+.mm-choice-joined .mm-choice-opt.is-on {
+  background: var(--mm-ch-mark-fill);
+  box-shadow: var(--mm-ch-mark-edge);
+}
+
+.mm-choice-chips .mm-choice-opt.is-on {
+  background: var(--mm-ch-mark-fill);
+  box-shadow: var(--mm-ch-mark-edge), var(--mm-ch-chip-edge);
+}
+
+.mm-choice-tabs .mm-choice-opt {
+  border-radius: 0;
+  padding: 4px 4px 6px;
+}
+
+.mm-choice-tabs .mm-choice-opt.is-on::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: var(--mm-ch-mark-width);
+  height: var(--mm-ch-mark-height);
+  transform: translateX(-50%);
+  border-radius: var(--mm-ch-mark-radius);
+  background: var(--mm-ch-mark-fill);
+}
+
+.mm-choice-radio .mm-choice-opt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 auto;
+  padding: 4px 2px;
+  text-align: left;
+}
+
+.mm-choice-ring {
+  position: relative;
+  flex: 0 0 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--mm-ch-radio-fill);
+  box-shadow: inset 0 0 0 1px var(--mm-ch-radio-edge);
+}
+
+.mm-choice-opt.is-on .mm-choice-ring::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--mm-ch-mark-fill);
+}
+
+.mm-tabs-themed {
+  margin-top: 8px;
+}
+
+/* Framed fields (the field style): text and number boxes, the dropdown header and its list, and the
+   keybind chip take the field's fill, outline and radius; list options wash in the list hover. */
+.mm-variant-field-frame .mm-field-box {
+  border-radius: var(--mm-field-radius);
+  box-shadow: inset 0 0 0 var(--mm-field-width) var(--mm-field-outline);
+  padding: 5px 10px;
+}
+
+.mm-variant-field-frame .mm-drop-header {
+  border-radius: var(--mm-field-radius);
+  box-shadow: inset 0 0 0 var(--mm-field-width) var(--mm-field-outline);
+}
+
+.mm-variant-field-frame .mm-drop-list {
+  margin-top: 2px;
+  border-radius: var(--mm-list-radius);
+}
+
+.mm-variant-field-frame .mm-drop-opt:hover {
+  background: var(--mm-list-hover);
+}
+
+.mm-variant-field-frame .mm-key-chip {
+  border: 0;
+  border-radius: var(--mm-field-radius);
+  background: var(--mm-field-bg);
+  color: var(--mm-field-text);
+  box-shadow: inset 0 0 0 var(--mm-field-width) var(--mm-field-outline);
+}
+
+/* Section headers (shell/collapse.lua): label is the caption in the section text style, rule adds a
+   line after it, and bar puts it on the section fill. A folding header washes in on hover. */
+.mm-panel:not(.mm-section-stock) .mm-section-title,
+.mm-panel:not(.mm-section-stock) .mm-accordion {
+  color: var(--mm-section-text-color, var(--mm-section-color));
+  font-family: var(--mm-section-text-font, inherit);
+  font-weight: var(--mm-section-text-weight, 500);
+  font-style: var(--mm-section-text-style, normal);
+  letter-spacing: var(--mm-section-text-spacing, normal);
+  text-transform: var(--mm-section-text-transform, none);
+  text-shadow: var(--mm-section-text-shadow, none);
+}
+
+.mm-section-label .mm-accordion,
+.mm-section-rule .mm-accordion {
+  background: transparent;
+  padding-left: 0;
+}
+
+.mm-section-label .mm-accordion:hover,
+.mm-section-rule .mm-accordion:hover {
+  background: color-mix(in srgb, var(--mm-text) 8%, transparent);
+}
+
+.mm-section-rule .mm-section-title {
+  display: flex;
+  align-items: center;
+}
+
+.mm-section-rule .mm-section-title::after,
+.mm-section-rule .mm-accordion::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  margin-left: 10px;
+  background: var(--mm-section-line);
+}
+
+.mm-section-rule .mm-accordion span:first-child {
+  flex: 0 1 auto;
+}
+
+.mm-section-rule .mm-accordion::after {
+  order: 1;
+}
+
+.mm-section-rule .mm-accordion .mm-mark {
+  order: 2;
+}
+
+.mm-section-bar .mm-section-title {
+  padding: 4px 10px;
+  background: var(--mm-section-header-bg);
+}
+
+/* Labels and separators follow the section's stock switch (Label.Stock): normal and muted labels
+   are body text, heading is the section text, warning is body text in the warning colour, and a
+   separator is a line in the palette's line colour, centred in the same gap. */
+.mm-labels-themed .mm-label {
+  color: var(--mm-body-color, var(--mm-text-primary));
+  font-size: var(--mm-font-item);
+  font-family: var(--mm-body-font, inherit);
+  font-weight: var(--mm-body-weight, inherit);
+  font-style: var(--mm-body-style, normal);
+  letter-spacing: var(--mm-body-spacing, normal);
+  text-transform: var(--mm-body-transform, none);
+  text-shadow: var(--mm-body-shadow, none);
+  -webkit-text-stroke: var(--mm-body-stroke, 0 transparent);
+  paint-order: stroke fill;
+  transform: var(--mm-body-skew, none);
+  transform-origin: left center;
+}
+
+.mm-labels-themed .mm-label-muted {
+  color: var(--mm-muted);
+}
+
+.mm-labels-themed .mm-label-heading {
+  color: var(--mm-section-text-color, var(--mm-section-color));
+  font-family: var(--mm-section-text-font, inherit);
+  font-weight: var(--mm-section-text-weight, inherit);
+  font-size: var(--mm-font-section);
+  /* A heading is section text, so the body's other text fields do not carry over to it. */
+  font-style: var(--mm-section-text-style, normal);
+  letter-spacing: var(--mm-section-text-spacing, normal);
+  text-transform: var(--mm-section-text-transform, none);
+  text-shadow: var(--mm-section-text-shadow, none);
+  -webkit-text-stroke: var(--mm-section-text-stroke, 0 transparent);
+  transform: var(--mm-section-text-skew, none);
+}
+
+.mm-labels-themed .mm-label-warning {
+  color: var(--mm-warning);
+}
+
+.mm-labels-themed .mm-sep {
+  background: linear-gradient(var(--mm-line), var(--mm-line)) center / 100% 1px no-repeat;
+}
+
+/* A stock theme with a body, hint or section override: labels take the body (or section) text style,
+   with each style's legacy colour as the base where the override sets none (labelVars), and the
+   config sizes where the override sets no size. */
+.mm-labels-legacy .mm-label {
+  color: var(--mm-label-color);
+  font-family: var(--mm-body-font, inherit);
+  font-weight: var(--mm-body-weight, inherit);
+  font-style: var(--mm-body-style, normal);
+  font-size: var(--mm-body-size, var(--mm-font-hint));
+  letter-spacing: var(--mm-body-spacing, normal);
+  text-transform: var(--mm-body-transform, none);
+  text-shadow: var(--mm-body-shadow, none);
+  -webkit-text-stroke: var(--mm-body-stroke, 0 transparent);
+  paint-order: stroke fill;
+  transform: var(--mm-body-skew, none);
+  transform-origin: left center;
+}
+
+.mm-labels-legacy .mm-label-muted {
+  color: var(--mm-label-muted-color);
+}
+
+.mm-labels-legacy .mm-label-warning {
+  color: var(--mm-label-warning-color);
+}
+
+.mm-labels-legacy .mm-label-heading {
+  color: var(--mm-label-heading-color);
+  font-family: var(--mm-section-text-font, inherit);
+  font-weight: var(--mm-section-text-weight, inherit);
+  font-style: var(--mm-section-text-style, normal);
+  font-size: var(--mm-section-text-size, var(--mm-font-section));
+  letter-spacing: var(--mm-section-text-spacing, normal);
+  text-transform: var(--mm-section-text-transform, none);
+  text-shadow: var(--mm-section-text-shadow, none);
+  -webkit-text-stroke: var(--mm-section-text-stroke, 0 transparent);
+  transform: var(--mm-section-text-skew, none);
+}
+
+.mm-labels-legacy .mm-sep {
+  background: linear-gradient(var(--mm-line), var(--mm-line)) center / 100% 1px no-repeat;
+}
+
+.mm-confirm-card {
+  border-radius: var(--mm-confirm-radius, 0);
+  overflow: hidden;
+}
+
+.mm-stepper-themed .mm-stepper-btn {
+  padding: 2px 10px;
+  cursor: pointer;
 }

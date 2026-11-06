@@ -1,8 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ButtonItem, DockSide, MenuDocument, ThemeName } from "../schema";
-import { themeVars } from "../theme";
-import { buttonChrome } from "./chrome";
-import { PreviewItem, type PreviewActions } from "./Items";
+import { barColors, headerVariant, styleVars } from "../theme/css";
+import { ChoiceStrip, PreviewItem, type PreviewActions } from "./Items";
+import {
+  buttonLook,
+  choiceLook,
+  closeLook,
+  labelVars,
+  panelClasses,
+  previewFor,
+  StyleContext,
+  usePreviewStyle,
+} from "./look";
 import "./MenuPreview.css";
 
 const DOCK_OPTIONS: { label: string; value: DockSide }[] = [
@@ -61,13 +70,15 @@ function seedCollapsed(doc: MenuDocument): Record<string, boolean> {
   return out;
 }
 
-function ConfirmCard({ item, onDismiss }: { item: ButtonItem; onDismiss: () => void }) {
+/** The confirm card. Its buttons follow the button item rule (buttonLook), so a ghost theme outlines them. */
+export function ConfirmCard({ item, onDismiss }: { item: ButtonItem; onDismiss: () => void }) {
+  const ps = usePreviewStyle();
   const spec = item.confirm;
   if (!spec) {
     return null;
   }
-  const ok = buttonChrome({ variant: spec.variant ?? item.variant ?? "danger" });
-  const cancel = buttonChrome({ variant: "secondary" });
+  const ok = buttonLook(ps, { variant: spec.variant ?? item.variant ?? "danger" });
+  const cancel = buttonLook(ps, { variant: "secondary" });
   return (
     <div className="mm-confirm-dim">
       <div className="mm-confirm-card">
@@ -84,14 +95,88 @@ function ConfirmCard({ item, onDismiss }: { item: ButtonItem; onDismiss: () => v
           </>
         )}
         <div className="mm-confirm-actions">
-          <button type="button" className="mm-btn mm-btn-inline" style={cancel} onClick={onDismiss}>
+          <button type="button" className={`mm-btn mm-btn-inline ${cancel.className}`} style={cancel.style} onClick={onDismiss}>
             {spec.cancelLabel ?? "Cancel"}
           </button>
-          <button type="button" className="mm-btn mm-btn-inline" style={ok} onClick={onDismiss}>
+          <button type="button" className={`mm-btn mm-btn-inline ${ok.className}`} style={ok.style} onClick={onDismiss}>
             {spec.confirmLabel ?? "Confirm"}
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function hintText(document: MenuDocument): string {
+  return `[${document.init.keyHint}] toggle menu`;
+}
+
+/**
+ * The header in the resolved header variant (Build.Header). stock is today's title row and hint;
+ * badge adds a square with the title's first letter; rule puts an accent bar under the title; badge,
+ * plain, tape and strip end with a line. bar draws in the band across the top of the panel instead.
+ */
+function Header({ document, variant }: { document: MenuDocument; variant: string }) {
+  const ps = usePreviewStyle();
+  const title = document.init.title;
+  const close = closeLook(ps);
+  const closeButton = (
+    <button type="button" className={`mm-btn mm-btn-inline mm-close ${close.className}`} style={close.style}>
+      Close
+    </button>
+  );
+  if (variant === "stock") {
+    return (
+      <>
+        <div className="mm-title-row">
+          <h2 className="mm-title">{title}</h2>
+          {closeButton}
+        </div>
+        <p className="mm-hint">{hintText(document)}</p>
+      </>
+    );
+  }
+  const letter = (/[A-Za-z0-9]/.exec(title)?.[0] ?? "M").toUpperCase();
+  return (
+    <>
+      <div className="mm-title-row">
+        {(variant === "badge" || variant === "strip") && (
+          <span className="mm-badge" aria-hidden="true">
+            {letter}
+          </span>
+        )}
+        <h2 className="mm-title">{title}</h2>
+        {closeButton}
+      </div>
+      {variant === "rule" && <div className="mm-header-rule" />}
+      <p className="mm-hint">{hintText(document)}</p>
+      {variant !== "rule" && <div className="mm-header-line" />}
+    </>
+  );
+}
+
+/** The band across the top of a themed panel for the bar, tape and strip headers (TopBand in shell/build.lua). */
+function TopBand({ document, variant }: { document: MenuDocument; variant: string }) {
+  const ps = usePreviewStyle();
+  if (variant === "tape") {
+    return <div className="mm-band-tape" aria-hidden="true" />;
+  }
+  if (variant === "strip") {
+    return <div className="mm-band-strip" aria-hidden="true" />;
+  }
+  if (variant !== "bar") {
+    return null;
+  }
+  const close = closeLook(ps, barColors(ps.resolved).text);
+  return (
+    <div className="mm-band-bar">
+      <div className="mm-band-titles">
+        <h2 className="mm-title">{document.init.title}</h2>
+        <p className="mm-hint">{hintText(document)}</p>
+      </div>
+      <button type="button" className={`mm-btn mm-btn-inline mm-close ${close.className}`} style={close.style}>
+        Close
+      </button>
     </div>
   );
 }
@@ -102,9 +187,15 @@ export function MenuPreview({
   onDockChange,
 }: {
   document: MenuDocument;
-  theme: ThemeName;
+  /** The preview's theme; the document's init.theme when not given. */
+  theme?: ThemeName;
   onDockChange?: (dock: DockSide) => void;
 }) {
+  const themeId = theme ?? document.init.theme;
+  const style = document.init.style;
+  const ps = useMemo(() => previewFor(themeId, style), [themeId, style]);
+  const variant = headerVariant(ps.resolved);
+  const tabsLook = choiceLook(ps, "tabs", undefined);
   const tabs = document.init.tabs;
   const dock = document.init.dock;
   const [activeTab, setActiveTab] = useState(tabs?.[0] ?? null);
@@ -154,16 +245,18 @@ export function MenuPreview({
   const dockLabel = DOCK_OPTIONS.find((opt) => opt.value === dock)?.label ?? dock;
 
   return (
+    <StyleContext.Provider value={ps}>
     <div className={`mm-stage dock-${dock}`}>
-      <div className="mm-panel" style={themeVars(theme)} data-theme={theme} role="region" aria-label="Menu preview">
+      <div
+        className={panelClasses(ps.resolved, ps.style)}
+        style={{ ...styleVars(ps.resolved), ...labelVars(ps) }}
+        data-theme={ps.resolved.id}
+        role="region"
+        aria-label="Menu preview"
+      >
+        <TopBand document={document} variant={variant} />
         <div className="mm-scroll">
-          <div className="mm-title-row">
-            <h2 className="mm-title">{document.init.title}</h2>
-            <button type="button" className="mm-btn mm-btn-inline mm-close" style={buttonChrome({})}>
-              Close
-            </button>
-          </div>
-          <p className="mm-hint">[{document.init.keyHint}] toggle menu</p>
+          {variant !== "bar" && <Header document={document} variant={variant} />}
 
           <p className="mm-hint mm-dock-cap">Dock</p>
           <div className="mm-drop">
@@ -197,11 +290,29 @@ export function MenuPreview({
             )}
           </div>
 
-          {tabs && tabs.length > 0 && (
+          {tabs && tabs.length > 0 && tabsLook.variant !== "stock" && (
+            <div className="mm-tabs-themed">
+              <ChoiceStrip
+                look={tabsLook}
+                options={tabs.map((name) => ({
+                  key: name,
+                  label: name,
+                  on: name === activeTab,
+                  onClick: () => {
+                    setActiveTab(name);
+                    setOpenDropdown(null);
+                    setDockOpen(false);
+                  },
+                }))}
+              />
+            </div>
+          )}
+
+          {tabs && tabs.length > 0 && tabsLook.variant === "stock" && (
             <div className="mm-tabs">
               {tabs.map((name) => {
                 const active = name === activeTab;
-                const chrome = buttonChrome({ active });
+                const chrome = buttonLook(ps, { active }).style;
                 return (
                   <button
                     key={name}
@@ -265,6 +376,14 @@ export function MenuPreview({
           })}
           <div className="mm-foot" />
         </div>
+        {ps.resolved.panel.corners === true && (
+          <>
+            <span className="mm-corner mm-corner-tl" aria-hidden="true" />
+            <span className="mm-corner mm-corner-tr" aria-hidden="true" />
+            <span className="mm-corner mm-corner-bl" aria-hidden="true" />
+            <span className="mm-corner mm-corner-br" aria-hidden="true" />
+          </>
+        )}
         {confirm && (
           <ConfirmCard
             item={confirm}
@@ -275,5 +394,6 @@ export function MenuPreview({
         )}
       </div>
     </div>
+    </StyleContext.Provider>
   );
 }
