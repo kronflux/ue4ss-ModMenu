@@ -316,7 +316,7 @@ local function CreatePicker(outer, namePrefix, options, selectedValue, dropOpts,
             edge = { outline = f.outline, width = f.width },
         }, headerRow)
         headerBtn, headerFill = headerPaint.widget, headerPaint.fill
-        root:AddChildToVerticalBox(headerPaint.root)
+        root:AddChildToVerticalBox(Paint.Bevelled(root, namePrefix .. "_HeaderBevel", headerPaint.root, f.bevel, true))
     end
 
     local optionsBox = Umg.Construct("/Script/UMG.VerticalBox", root, namePrefix .. "_Opts")

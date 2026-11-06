@@ -231,7 +231,13 @@ local function BuildCheck(ctx, name, t, m, themeH)
     AddToOverlay(paint, stack, off, 0)
     AddToOverlay(paint, stack, on, 0)
     AddToOverlay(paint, stack, mark, 0)
-    return Sized(umg, ctx.contentBox, name .. "_Size", stack, 20 * m, 20 * m), { on, mark }, { off }
+    -- A sunken bevel goes over the whole box, as Windows Classic draws its check box. The bevel's
+    -- lines are their own shapes and are never swapped, so the on and off shapes stay as they are.
+    local boxed = stack
+    if t.checkBevel ~= nil then
+        boxed = paint.Bevelled(ctx.contentBox, name .. "_BoxBevel", stack, t.checkBevel, true)
+    end
+    return Sized(umg, ctx.contentBox, name .. "_Size", boxed, 20 * m, 20 * m), { on, mark }, { off }
 end
 
 --- A chip that reads On or Off. Each word is its own TextBlock in its own colour, so switching

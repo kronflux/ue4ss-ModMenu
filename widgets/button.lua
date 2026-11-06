@@ -106,8 +106,14 @@ local TINTS = {
     underline = { 0, 0.16, 0.30 },
 }
 
--- Stage 2 variants such as xp and classic are not drawn yet, so any other name draws as fill.
-local LOOK_VARIANTS = { fill = true, soft = true, ghost = true, underline = true }
+-- Any other variant name draws as fill. xp and classic are in this set but still fall back to
+-- fill when the theme lacks the table they draw from (see Look).
+local LOOK_VARIANTS = { fill = true, soft = true, ghost = true, underline = true, xp = true, classic = true }
+
+-- The xp rings are 2 wide inside the 1-wide edge, as StyleLab draws them, and the face gradient
+-- is built from this many strips.
+local XP_RING_WIDTH = 2
+local XP_FACE_STEPS = 10
 
 -- The caption padding inside a shaped button, because the shape button clears the Button's own padding.
 local LABEL_PAD = { 10, 4, 10, 4 }
@@ -174,6 +180,26 @@ local function Look(b, palette, roleName)
     if not LOOK_VARIANTS[variant] then
         variant = "fill"
     end
+    -- A theme's face for this role replaces its fill and caption colour, as StyleLab's RoleColors
+    -- does. Disabled and active keep their own colours so they stay distinguishable.
+    local face = roleName ~= "disabled" and roleName ~= "active" and b.faces and b.faces[roleName] or nil
+    if face ~= nil then
+        local copy = {}
+        for k, v in pairs(role) do
+            copy[k] = v
+        end
+        copy.fill = face.fill or role.fill
+        copy.text = face.text or role.text
+        role = copy
+    end
+    -- xp and classic draw layered looks only for a role that is not disabled or active, and only
+    -- when the theme gives them what they draw from; otherwise they draw as a flat fill.
+    local layered = roleName ~= "disabled" and roleName ~= "active"
+    if variant == "xp" and (not layered or type(b.xp) ~= "table" or b.xp.face == nil or b.xp.pressedFace == nil) then
+        variant = "fill"
+    elseif variant == "classic" and (not layered or type(b.bevel) ~= "table" or b.bevel.light == nil or b.bevel.dark == nil) then
+        variant = "fill"
+    end
     local radius, pill = b.radius or 0, b.pill == true
     local base = role.fill or WHITE
     -- Tinted variants draw in one colour. Secondary uses the text colour, as StyleLab does, and
@@ -195,7 +221,7 @@ local function Look(b, palette, roleName)
     local outline = nil
     if variant == "ghost" then
         outline = tone
-    elseif variant ~= "underline" then
+    elseif variant ~= "underline" and variant ~= "xp" and variant ~= "classic" then
         outline = (roleName == "secondary" and b.secondaryEdge) or b.edge
     end
     local width = tonumber(b.width) or 1
@@ -203,7 +229,41 @@ local function Look(b, palette, roleName)
         look.edge = { outline = outline, width = width }
     end
 
-    if variant == "fill" then
+    if variant == "xp" then
+        -- A dark rounded edge around a gradient face. Hover adds an orange glow inside the edge and
+        -- drops the default ring, and pressed swaps to the darker face with no glow.
+        local x = b.xp
+        local inner = math.max(0, LargestRadius(radius) - 1)
+        local function Ring(color)
+            return { fill = Alpha(color, 0), outline = color, width = XP_RING_WIDTH, radius = inner }
+        end
+        local function FaceLook(stops)
+            return { gradient = { stops = stops, steps = XP_FACE_STEPS, radius = inner } }
+        end
+        local edge = { fill = Alpha(x.edge or BLACK, 0), outline = x.edge or BLACK, width = 1, radius = radius }
+        local normal = { FaceLook(x.face) }
+        if roleName == "primary" and x.defaultRing ~= nil then
+            normal[#normal + 1] = Ring(x.defaultRing)
+        end
+        normal[#normal + 1] = edge
+        local hover = { FaceLook(x.face) }
+        if x.glow ~= nil then
+            hover[#hover + 1] = Ring(x.glow)
+        end
+        hover[#hover + 1] = edge
+        look.text = role.text
+        look.normal = { layers = normal }
+        look.hover = { layers = hover }
+        look.pressed = { layers = { FaceLook(x.pressedFace), edge } }
+    elseif variant == "classic" then
+        -- A raised two-ring bevel that turns sunken while pressed, with the caption moving one unit
+        -- down and right. Hover looks like rest, as in Windows Classic.
+        local raised = { layers = { { fill = base }, { bevel = b.bevel, sunken = false } } }
+        look.text = role.text
+        look.normal = raised
+        look.hover = raised
+        look.pressed = { layers = { { fill = base }, { bevel = b.bevel, sunken = true } }, shift = { x = 1, y = 1 } }
+    elseif variant == "fill" then
         look.text = role.text
         local hover, pressed
         if LargestRadius(radius) <= 0 and not pill and look.edge == nil then
@@ -262,6 +322,8 @@ function Button.States(resolved, item, over)
         look.disabled = Look(b, palette, "disabled").normal
     end
     look.style = b
+    -- nil means the button keeps its natural height; only a theme that sets one gets a wrapper.
+    look.height = tonumber(b.height)
     return look
 end
 
@@ -554,6 +616,8 @@ local function BuildThemed(ctx, resolved)
         local face, parts = BuildFace(ctx, resolved, states, caption, shaped)
         ctrl = Paint.StateButton(ctx.contentBox, ctx.namePrefix, states, face, { pad = 0 })
         ctrl.labelWidget = parts.label
+        -- A pressed look's shift moves the caption alone, not the active shape or outline beside it.
+        ctrl.label = parts.label
         ctrl.activeShape = parts.activeShape
         ctrl.disabledEdge = parts.disabledEdge
         ctrl.bar = parts.bar
@@ -578,6 +642,19 @@ function Button.build(ctx)
         local fill, button, label = umg.CreateFilledButton(ctx.contentBox, ctx.namePrefix, item.label)
         ctrl = { root = fill, widget = button, fill = fill, labelWidget = label }
     end
+    -- A theme that sets a button height gets a SizeBox with that minimum around the button. The
+    -- wrapper replaces the root only when it took the button, so a failed write leaves the button usable.
+    local height = resolved ~= nil and Button.States(resolved, { variant = item.variant, look = item.look }).height or nil
+    if height ~= nil then
+        local sized = umg.Construct("/Script/UMG.SizeBox", ctx.contentBox, ctx.namePrefix .. "_Height")
+        local ok = pcall(function()
+            sized:SetMinDesiredHeight(height)
+            sized:SetContent(ctrl.root)
+        end)
+        if ok then
+            ctrl.root = sized
+        end
+    end
     umg.AddToContent(ctx, ctrl.root)
     umg.AddItemPad(ctx, ctx.namePrefix .. "_Pad", 8)
     ctrl.kind = "button"
@@ -597,6 +674,15 @@ local function FireClick(ctrl, ctx, path)
     if ctrl.item.confirm ~= nil and ctx.ShowConfirm ~= nil then
         ctx.ShowConfirm(ctrl.item)
     else
+        -- A button that asks to confirm leaves the motion to the dialog's button, so one action never
+        -- moves the menu twice. A danger click shakes the menu, and any other click pops it.
+        if ctx.motion ~= nil then
+            if ctrl.item.variant == "danger" then
+                ctx.motion.Shake()
+            else
+                ctx.motion.Pop()
+            end
+        end
         ctx.SafeCall(ctrl.item.onClick)
     end
     ctx.ReclaimMenuInput()

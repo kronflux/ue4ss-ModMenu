@@ -274,6 +274,8 @@ function Keybind.build(ctx)
             pad = { 10, 4, 10, 4 },
         })
         root, button, label = paint.root, paint.widget, paint.label
+        -- The bevel goes around the whole field frame and takes no clicks itself.
+        root = PaintLib.Bevelled(ctx.contentBox, ctx.namePrefix .. "_FieldBevel", root, field.bevel, true)
         themed = { paint = paint, field = field, textSpec = textSpec, accent = ctx.config.resolved.palette.accent }
     else
         fill, button, label = umg.CreateFilledButton(

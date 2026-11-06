@@ -73,6 +73,7 @@ function TextInput.build(ctx)
             labelWidth = item.labelWidth,
             hint = item.placeholder,
             fillField = fillField,
+            bevel = field ~= nil and field.bevel or nil,
         }
     )
     umg.AddToContent(ctx, root, {

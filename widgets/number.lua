@@ -229,6 +229,7 @@ function Number.build(ctx)
             labelWidth = item.labelWidth,
             hint = item.placeholder,
             fillField = fillField,
+            bevel = field ~= nil and field.bevel or nil,
             prefix = item.prefix,
             suffix = item.suffix,
             extras = item.step ~= nil and AddStepButtons or nil,

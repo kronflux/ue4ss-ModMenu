@@ -273,6 +273,103 @@ if okStyle and okPaint and okTheme and type(Button.States) == "function" then
     assert_eq("a legacy button relabels as given", Button.CaptionText({ captionSpec = { upper = true } }, "Go now"), "Go now")
 end
 
+-- The xp and classic variants draw layered looks from the theme's xp and bevel tables, faces replace a
+-- role's colours, and height asks for a minimum-height wrapper only when the theme sets it.
+if okStyle and okPaint and type(Button.States) == "function" then
+    local function hasOutline(look, color)
+        for _, layer in ipairs(look.layers or {}) do
+            -- ForItem copies tables, so colours are compared by channel, not identity.
+            local o = layer.outline
+            if o ~= nil and o.R == color.R and o.G == color.G and o.B == color.B and o.A == color.A then
+                return true
+            end
+        end
+        return false
+    end
+    local xpDef = {
+        base = "slate",
+        button = {
+            variant = "xp",
+            radius = 3,
+            height = 28,
+            xp = {
+                edge = "#003C74",
+                glow = "#F8B33A",
+                defaultRing = "#8CB4F0",
+                face = { "#FFFFFF", "#F4F3EE" },
+                pressedFace = { "#F4F3EE", "#C0C0C0" },
+            },
+            faces = { secondary = { fill = "#ECE9D8", text = "#112233" } },
+        },
+    }
+    local xp = Style.Resolve(xpDef)
+    local x = xp.button.xp
+    local primaryXp = Button.States(xp, { variant = "primary" })
+    assert_true("an xp button draws its own shapes", Paint.NeedsShapes(primaryXp) == true)
+    assert_eq("xp normal starts with the face gradient", primaryXp.normal.layers[1].gradient.stops, x.face)
+    assert_eq("xp pressed starts with the pressed face gradient", primaryXp.pressed.layers[1].gradient.stops, x.pressedFace)
+    assert_true("xp normal draws the edge ring", hasOutline(primaryXp.normal, x.edge))
+    assert_true("xp pressed draws the edge ring", hasOutline(primaryXp.pressed, x.edge))
+    assert_true("a primary xp button rests with the default ring", hasOutline(primaryXp.normal, x.defaultRing))
+    assert_true("xp hover shows the glow ring", hasOutline(primaryXp.hover, x.glow))
+    assert_true("xp hover drops the default ring", not hasOutline(primaryXp.hover, x.defaultRing))
+    assert_true("xp pressed shows no glow", not hasOutline(primaryXp.pressed, x.glow))
+    assert_true("xp normal shows no glow", not hasOutline(primaryXp.normal, x.glow))
+    assert_eq("xp height comes from the theme", primaryXp.height, 28)
+
+    local defaultXp = Button.States(xp, {})
+    assert_true("a non-primary xp button has no default ring", not hasOutline(defaultXp.normal, x.defaultRing))
+
+    local secondaryXp = Button.States(xp, { variant = "secondary" })
+    assert_eq("faces.secondary sets the secondary text colour", secondaryXp.text, xp.button.faces.secondary.text)
+    local flatFace = Style.Resolve({ base = "slate", button = { faces = { secondary = { fill = "#ECE9D8", text = "#112233" } } } })
+    local faced = Button.States(flatFace, { variant = "secondary" })
+    assert_eq("faces.secondary sets the secondary fill", faced.normal.fill, flatFace.button.faces.secondary.fill)
+
+    local disabledXp = Button.States(xp, { variant = "primary", enabled = false })
+    assert_eq("a disabled xp button keeps one look", disabledXp.hover, disabledXp.normal)
+    assert_eq("a disabled xp button is a flat disabled fill", disabledXp.normal.fill, xp.button.roles.disabled.fill)
+
+    local noXp = Button.States(Style.Resolve({ base = "slate", button = { variant = "xp" } }), { variant = "primary" })
+    assert_true("xp with no xp table falls back to a fill look", noXp.normal.layers == nil and noXp.normal.fill ~= nil)
+
+    local classic = Style.Resolve({
+        base = "slate",
+        button = {
+            variant = "classic",
+            radius = 0,
+            bevel = { light = "#DFDFDF", dark = "#0A0A0A", innerLight = "#FFFFFF", innerDark = "#808080" },
+        },
+    })
+    local classicStates = Button.States(classic, { variant = "primary" })
+    assert_true("a classic button draws its own shapes", Paint.NeedsShapes(classicStates) == true)
+    assert_eq("classic pressed shifts the caption one unit down and right", classicStates.pressed.shift, { x = 1, y = 1 })
+    assert_eq("classic normal has no shift", classicStates.normal.shift, nil)
+    local function bevelLayer(look)
+        for _, layer in ipairs(look.layers or {}) do
+            if layer.bevel ~= nil then
+                return layer
+            end
+        end
+        return nil
+    end
+    assert_eq("classic pressed holds a sunken bevel", bevelLayer(classicStates.pressed) and bevelLayer(classicStates.pressed).sunken, true)
+    assert_true("classic normal holds a raised bevel", bevelLayer(classicStates.normal) ~= nil and not bevelLayer(classicStates.normal).sunken)
+    assert_eq("classic normal fills with the role face", classicStates.normal.layers[1].fill, classic.button.roles.primary.fill)
+    assert_eq("a theme with no height gives no height", classicStates.height, nil)
+
+    local bare = Button.States(Style.Resolve({ base = "slate", button = { variant = "classic" } }), { variant = "primary" })
+    assert_true("classic with no bevel draws a flat role fill", bare.normal.layers == nil and bare.normal.fill ~= nil)
+
+    assert_eq("slate buttons have no height wrapper", Button.States(Style.Resolve("slate"), {}).height, nil)
+
+    local okStepper, Stepper = pcall(require, "ModMenu.widgets.stepper")
+    if okStepper and type(Stepper._states) == "function" then
+        local stepXp = Stepper._states(xp, {})
+        assert_true("stepper buttons follow the xp button looks", stepXp.normal.layers ~= nil and stepXp.normal.layers[1].gradient ~= nil)
+    end
+end
+
 -- Confirm buttons take their looks from Button.States, so a ghost theme outlines them as it
 -- outlines button items, and light keeps today's flat dialog buttons.
 local confirmStub = package.loaded["UEHelpers.UEHelpers"] == nil

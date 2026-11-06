@@ -237,6 +237,57 @@ function Progress.SegmentColor(pr, i, fill, n)
     return ramp[index]
 end
 
+-- The strips in a lit block's vertical shading.
+local BLOCK_STEPS = 6
+
+-- A frame with an edge or a usable bevel gets this much room around the trough when it names none.
+local FRAME_PAD = 2
+
+--- How a progress trough is framed: kind bevel when the frame has a bevel with light and dark
+--- colours, edge when it has an edge colour, and none otherwise, so a frame that would draw nothing
+--- draws no wrapper. A bevel wins over an edge because it is the sturdier look, and it is drawn
+--- with the edge as well when both are set. pad defaults to 2.
+---@param pr table|nil resolved progress fields
+---@return table { kind = "none"|"edge"|"bevel", pad = number }
+function Progress.FrameSpec(pr)
+    local frame = type(pr) == "table" and pr.frame or nil
+    if type(frame) ~= "table" then
+        return { kind = "none", pad = FRAME_PAD }
+    end
+    local pad = tonumber(frame.pad) or FRAME_PAD
+    if type(frame.bevel) == "table" and #Paint.BevelPlan(frame.bevel, true) > 0 then
+        return { kind = "bevel", pad = pad }
+    end
+    if frame.edge ~= nil then
+        return { kind = "edge", pad = pad }
+    end
+    return { kind = "none", pad = pad }
+end
+
+-- The trough's frame: an outlined box that holds the bar with the frame's pad inside, then the
+-- sunken bevel over it when the frame has one. A frame that names no fill is white, as StyleLab's
+-- trough frame is; the XP and Classic presets both name one. Each part is its own shape, never recoloured.
+local function FrameBar(outer, name, pr, widget)
+    local spec = Progress.FrameSpec(pr)
+    if spec.kind == "none" then
+        return widget
+    end
+    local f = pr.frame
+    local frame = Paint.Box(outer, name .. "_Frame", {
+        fill = f.fill or WHITE,
+        outline = f.edge,
+        width = f.edge and 1 or 0,
+        radius = f.radius or 0,
+    }, spec.pad)
+    pcall(function()
+        frame:SetContent(widget)
+    end)
+    if spec.kind == "bevel" then
+        return Paint.Bevelled(outer, name .. "_FrameBevel", frame, f.bevel, true)
+    end
+    return frame
+end
+
 -- The spec runs without the game and cannot build a widget, so the module exposes these helpers.
 Progress._coerce = Coerce
 Progress._fraction = Fraction
@@ -352,8 +403,15 @@ local function BuildSegments(umg, size, name, pr, fill)
     for i = 1, n do
         local cell = umg.Construct("/Script/UMG.Overlay", row, name .. "_Seg" .. i)
         local trackShape = Paint.Box(cell, name .. "_SegTrack" .. i, { fill = pr.track or WHITE, radius = pr.radius }, 0)
-        local lit = Paint.Box(cell, name .. "_SegLit" .. i, { fill = Progress.SegmentColor(pr, i, fill, n),
-            radius = pr.radius }, 0)
+        local lit
+        if type(pr.block) == "table" and #pr.block >= 2 then
+            -- A block with its own vertical shading, as in Windows XP. It is shown and hidden whole,
+            -- like a flat lit shape, and its strips are never recoloured.
+            lit = Paint.Gradient(cell, name .. "_SegLit" .. i, { stops = pr.block, steps = BLOCK_STEPS, radius = pr.radius })
+        else
+            lit = Paint.Box(cell, name .. "_SegLit" .. i, { fill = Progress.SegmentColor(pr, i, fill, n),
+                radius = pr.radius }, 0)
+        end
         pcall(function()
             for _, shape in ipairs({ trackShape, lit }) do
                 local slot = cell:AddChildToOverlay(shape)
@@ -433,7 +491,11 @@ function Progress.build(ctx)
         size:SetWidthOverride(BAR_WIDTH)
         size:SetHeightOverride(barHeight)
         size:SetContent(barWidget)
-        local slot = root:AddChildToHorizontalBox(size)
+    end)
+    -- The frame goes around the sized bar, so its pad and edge add to the bar's width and height.
+    local framed = themed and FrameBar(root, name, pr, size) or size
+    pcall(function()
+        local slot = root:AddChildToHorizontalBox(framed)
         slot:SetSize({ SizeRule = 0, Value = 0.0 })
         slot:SetPadding({ Left = GAP, Top = 0, Right = 0, Bottom = 0 })
         slot:SetVerticalAlignment(2)

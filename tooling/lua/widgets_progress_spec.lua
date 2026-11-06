@@ -246,3 +246,20 @@ failing = false
 Progress.apply(flakyCtrl, 10, { values = {} })
 assert_eq("the same value writes a failed block again", retried[1], 3)
 assert_eq("a written block records its shown state", flakyCtrl.cellShown[1], true)
+-- The trough frame is chosen by its fields: a usable bevel wins, then an edge, and anything else draws no frame.
+local frameEdge = { r = 1, g = 1, b = 1, a = 1 }
+local edgeSpec = Progress.FrameSpec({ frame = { edge = frameEdge, radius = 4, pad = 2 } })
+assert_eq("a frame with an edge is kind edge", edgeSpec.kind, "edge")
+assert_eq("a frame keeps its pad", edgeSpec.pad, 2)
+local bevelSpec = Progress.FrameSpec({ frame = { fill = frameEdge, bevel = { light = frameEdge, dark = frameEdge } } })
+assert_eq("a frame with a fill and a bevel is kind bevel", bevelSpec.kind, "bevel")
+assert_eq("a frame pad defaults to 2", bevelSpec.pad, 2)
+assert_eq("a progress style without a frame is kind none", Progress.FrameSpec({}).kind, "none")
+assert_eq("a nil progress style is kind none", Progress.FrameSpec(nil).kind, "none")
+assert_eq("a frame with neither an edge nor a usable bevel is kind none",
+    Progress.FrameSpec({ frame = { fill = frameEdge, bevel = { width = 1 } } }).kind, "none")
+assert_eq("a bevel with only a light colour draws nothing, so the frame is none",
+    Progress.FrameSpec({ frame = { bevel = { light = frameEdge } } }).kind, "none")
+assert_eq("an edge frame with a pad of 0 keeps it", Progress.FrameSpec({ frame = { edge = frameEdge, pad = 0 } }).pad, 0)
+assert_eq("light and dark have no frame", Progress.FrameSpec(Style.Resolve("light").progress).kind, "none")
+assert_eq("segments are still counted the same way", Progress.SegmentsLit(50, 0, 100, 12), 6)
