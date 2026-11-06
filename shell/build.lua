@@ -19,6 +19,9 @@ local Confirm = require("ModMenu.shell.confirm")
 local Tooltip = require("ModMenu.core.tooltip")
 local Persist = require("ModMenu.core.persist")
 local Paint = require("ModMenu.core.paint")
+local Chrome = require("ModMenu.shell.chrome")
+local Effects = require("ModMenu.shell.effects")
+local Motion = require("ModMenu.core.motion")
 
 local Log = Util.Log
 local Debug = Util.Debug
@@ -36,12 +39,23 @@ local V_FILL, V_TOP, V_CENTER, V_BOTTOM = 0, 1, 2, 3
 
 local WHITE = { R = 1, G = 1, B = 1, A = 1 }
 
--- Header variants this stage draws. A preset naming a later variant, such as window or mac, gets
--- the badge header, because a header must always show the title and the Close button.
-local HEADER_VARIANTS = { stock = true, badge = true, plain = true, rule = true, bar = true, tape = true, strip = true }
+-- Header variants the shell draws. A preset naming any other variant gets the badge header, because
+-- a header must always show the title and the Close button.
+local HEADER_VARIANTS = {
+    stock = true, badge = true, plain = true, rule = true, bar = true, tape = true, strip = true,
+    window = true, mac = true, xpbar = true, classic = true,
+}
 
 -- Variants drawn as a band across the top of the panel, outside the padded scroll area.
-local BAND_VARIANTS = { bar = true, tape = true, strip = true }
+local BAND_VARIANTS = {
+    bar = true, tape = true, strip = true, window = true, xpbar = true, classic = true,
+}
+
+-- Variants whose title row lives in S.headerBand and is rebuilt with the content: the bar and the
+-- window frames. The tape and strip bands are decoration only, and their header is a content row.
+local function InBandVariant(variant)
+    return variant == "bar" or Chrome.BAND[variant] == true
+end
 
 local function Alpha(color, a)
     return { R = color.R, G = color.G, B = color.B, A = a }
@@ -149,7 +163,7 @@ end
 --- rim or corner brackets. Light and dark are such panels, so they keep today's two Borders.
 ---@param panel table|nil
 ---@return boolean
-function M.IsStockPanel(panel)
+function M.IsStockPanel(panel, motion)
     if type(panel) ~= "table" then
         return true
     end
@@ -160,6 +174,15 @@ function M.IsStockPanel(panel)
         return false
     end
     if Paint.ShadowDepth(panel) > 0 then
+        return false
+    end
+    -- A status bar is drawn inside the themed panel's stack.
+    if type(panel.statusBar) == "table" then
+        return false
+    end
+    -- Scanlines, the sweep and the glints are drawn into the themed panel's body.
+    if panel.scanlines == true or (tonumber(panel.scanlines) or 0) > 0 or panel.sweep == true
+        or (type(motion) == "table" and motion.sparkle == true) then
         return false
     end
     return panel.rim ~= true and panel.corners ~= true
@@ -189,6 +212,20 @@ end
 ------------------------------------------------------------------------------------------
 -- Header
 ------------------------------------------------------------------------------------------
+
+-- Decorative parts that already failed this session, so each failure is logged once and not on every build.
+local failedParts = {}
+
+--- Build one decorative part of the panel guarded. Umg.Construct throws by design, and a blur, rim,
+--- bracket, shadow or window frame that fails must leave a usable panel rather than abort the whole shell.
+local function Decoration(part, fn)
+    local ok, err = pcall(fn)
+    if not ok and not failedParts[part] then
+        failedParts[part] = true
+        Log("panel " .. part .. " failed, drawn without it: " .. tostring(err))
+    end
+    return ok
+end
 
 local function HintText(config)
     local keyName = tostring(config.keyHint or config.keyName or "F6")
@@ -266,6 +303,24 @@ local function ThemedText(outer, name, text, spec, size)
     Paint.Text(block, spec, size)
     SetLabelText(block, Paint.Caption(text, spec))
     return block
+end
+
+--- The header title, with the ghost copies of a glitching look. A title that cannot get its ghosts is
+--- drawn plain, under another name so that it never meets the half-built one.
+local function TitleWidget(S, outer, text, spec, size, resolved, suffix)
+    local widget = nil
+    Decoration("title ghosts", function()
+        widget = Effects.Title(S, outer, text, spec, size, resolved, suffix)
+    end)
+    if widget == nil then
+        widget = ThemedText(outer, "ModMenu_TitleFallback_" .. suffix, text, spec, size)
+        if S.fx == nil then
+            Effects.Reset(S)
+        end
+        S.fx.title = widget
+        S.fx.ghosts = {}
+    end
+    return widget
 end
 
 --- The pointer looks of the Close button. On a coloured band (tint given) it is a clear wash of the
@@ -347,6 +402,17 @@ local function HeaderLine(S, name, color, w, h, pad, halign)
     VBoxAdd(S.contentBox, Sized(S.contentBox, name .. "_Size", line, w, h), pad, halign)
 end
 
+--- Undo a window frame that failed part way: drop the controls it registered and the widgets it
+--- put in the row, so the plain header drawn instead owns the row alone.
+local function DropFailedFrame(S, row, first)
+    for i = #S.liveControls, first, -1 do
+        S.liveControls[i] = nil
+    end
+    pcall(function()
+        row:ClearChildren()
+    end)
+end
+
 --- Draw the header into row: the title, the Close button and the hint line, in the resolved
 --- header variant. For bar, row sits in the band across the top of the panel; for every other
 --- variant it is the first row of the content, and the hint and any rule go under it.
@@ -367,20 +433,62 @@ function M.Header(S, row, resolved, suffix)
     local palette = resolved.palette
     local header = resolved.header
 
-    -- A bar header is drawn only in the band Create built for it; without that band it falls back to plain.
-    local inBand = variant == "bar" and IsValid(S.headerBand)
-    if variant == "bar" and not inBand then
+    -- A bar or window-frame header is drawn only in the band Create built for it; without that band
+    -- it falls back to plain.
+    local inBand = InBandVariant(variant) and IsValid(S.headerBand)
+    if InBandVariant(variant) and not inBand then
         variant = "plain"
     end
 
-    if inBand then
+    -- The window frames keep the hint as the first line of the content, under the title bar.
+    local function FrameHint(pad, halign)
+        VBoxAdd(S.contentBox, ThemedText(S.contentBox, "ModMenu_Hint_" .. suffix, HintText(config), resolved.hint, hintSize),
+            pad, halign)
+    end
+
+    if inBand and variant ~= "bar" then
+        local first = #S.liveControls + 1
+        if Decoration("window frame", function()
+            Chrome.BandRow(S, row, resolved, suffix)
+        end) then
+            FrameHint({ 0, 8, 0, 10 })
+            return
+        end
+        DropFailedFrame(S, row, first)
+        variant = "plain"
+    elseif variant == "mac" then
+        local first = #S.liveControls + 1
+        if Decoration("window frame", function()
+            Chrome.MacHeader(S, row, resolved, suffix)
+        end) then
+            FrameHint({ 0, 0, 0, 10 }, H_CENTER)
+            if header.line ~= nil then
+                HeaderLine(S, "ModMenu_HeaderLine_" .. suffix, header.line, nil, 1, { 0, 0, 0, 10 }, H_FILL)
+            end
+            return
+        end
+        DropFailedFrame(S, row, first)
+        variant = "plain"
+    end
+
+    if inBand and variant == "bar" then
         local barText = M.BarColors(resolved)
         local titles = Construct("/Script/UMG.VerticalBox", row, "ModMenu_Titles_" .. suffix)
-        VBoxAdd(titles, ThemedText(titles, "ModMenu_Title_" .. suffix, config.title,
-            WithColor(resolved.title, barText), titleSize), 0)
+        VBoxAdd(titles, TitleWidget(S, titles, config.title, WithColor(resolved.title, barText), titleSize,
+            resolved, suffix), 0)
         VBoxAdd(titles, ThemedText(titles, "ModMenu_Hint_" .. suffix, HintText(config),
             WithColor(resolved.hint, Alpha(barText, 0.8)), hintSize), { 0, 2, 0, 0 })
-        HBoxAdd(row, titles, true, 0, V_TOP)
+        -- With a cursor the titles keep their own width and the cursor follows them, as in StyleLab;
+        -- without one the titles fill the row, as before.
+        local cursor = nil
+        Decoration("cursor", function()
+            cursor = Effects.Cursor(S, row, resolved, suffix)
+        end)
+        HBoxAdd(row, titles, cursor == nil, 0, V_TOP)
+        if cursor ~= nil then
+            HBoxAdd(row, cursor, false, { 8, 2, 0, 0 }, V_TOP)
+            HBoxAdd(row, Construct("/Script/UMG.Spacer", row, "ModMenu_CursorGap_" .. suffix), true, 0, V_TOP)
+        end
         ThemedClose(S, row, resolved, suffix, barText)
         return
     end
@@ -389,7 +497,7 @@ function M.Header(S, row, resolved, suffix)
     if variant == "badge" or variant == "strip" then
         Badge(S, row, resolved, suffix)
     end
-    HBoxAdd(row, ThemedText(row, "ModMenu_Title_" .. suffix, config.title, resolved.title, titleSize), true, 0, V_CENTER)
+    HBoxAdd(row, TitleWidget(S, row, config.title, resolved.title, titleSize, resolved, suffix), true, 0, V_CENTER)
     ThemedClose(S, row, resolved, suffix, nil)
 
     if variant == "rule" then
@@ -430,6 +538,17 @@ local function TopBand(S, stack, resolved, suffix)
     local palette = resolved.palette
     local radii = Radii(resolved.panel.radius)
     local top = { radii[1], radii[2], 0, 0 }
+    if Chrome.BAND[variant] then
+        -- A frame that cannot be built leaves no band, and the header is drawn plain.
+        local built = nil
+        Decoration("window frame band", function()
+            built = Chrome.TopBand(S, stack, resolved, suffix)
+        end)
+        if built == nil then
+            S.headerBand = nil
+        end
+        return built
+    end
     if variant == "bar" then
         local _, fill = M.BarColors(resolved)
         local pad = M.PanelPadding(S.config)
@@ -493,20 +612,6 @@ local function StockPanel(S, suffix)
     S.menuScroll = scroll
     fill:SetContent(scroll)
     return outline, scroll
-end
-
--- Decorative parts that already failed this session, so each failure is logged once and not on every build.
-local failedParts = {}
-
---- Build one decorative part of the panel guarded. Umg.Construct throws by design, and a blur, rim,
---- bracket or shadow that fails must leave a usable panel rather than abort the whole shell.
-local function Decoration(part, fn)
-    local ok, err = pcall(fn)
-    if not ok and not failedParts[part] then
-        failedParts[part] = true
-        Log("panel " .. part .. " failed, drawn without it: " .. tostring(err))
-    end
-    return ok
 end
 
 --- The panel body with its shadow behind it, or the body alone when there is no shadow or the shadow
@@ -597,7 +702,32 @@ local function ThemedPanel(S, resolved, suffix)
         slot:SetPadding(M.PanelPadding(config))
         slot:SetSize({ SizeRule = 1, Value = 1.0 })
     end)
-    OverlayAdd(body, box, 0)
+
+    -- A status bar closes the stack under the scroll area, as on Windows XP forms.
+    if type(p.statusBar) == "table" then
+        Decoration("status bar", function()
+            Chrome.StatusBar(S, stack, resolved, suffix)
+        end)
+    end
+
+    -- A raised bevel is drawn over the panel shape as 1-unit lines, as StyleLab's Bevel does. A bevel
+    -- that fails leaves the plain panel shape.
+    local shape = box
+    if type(p.bevel) == "table" then
+        local ok = Decoration("bevel", function()
+            shape = Paint.Bevelled(body, "ModMenu_PanelBevel_" .. suffix, box, p.bevel, false)
+        end)
+        if not ok then
+            pcall(function()
+                box:RemoveFromParent()
+            end)
+            shape = box
+        end
+    end
+    OverlayAdd(body, shape, 0)
+
+    -- The drawn effects sit over the panel shape and under the rim, in StyleLab's order.
+    Effects.Build(S, body, resolved, suffix, Decoration)
 
     if p.rim == true then
         Decoration("rim", function()
@@ -624,7 +754,11 @@ local function ThemedPanel(S, resolved, suffix)
         end
     end
 
-    return ShadowWrap(canvas, "ModMenu_PanelShadow_" .. suffix, p, body), scroll
+    -- The outermost widget, which the shadow wraps, is kept for the effects and the motion to move.
+    local root = ShadowWrap(canvas, "ModMenu_PanelShadow_" .. suffix, p, body)
+    S.panelRoot = root
+    S.fx.root = root
+    return root, scroll
 end
 
 --- Build the panel under S.menuCanvas from the resolved style and return the widget to add to the
@@ -637,9 +771,15 @@ end
 function M.Panel(S, resolved, suffix)
     suffix = suffix or Instance.ShellNameSuffix(S.config)
     S.headerBand = nil
+    S.panelRoot = nil
+    Effects.Reset(S)
     local panel = type(resolved) == "table" and resolved.panel or nil
-    if M.IsStockPanel(panel) and not BAND_VARIANTS[M.HeaderVariant(resolved)] then
-        return StockPanel(S, suffix)
+    local motion = type(resolved) == "table" and resolved.motion or nil
+    if M.IsStockPanel(panel, motion) and not BAND_VARIANTS[M.HeaderVariant(resolved)] then
+        local outline, scroll = StockPanel(S, suffix)
+        S.panelRoot = outline
+        S.fx.root = outline
+        return outline, scroll
     end
     ---@cast resolved table
     return ThemedPanel(S, resolved, suffix)
@@ -671,6 +811,10 @@ function M.BuildContent(S)
     Session.ClearLive(S)
     -- The old controls are gone, so their tooltip targets go too. The shared tooltip widget is kept.
     Tooltip.Reset(S)
+    -- The title and cursor handles point into the content that was just cleared.
+    Effects.ResetContent(S)
+    -- The section widgets of the open stagger, one list of widgets per section, refilled below.
+    S.fx.sections = {}
 
     -- Must change every rebuild. Reusing FNames after ClearChildren resurrects zombies —
     -- category (more option rows) breaks harder than language; both are the same control.
@@ -683,7 +827,7 @@ function M.BuildContent(S)
     -- every content build, so a new title or hint shows without rebuilding the shell.
     local resolved = config.resolved
     local titleRow
-    if M.HeaderVariant(resolved) == "bar" and IsValid(S.headerBand) then
+    if InBandVariant(M.HeaderVariant(resolved)) and IsValid(S.headerBand) then
         titleRow = Construct("/Script/UMG.HorizontalBox", S.headerBand, "ModMenu_TitleRow_" .. suffix)
         local placed = pcall(function()
             S.headerBand:SetContent(titleRow)
@@ -731,7 +875,11 @@ function M.BuildContent(S)
         return
     end
 
+    -- A section is several widgets added straight to the content box, with no widget of its own, so the
+    -- stagger records the children the section added. It is read only when the open motion is on.
+    local staggerOn = resolved.motion ~= nil and resolved.motion.open == true
     for sIndex, section in ipairs(visible) do
+        local firstChild = staggerOn and Motion.ChildCount(contentBox) or nil
         local collapsed = Collapse.IsCollapsed(S, section)
         local itemParent = contentBox
         if Collapse.IsCollapsible(section) then
@@ -776,6 +924,10 @@ function M.BuildContent(S)
             end
         end
 
+        if staggerOn then
+            S.fx.sections[#S.fx.sections + 1] = Motion.ChildrenSince(contentBox, firstChild)
+        end
+
         if sIndex < #visible then
             AddSpacer(contentBox, "ModMenu_Between_" .. section.id .. "_" .. suffix, config.spacing.gapSection)
         end
@@ -809,6 +961,8 @@ function M.Teardown(S)
     S.panelBorder = nil
     S.panelOutline = nil
     S.headerBand = nil
+    S.panelRoot = nil
+    Effects.Reset(S)
     S.confirm = nil
     S.confirmRoot = nil
     S.confirmSlot = nil
