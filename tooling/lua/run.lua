@@ -170,6 +170,9 @@ local specs = {
     "widgets_keybind_spec.lua",
     "persist_spec.lua",
     "persist_shell_spec.lua",
+    "chrome_spec.lua",
+    "effects_spec.lua",
+    "motion_spec.lua",
 }
 
 -- Specs reach the encoder through this global so they can check its JSON output directly.

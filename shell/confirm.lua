@@ -18,6 +18,7 @@ local Input = require("ModMenu.core.input")
 local InputMode = require("ModMenu.core.inputmode")
 local Dock = require("ModMenu.shell.dock")
 local Button = require("ModMenu.widgets.button")
+local Motion = require("ModMenu.core.motion")
 
 local Log = Util.Log
 local Debug = Util.Debug
@@ -389,10 +390,17 @@ function M.Poll(S)
 
     if fired == "confirm" then
         Input.IgnoreClicks(2)
+        -- The variant is read first, because Hide clears the spec. A danger confirm shakes the menu.
+        if S.confirm.variant == "danger" then
+            Motion.Shake(S)
+        else
+            Motion.Pop(S)
+        end
         M.Hide(S, "confirm")
         InputMode.Reclaim()
     elseif fired == "cancel" then
         Input.IgnoreClicks(2)
+        Motion.Pop(S)
         M.Hide(S, "cancel")
         InputMode.Reclaim()
     end

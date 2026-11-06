@@ -62,6 +62,7 @@ local Paint = require("ModMenu.core.paint")
 local Input = require("ModMenu.core.input")
 local Config = require("ModMenu.core.config")
 local Style = require("ModMenu.core.style")
+local Motion = require("ModMenu.core.motion")
 local Instance = require("ModMenu.core.instance")
 local InputMode = require("ModMenu.core.inputmode")
 local Session = require("ModMenu.shell.session")
@@ -128,8 +129,19 @@ end
 local valuesView = ChangeView(S.values)
 local foldView = ChangeView(S.foldCollapsedByKey)
 
+-- The click motions, bound to this shell, so a widget triggers one without holding the session.
+local motionApi = {
+    Pop = function()
+        Motion.Pop(S)
+    end,
+    Shake = function()
+        Motion.Shake(S)
+    end,
+}
+
 S.makeWidgetCtx = function()
     return {
+        motion = motionApi,
         values = S.persistOn and valuesView or S.values,
         liveControls = S.liveControls,
         -- The keybind widget checks conflicts against this shell's registered sections, including ones on a tab that is not built.

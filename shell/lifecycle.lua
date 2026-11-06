@@ -20,6 +20,7 @@ local Tooltip = require("ModMenu.core.tooltip")
 local Persist = require("ModMenu.core.persist")
 local Dock = require("ModMenu.shell.dock")
 local Registry = require("ModMenu.shell.registry")
+local Motion = require("ModMenu.core.motion")
 
 local Log = Util.Log
 local Debug = Util.Debug
@@ -40,7 +41,18 @@ function M.StopPoll(S)
     -- dropping the Lua function here is what produces "Ref was not function".
 end
 
+-- Run a motion call so that an animation fault never stops the poll that closes the menu. The first
+-- failure is logged once, because the same fault would repeat on every 16 ms tick.
+local function GuardMotion(S, fn, ...)
+    local ok, err = pcall(fn, S, ...)
+    if not ok and not S.motionFailed then
+        S.motionFailed = true
+        Log("motion failed: " .. tostring(err))
+    end
+end
+
 local function PollControls(S)
+    GuardMotion(S, Motion.Tick, os.clock())
     -- The tooltip is polled before the confirm check, so an open confirm dialog hides it.
     -- os.clock is the clock the shell already uses for debounce, and on Windows it counts wall time.
     Tooltip.Poll(S, os.clock() * 1000)
@@ -207,6 +219,8 @@ function M.Open(S, opts)
         -- Brief delay so the shell is in the viewport before the overlay attaches.
         S.cursorShowHandle = ExecuteInGameThreadWithDelay(50, S.cursorShowFn)
     end
+    -- A rebuild while open also comes through here, so the stagger plays again on the new widgets.
+    GuardMotion(S, Motion.Start, os.clock())
     Debug(string.format("OPEN tag=%s", tostring(Instance.GetTag())))
     for _, fn in ipairs(S.onOpenCallbacks) do
         SafeCall(fn)
@@ -218,6 +232,8 @@ function M.Close(S)
     -- Close keeps the tree and the live controls for the next Open, so the tooltip hides but keeps its targets.
     Tooltip.Hide(S)
     M.StopPoll(S)
+    -- The tick has stopped, so a half-finished animation is put back at rest here.
+    GuardMotion(S, Motion.Stop)
     if S.cursorShowHandle ~= nil then
         pcall(function()
             CancelDelayedAction(S.cursorShowHandle)

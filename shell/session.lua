@@ -25,6 +25,17 @@ function M.New(opts)
         panelSlot = nil,
         panelBorder = nil, ---@type any fill Border
         panelOutline = nil, ---@type any 1px outline Border
+        panelRoot = nil, ---@type any the panel's outermost widget, the one the shadow wraps
+        -- The drawn effect widgets of this shell, for core/motion.lua: root, scanlines, sweep, noise, tear,
+        -- sparkles, ghosts, title and cursor (shell/effects.lua).
+        fx = { sparkles = {}, ghosts = {} }, ---@type table
+        -- Motion state (core/motion.lua): the clock times that start the open stagger, a click pop and a
+        -- danger shake, and the tick's own bookkeeping. Each start time is nil while that motion is idle.
+        openedAt = nil, ---@type number|nil
+        popAt = nil, ---@type number|nil
+        shakeAt = nil, ---@type number|nil
+        motionState = nil, ---@type table|nil
+        motionFailed = false, -- true once a motion tick failed and the failure was logged
         menuOpen = false,
         contentGen = 0,
         pollHandle = nil,
