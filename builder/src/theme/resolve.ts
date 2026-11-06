@@ -80,6 +80,20 @@ const ROLE_KINDS: Record<string, string> = {
 };
 const SHADOW_KINDS: Record<string, string> = { x: "number", y: "number", color: "color" };
 
+// The stage 2 kinds that are a fixed set of keys. A key may itself hold another stage 2 kind: an xp face
+// holds two stops lists and a frame holds a bevel. Every key is optional, so a borrowed value that kept
+// only a width is still valid.
+const FIXED_KINDS: Record<string, Record<string, string>> = {
+  bevel: { light: "color", dark: "color", innerLight: "color", innerDark: "color", width: "number" },
+  xpface: { edge: "color", glow: "color", defaultRing: "color", face: "stops", pressedFace: "stops" },
+  frame: { edge: "color", fill: "color", radius: "radius", pad: "number", bevel: "bevel" },
+  statusbar: { text: "string", fill: "color", line: "color" },
+};
+// A faces entry is a map from button role to one of these.
+const FACE_KINDS: Record<string, string> = { fill: "color", text: "color" };
+// Every stage 2 kind. Their validation messages read `expected <kind>`.
+const STAGE2_KINDS = new Set(["stops", "bevel", "faces", "xpface", "frame", "statusbar"]);
+
 // A definition may carry these keys beside its object types.
 const DEFINITION_KEYS = new Set(["id", "stage", "name", "subtitle", "footer", "icon", "palette", "base", "parts"]);
 
@@ -278,6 +292,20 @@ function copyByKind(kind: string | undefined, v: Field): Field {
     }
     return out;
   }
+  if (kind === "stops" && isTable(v)) {
+    return Array.isArray(v) ? v.map((stop) => color(stop)) : [];
+  }
+  const fixed = kind === undefined ? undefined : own(FIXED_KINDS, kind);
+  if (fixed !== undefined && isTable(v)) {
+    return copyTable(fixed, v);
+  }
+  if (kind === "faces" && isTable(v)) {
+    const out: Dict = {};
+    for (const [role, entry] of entries(v)) {
+      out[role] = isTable(entry) ? copyTable(FACE_KINDS, entry) : entry;
+    }
+    return out;
+  }
   if (kind === "table") {
     return convertDeep(v);
   }
@@ -301,8 +329,23 @@ function shallow(t: unknown): Dict {
   return out;
 }
 
-// Merge two entries of one type. Roles merge per role and per colour, and text tables per key,
-// because an override names only the parts it changes.
+// Merge two tables of one fixed-key kind key by key, and a nested fixed-key kind the same way. A stops
+// list replaces whole, because half a gradient has no meaning.
+function mergeFixed(kind: string, base: Dict, over: Dict): Dict {
+  const kinds = FIXED_KINDS[kind];
+  const out = shallow(base);
+  for (const [k, v] of entries(over)) {
+    const sub = own(kinds, k);
+    out[k] =
+      sub !== undefined && own(FIXED_KINDS, sub) !== undefined && isTable(v) && isTable(out[k])
+        ? mergeFixed(sub, out[k], v)
+        : v;
+  }
+  return out;
+}
+
+// Merge two entries of one type. Roles merge per role and per colour, text tables per key, and the
+// stage 2 kinds per key, because an override names only the parts it changes.
 function mergeType(typeName: string, base: unknown, over: unknown): Dict {
   const kinds = own(TYPES, typeName) ?? {};
   const out = shallow(base);
@@ -314,6 +357,14 @@ function mergeType(typeName: string, base: unknown, over: unknown): Dict {
         roles[role] = isTable(entry) && isTable(roles[role]) ? { ...shallow(roles[role]), ...shallow(entry) } : entry;
       }
       out[f] = roles;
+    } else if (kind !== undefined && own(FIXED_KINDS, kind) !== undefined && isTable(v) && isTable(out[f])) {
+      out[f] = mergeFixed(kind, out[f], v);
+    } else if (kind === "faces" && isTable(v) && isTable(out[f])) {
+      const faces = shallow(out[f]);
+      for (const [role, entry] of entries(v)) {
+        faces[role] = isTable(entry) && isTable(faces[role]) ? { ...shallow(faces[role]), ...shallow(entry) } : entry;
+      }
+      out[f] = faces;
     } else if (kind === "text" && isTable(v) && isTable(out[f])) {
       out[f] = { ...shallow(out[f]), ...shallow(v) };
     } else {
@@ -331,6 +382,29 @@ function withoutColors(t: Dict, kinds: Record<string, string>): Dict {
     }
   }
   return out;
+}
+
+// The part of a stage 2 value that a borrow keeps, which is only what is not a colour: a bevel keeps its
+// width, a frame its radius, pad and bevel width, and a status bar its text. Stops, faces and xp faces hold
+// nothing else, so nothing is kept. An empty result means the field is dropped.
+function stripKind(kind: string, v: Dict): Dict {
+  if (kind === "bevel") {
+    return present(v.width) ? { width: v.width } : {};
+  }
+  if (kind === "statusbar") {
+    return present(v.text) ? { text: v.text } : {};
+  }
+  if (kind === "frame") {
+    const out: Dict = {};
+    if (present(v.radius)) out.radius = deepCopy(v.radius);
+    if (present(v.pad)) out.pad = v.pad;
+    if (isTable(v.bevel)) {
+      const bevel = stripKind("bevel", v.bevel);
+      if (Object.keys(bevel).length > 0) out.bevel = bevel;
+    }
+    return out;
+  }
+  return {};
 }
 
 // An entry without its colours, so a borrowed type takes its shape from one preset and its colours
@@ -358,6 +432,11 @@ function stripColors(typeName: string, entry: unknown): Dict {
       }
     } else if (kind === "shadow" && isTable(v)) {
       out[f] = withoutColors(v, SHADOW_KINDS);
+    } else if (kind !== undefined && STAGE2_KINDS.has(kind) && isTable(v)) {
+      const kept = stripKind(kind, v);
+      if (Object.keys(kept).length > 0) {
+        out[f] = kept;
+      }
     } else {
       out[f] = v;
     }
@@ -381,19 +460,20 @@ function isFont(v: unknown): boolean {
   return typeof v === "string" || (Array.isArray(v) && v.length > 0 && v.every((n) => typeof n === "string"));
 }
 
-function checkTable(path: string, kinds: Record<string, string>, t: Dict, issues: StyleIssue[]) {
+// `inside` marks a table that is part of a stage 2 value, whose entries report `expected <kind>`.
+function checkTable(path: string, kinds: Record<string, string>, t: Dict, issues: StyleIssue[], inside = false) {
   for (const [k, v] of entries(t)) {
     const kind = own(kinds, k);
     if (kind === undefined) {
       issues.push({ path: `${path}.${k}`, message: "unknown field" });
     } else {
-      checkValue(`${path}.${k}`, kind, v, issues);
+      checkValue(`${path}.${k}`, kind, v, issues, inside);
     }
   }
 }
 
-function checkValue(path: string, kind: string, v: unknown, issues: StyleIssue[]) {
-  const bad = () => issues.push({ path, message: `must be ${kind}` });
+function checkValue(path: string, kind: string, v: unknown, issues: StyleIssue[], inside = false) {
+  const bad = () => issues.push({ path, message: `${inside || STAGE2_KINDS.has(kind) ? "expected" : "must be"} ${kind}` });
   if (kind === "color") {
     if (!isColorValue(v)) bad();
   } else if (kind === "number") {
@@ -429,6 +509,38 @@ function checkValue(path: string, kind: string, v: unknown, issues: StyleIssue[]
         issues.push({ path: rolePath, message: `must be a table of ${kind}` });
       } else {
         checkTable(rolePath, ROLE_KINDS, entry, issues);
+      }
+    }
+  } else if (kind === "stops") {
+    if (!isTable(v)) {
+      bad();
+      return;
+    }
+    const stops: unknown[] = Array.isArray(v) ? v : [];
+    if (stops.length < 2) {
+      issues.push({ path, message: "expected at least 2 colours" });
+      return;
+    }
+    stops.forEach((stop, i) => {
+      if (!isColorValue(stop)) issues.push({ path: `${path}[${i + 1}]`, message: "expected color" });
+    });
+  } else if (own(FIXED_KINDS, kind) !== undefined) {
+    // A table of keys. An empty list is an empty table, but a list with entries is not.
+    if (!isTable(v) || (Array.isArray(v) && v.length > 0)) bad();
+    else checkTable(path, FIXED_KINDS[kind], v, issues, true);
+  } else if (kind === "faces") {
+    if (!isTable(v) || (Array.isArray(v) && v.length > 0)) {
+      bad();
+      return;
+    }
+    for (const [role, entry] of entries(v)) {
+      const rolePath = `${path}.${role}`;
+      if (!ROLE_NAMES.includes(role)) {
+        issues.push({ path: rolePath, message: "unknown field" });
+      } else if (!isTable(entry) || (Array.isArray(entry) && entry.length > 0)) {
+        issues.push({ path: rolePath, message: "expected table" });
+      } else {
+        checkTable(rolePath, FACE_KINDS, entry, issues, true);
       }
     }
   } else if (kind === "table") {
@@ -636,6 +748,31 @@ function merge(base: unknown, over: unknown): Dict {
   return { ...shallow(base), ...shallow(over) };
 }
 
+// A bevel with no width is one unit wide, as the field list says. Only a bevel that exists gets one, so a
+// borrow that dropped its bevel does not bring it back.
+function withBevelWidth(bevel: unknown): unknown {
+  return isTable(bevel) ? merge({ width: 1 }, bevel) : bevel;
+}
+
+// The bevel and status bar defaults of each object type, filled for a resolved entry and for an item look
+// merged over it.
+function fillDefaults(typeName: string, s: Dict): Dict {
+  if (typeName === "panel") {
+    s.bevel = withBevelWidth(s.bevel);
+    // The status bar says "Ready" unless the theme gives it other text.
+    if (isTable(s.statusBar)) {
+      s.statusBar = merge({ text: "Ready" }, s.statusBar);
+    }
+  } else if (typeName === "button" || typeName === "field") {
+    s.bevel = withBevelWidth(s.bevel);
+  } else if (typeName === "toggle") {
+    s.checkBevel = withBevelWidth(s.checkBevel);
+  } else if (typeName === "progress" && isTable(s.frame) && present(s.frame.bevel)) {
+    s.frame = merge(s.frame, { bevel: withBevelWidth(s.frame.bevel) });
+  }
+  return s;
+}
+
 function largestRadius(radius: unknown): number {
   if (Array.isArray(radius)) {
     return radius.reduce((largest: number, r: number) => (r > largest ? r : largest), 0);
@@ -684,11 +821,11 @@ const RESOLVERS: Record<ObjectType, Resolver> = {
     // The blur sits at half the panel's radius (field note 32), so it follows a changed radius.
     s.blurRadius ??= largestRadius(s.radius) * 0.5;
     s.blurInset ??= 2;
-    return s;
+    return fillDefaults("panel", s);
   },
   header(t, p) {
     return merge(
-      { variant: "badge", fill: alpha(p.bg, 0), text: p.text, line: p.line, badgeFill: mix(p.bg, p.accent, 0.16), controlGlyph: p.text },
+      { variant: "badge", fill: alpha(p.bg, 0), text: p.text, line: p.line, badgeFill: mix(p.bg, p.accent, 0.16), controlGlyph: p.text, captions: "all" },
       t,
     );
   },
@@ -712,14 +849,14 @@ const RESOLVERS: Record<ObjectType, Resolver> = {
     return s;
   },
   button(t, p) {
-    const s = merge({ variant: "fill", radius: 8, width: 1, height: 36, hoverToward: WHITE, hoverAmount: 0.14 }, t);
+    const s = merge({ variant: "fill", radius: 8, width: 1, hoverToward: WHITE, hoverAmount: 0.14 }, t);
     // Every role is filled, so a widget never meets an absent fill or text colour.
     const roles = defaultRoles(p);
     for (const [role, entry] of entries(s.roles)) {
       roles[role] = merge(roles[role], entry);
     }
     s.roles = roles;
-    return s;
+    return fillDefaults("button", s);
   },
   toggle(t, p) {
     const s = merge(
@@ -731,7 +868,7 @@ const RESOLVERS: Record<ObjectType, Resolver> = {
       t,
     );
     s.radius ??= s.h / 2;
-    return s;
+    return fillDefaults("toggle", s);
   },
   slider(t, p) {
     return merge(
@@ -740,7 +877,8 @@ const RESOLVERS: Record<ObjectType, Resolver> = {
     );
   },
   progress(t, p) {
-    return merge({ variant: "bar", height: 8, radius: 4, segments: 12, gap: 3, track: p.track, fill: p.accent }, t);
+    const s = merge({ variant: "bar", height: 8, radius: 4, segments: 12, gap: 3, track: p.track, fill: p.accent }, t);
+    return fillDefaults("progress", s);
   },
   choice(t, p, s) {
     return merge(
@@ -771,7 +909,7 @@ const RESOLVERS: Record<ObjectType, Resolver> = {
     );
     f.headerFill ??= mix(p.bg, p.text, 0.12);
     f.headerText ??= f.text;
-    return f;
+    return fillDefaults("field", f);
   },
   list(t, p, s) {
     const f = s.field;
@@ -787,7 +925,7 @@ const RESOLVERS: Record<ObjectType, Resolver> = {
     return merge({ fill: p.surface, dim: alpha(BLACK, 0.6), divider: p.line, radius: s.panel.radius }, t);
   },
   motion(t) {
-    return merge({ pulse: false, cursor: false, glitch: false, sparkle: false }, t);
+    return merge({ pulse: false, cursor: false, glitch: false, sparkle: false, open: true, pop: true, shake: true }, t);
   },
 };
 
@@ -974,5 +1112,5 @@ export function forItem(resolved: ResolvedStyle, objectType: string, look?: Reco
   if (!present(look)) {
     return base;
   }
-  return mergeType(objectType, base, normalize(objectType, look));
+  return fillDefaults(objectType, mergeType(objectType, base, normalize(objectType, look)));
 }

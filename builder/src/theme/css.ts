@@ -55,6 +55,43 @@ export function cssColorFor(resolved: Pick<ResolvedStyle, "id">): (c: Color) => 
   return (c) => colorCss(srgbColor(c));
 }
 
+export type Bevel = { light?: Color; dark?: Color; innerLight?: Color; innerDark?: Color; width?: number };
+
+/**
+ * Stops as a CSS gradient, top to bottom or left to right. Stops are linear colours, so they are
+ * converted to sRGB unless the caller passes the colour function of a legacy theme. The library draws
+ * evenly spaced strips, which is what a gradient with no stop positions gives.
+ */
+export function stopsToCss(stops: Color[], horizontal: boolean, css: (c: Color) => string = (c) => colorCss(srgbColor(c))): string {
+  return `linear-gradient(${horizontal ? "90deg" : "180deg"}, ${stops.map((c) => css(c)).join(", ")})`;
+}
+
+/**
+ * A bevel as an inset box-shadow, as Paint.BevelPlan draws it: light along the top and left, dark along
+ * the bottom and right, swapped when sunken, then a second ring one width further in when the bevel has
+ * both inner colours. The first shadow paints on top, so the outer ring comes first. A bevel without
+ * light or dark draws nothing.
+ */
+export function bevelToCss(
+  bevel: Bevel | undefined,
+  sunken: boolean,
+  css: (c: Color) => string = (c) => colorCss(srgbColor(c)),
+): string {
+  if (!bevel || !bevel.light || !bevel.dark) {
+    return "none";
+  }
+  const w = typeof bevel.width === "number" && Number.isFinite(bevel.width) ? bevel.width : 1;
+  const ring = (light: Color, dark: Color, depth: number): string[] => {
+    const [a, b] = sunken ? [dark, light] : [light, dark];
+    return [`inset ${depth}px ${depth}px 0 0 ${css(a)}`, `inset ${-depth}px ${-depth}px 0 0 ${css(b)}`];
+  };
+  const shadows = ring(bevel.light, bevel.dark, w);
+  if (bevel.innerLight && bevel.innerDark) {
+    shadows.push(...ring(bevel.innerLight, bevel.innerDark, w * 2));
+  }
+  return shadows.join(", ");
+}
+
 function kebab(key: string): string {
   return key.replace(/[A-Z]/g, (ch) => `-${ch.toLowerCase()}`);
 }
@@ -241,6 +278,14 @@ function alpha(c: Color, a: number): Color {
 // The panel's box-shadow: a hard shadow wins, else one hard-edged offset copy per layer, each moved
 // right by half its depth and down by its depth, as Paint.Shadow lays out its shade boxes.
 function panelShadow(panel: ResolvedEntry, css: (c: Color) => string): string {
+  // A raised bevel is drawn over the panel shape, so its inset lines come first and the outer shadow after.
+  const bevel = asBevel(panel.bevel) ? bevelToCss(asBevel(panel.bevel), false, css) : "none";
+  const outer = panelOuterShadow(panel, css);
+  const parts = [bevel, outer].filter((s) => s !== "none");
+  return parts.length > 0 ? parts.join(", ") : "none";
+}
+
+function panelOuterShadow(panel: ResolvedEntry, css: (c: Color) => string): string {
   const hard = num(panel.hardShadow, 0);
   if (hard > 0) {
     const c = isColor(panel.hardShadowColor) ? panel.hardShadowColor : { R: 0, G: 0, B: 0, A: 1 };
@@ -266,16 +311,46 @@ function panelShadow(panel: ResolvedEntry, css: (c: Color) => string): string {
  * True when the panel draws as the library's original panel: square, no outline width, no blur,
  * shadow, rim or corners, as Build.IsStockPanel decides. Such a panel keeps today's 1 px edge.
  */
-export function isStockPanel(panel: ResolvedEntry | undefined): boolean {
+export function isStockPanel(panel: ResolvedEntry | undefined, motion?: ResolvedEntry): boolean {
   if (panel === undefined) {
     return true;
   }
-  const flat = largestRadius(panel.radius) <= 0 && panel.pill !== true && num(panel.width, 0) <= 0;
+  // A bevel is not flat (Paint.IsFlat), a status bar and the drawn effects live in the themed panel's body.
+  const flat = largestRadius(panel.radius) <= 0 && panel.pill !== true && num(panel.width, 0) <= 0 && asBevel(panel.bevel) === undefined;
   const shadow = num(panel.hardShadow, 0) > 0 || (Array.isArray(panel.shadowLayers) && panel.shadowLayers.length > 0);
-  return flat && num(panel.blur, 0) <= 0 && !shadow && panel.rim !== true && panel.corners !== true;
+  const effects = scanStrength(panel) > 0 || panel.sweep === true || motion?.sparkle === true;
+  return (
+    flat &&
+    num(panel.blur, 0) <= 0 &&
+    !shadow &&
+    typeof panel.statusBar !== "object" &&
+    !effects &&
+    panel.rim !== true &&
+    panel.corners !== true
+  );
 }
 
-const HEADER_VARIANTS = new Set(["stock", "badge", "plain", "rule", "bar", "tape", "strip"]);
+/** A bevel that draws something: light and dark are both present. */
+export function asBevel(v: unknown): Bevel | undefined {
+  if (typeof v !== "object" || v === null) {
+    return undefined;
+  }
+  const b = v as Bevel;
+  return isColor(b.light) && isColor(b.dark) ? b : undefined;
+}
+
+/** The scanline strength: true is the default 0.25, a number is itself, anything else is none (Effects.Build). */
+export function scanStrength(panel: ResolvedEntry): number {
+  if (panel.scanlines === true) {
+    return 0.25;
+  }
+  return typeof panel.scanlines === "number" && panel.scanlines > 0 ? panel.scanlines : 0;
+}
+
+const HEADER_VARIANTS = new Set(["stock", "badge", "plain", "rule", "bar", "tape", "strip", "window", "mac", "xpbar", "classic"]);
+
+/** The band headers draw in a band across the top of the panel; mac is a row in the content. */
+export const BAND_HEADERS = new Set(["bar", "tape", "strip", "window", "xpbar", "classic"]);
 
 /** The header variant the preview draws; a variant this stage does not draw falls back to badge, as in Lua. */
 export function headerVariant(resolved: ResolvedStyle): string {
@@ -337,6 +412,9 @@ export function typeVars(type: string, e: ResolvedEntry, css: (c: Color) => stri
     put(v, "--mm-toggle-check-edge-on", e.checkEdgeOn, css);
     put(v, "--mm-toggle-check-mark", e.checkMark, css);
     v["--mm-toggle-check-edge-width"] = `${num(e.checkEdgeWidth, 1)}px`;
+    // A sunken bevel goes over the whole check box, as Windows Classic draws it.
+    const checkBevel = asBevel(e.checkBevel);
+    if (checkBevel) v["--mm-toggle-check-bevel"] = bevelToCss(checkBevel, true, css);
   } else if (type === "slider") {
     v["--mm-slider-thickness"] = `${num(e.thickness, 4)}px`;
     v["--mm-slider-size"] = `${num(e.size, 16)}px`;
@@ -358,6 +436,8 @@ export function typeVars(type: string, e: ResolvedEntry, css: (c: Color) => stri
     put(v, "--mm-field-bg", e.fill, css);
     put(v, "--mm-field-text", e.text, css);
     put(v, "--mm-field-hint", e.hint, css);
+    const fieldBevel = asBevel(e.bevel);
+    if (fieldBevel) v["--mm-field-bevel"] = bevelToCss(fieldBevel, true, css);
     put(v, "--mm-dropdown-header-bg", e.headerFill, css);
     put(v, "--mm-dropdown-header-text", e.headerText, css);
   } else if (type === "list") {
@@ -374,6 +454,101 @@ export function typeVars(type: string, e: ResolvedEntry, css: (c: Color) => stri
     Object.assign(v, textVars(type, e, key, css));
   }
   return v;
+}
+
+const WHITE: Color = { R: 1, G: 1, B: 1, A: 1 };
+const BLACK: Color = { R: 0, G: 0, B: 0, A: 1 };
+
+function mixColor(a: Color, b: Color, t: number): Color {
+  return { R: a.R + (b.R - a.R) * t, G: a.G + (b.G - a.G) * t, B: a.B + (b.B - a.B) * t, A: a.A + (b.A - a.A) * t };
+}
+
+/**
+ * The title bar's gradient for the xpbar and classic headers: top to bottom for XP, left to right for
+ * Classic (Chrome.TopBand). Undefined for any other header or a preset without barStops.
+ */
+export function bandFillCss(resolved: ResolvedStyle, css: (c: Color) => string): string | undefined {
+  const variant = resolved.header.variant;
+  const stops = colorStops(resolved.header.barStops);
+  if (stops === undefined || (variant !== "xpbar" && variant !== "classic")) {
+    return undefined;
+  }
+  return stopsToCss(stops, variant === "classic", css);
+}
+
+/** A stops list that has the two colours a gradient needs, or undefined. */
+export function colorStops(v: unknown): Color[] | undefined {
+  return Array.isArray(v) && v.length >= 2 && v.every(isColor) ? (v as Color[]) : undefined;
+}
+
+function cornerRadii(radius: unknown): [number, number, number, number] {
+  if (Array.isArray(radius)) {
+    return [num(radius[0], 0), num(radius[1], 0), num(radius[2], 0), num(radius[3], 0)];
+  }
+  const r = num(radius, 0);
+  return [r, r, r, r];
+}
+
+// The window frame colours and sizes as variables: the title bar fill, the caption buttons' faces and
+// the status bar (shell/chrome.lua). A variable is written only when the preset gives what it draws from,
+// so a preset without a window frame gets none of them.
+function frameVars(resolved: ResolvedStyle, css: (c: Color) => string): Record<string, string> {
+  const vars: Record<string, string> = {};
+  const header = resolved.header;
+  const panel = resolved.panel;
+  const p = resolved.palette;
+  const variant = header.variant;
+  const barStops = colorStops(header.barStops);
+  const [rTopLeft, rTopRight] = cornerRadii(panel.radius);
+
+  if (typeof panel.bandInset === "number") {
+    vars["--mm-band-inset"] = `${panel.bandInset}px`;
+  }
+  const bandFill = bandFillCss(resolved, css);
+  if (bandFill !== undefined) {
+    vars["--mm-band-fill"] = bandFill;
+    const r = Math.max(0, rTopLeft - 3);
+    vars["--mm-band-radius"] = variant === "xpbar" ? `${r}px ${r}px 0 0` : "0";
+  }
+  if (variant === "xpbar") {
+    // White on the blue bar with the dark drop shadow of Windows XP.
+    vars["--mm-band-title-shadow"] = `1px 1px 0 ${isColor(header.titleShadow) ? css(header.titleShadow) : "rgb(15, 16, 137)"}`;
+  }
+
+  if (variant === "window") {
+    vars["--mm-cap-hover"] = css(alpha(p.text, 0.06));
+    vars["--mm-cap-press"] = css(alpha(p.text, 0.04));
+    vars["--mm-cap-close-radius"] = `0 ${rTopRight}px 0 0`;
+  }
+  if (variant === "xpbar") {
+    const controls = colorStops(header.controlStops) ?? barStops;
+    const close = colorStops(header.closeStops) ?? barStops;
+    const shade = (stops: Color[], toward: Color, amount: number) => stops.map((c) => mixColor(c, toward, amount));
+    for (const [name, stops] of [["xp", controls], ["xp-close", close]] as const) {
+      if (stops !== undefined) {
+        vars[`--mm-cap-${name}`] = stopsToCss(stops, false, css);
+        vars[`--mm-cap-${name}-hover`] = stopsToCss(shade(stops, WHITE, 0.25), false, css);
+        vars[`--mm-cap-${name}-pressed`] = stopsToCss(shade(stops, BLACK, 0.2), false, css);
+      }
+    }
+  }
+  if (variant === "classic") {
+    const face = isColor(header.controlFace) ? header.controlFace : { R: 0.527, G: 0.527, B: 0.527, A: 1 };
+    // A panel without a usable bevel gets one derived from the face, so the press still shows.
+    const bevel = asBevel(panel.bevel) ?? { light: mixColor(face, WHITE, 0.6), dark: mixColor(face, BLACK, 0.55) };
+    vars["--mm-cap-face"] = css(face);
+    vars["--mm-cap-bevel"] = bevelToCss(bevel, false, css);
+    vars["--mm-cap-bevel-pressed"] = bevelToCss(bevel, true, css);
+    vars["--mm-cap-ink"] = css(isColor(header.controlGlyph) ? header.controlGlyph : BLACK);
+  }
+
+  const status = panel.statusBar as ResolvedEntry | undefined;
+  if (typeof status === "object" && status !== null) {
+    // Without a fill the bar uses the panel background, and without a line the palette's line colour.
+    vars["--mm-status-fill"] = css(isColor(status.fill) ? status.fill : p.bg);
+    vars["--mm-status-line"] = css(isColor(status.line) ? status.line : p.line);
+  }
+  return vars;
 }
 
 /**
@@ -429,9 +604,16 @@ export function styleVars(resolved: ResolvedStyle): Record<string, string> {
   vars["--mm-header-bar-fill"] = css(bar.fill);
   vars["--mm-header-bar-text"] = css(bar.text);
   vars["--mm-header-bar-hint"] = css(alpha(bar.text, 0.8 * bar.text.A));
+  Object.assign(vars, frameVars(resolved, css));
 
   for (const type of ["title", "body", "hint", "data", "section", "button", "toggle", "slider", "progress", "field", "list", "confirm"]) {
     Object.assign(vars, typeVars(type, (resolved as Record<string, ResolvedEntry>)[type], css));
+  }
+  if (resolved.motion?.glitch === true) {
+    // The title's two ghost copies, one red and one in the accent, three units to either side (Effects.Title).
+    const ghosts = `3px 0 0 ${css(alpha(p.danger, 0.8))}, -3px 0 0 ${css(alpha(p.accent, 0.8))}`;
+    const own = vars["--mm-title-shadow"];
+    vars["--mm-title-shadow"] = own !== undefined && own !== "none" ? `${own}, ${ghosts}` : ghosts;
   }
   return vars;
 }

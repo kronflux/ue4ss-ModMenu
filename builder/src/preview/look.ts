@@ -3,12 +3,17 @@
 import { createContext, useContext, type CSSProperties } from "react";
 import type { ButtonVariant, StyleOverrides, ThemeName } from "../schema";
 import {
+  asBevel,
+  bevelToCss,
+  BAND_HEADERS,
+  colorStops,
   cssColorFor,
   headerVariant,
   isLegacyTheme,
   isStockPanel,
   largestRadius,
   radiusCss,
+  stopsToCss,
   typefaceCss,
   typeVars,
 } from "../theme/css";
@@ -158,7 +163,7 @@ export function panelClasses(resolved: ResolvedStyle, style?: StyleOverrides): s
   const section = typeof sectionVariant === "string" ? sectionVariant : "stock";
   const classes = ["mm-panel", `mm-header-${header}`, `mm-section-${section}`];
   // A band header needs the themed panel, as Build.Panel draws it.
-  if (!isStockPanel(panel) || header === "bar" || header === "tape" || header === "strip") {
+  if (!isStockPanel(panel, resolved.motion) || BAND_HEADERS.has(header)) {
     classes.push("mm-panel-themed");
   }
   if (num(panel.blur) > 0) classes.push("mm-blur");
@@ -216,7 +221,7 @@ export function lookVars(ps: PreviewStyle, type: string, look: Look): VarStyle |
 // Buttons (widgets/button.lua, Button.States)
 // ---------------------------------------------------------------------------------------------
 
-const BUTTON_VARIANTS = new Set(["fill", "soft", "ghost", "underline"]);
+const BUTTON_VARIANTS = new Set(["fill", "soft", "ghost", "underline", "xp", "classic"]);
 const TINTS: Record<string, [number, number, number]> = {
   soft: [0.14, 0.24, 0.34],
   ghost: [0, 0.16, 0.3],
@@ -246,6 +251,15 @@ function roleName(item: ButtonOpts): string {
   return ROLES.has(v) ? v : "default";
 }
 
+// The button's own typeface, spacing and case, which every shaped look shares.
+function typography(b: ResolvedEntry, style: VarStyle) {
+  const face = typefaceCss(b.typeface);
+  if (face.weight) style.fontWeight = face.weight;
+  if (face.style) style.fontStyle = face.style;
+  if (typeof b.spacing === "number") style.letterSpacing = `${b.spacing / 1000}em`;
+  if (b.upper === true) style.textTransform = "uppercase";
+}
+
 /**
  * A button's look: its variant class, colours, radius, edge and the hover and pressed colours.
  * `over` is merged over the button style last, as the stepper puts its radius and pill there.
@@ -262,15 +276,29 @@ export function buttonLook(ps: PreviewStyle, item: ButtonOpts, over?: Record<str
   if (!BUTTON_VARIANTS.has(variant)) {
     variant = "fill";
   }
+  // A theme's face for the role replaces its fill and caption colour, but not for disabled or active, which
+  // keep their own so they stay distinguishable. xp and classic draw layers only for a role that is neither
+  // and only when the theme gives them what they draw from; otherwise they draw as a flat fill (Look).
+  const layered = name !== "disabled" && name !== "active";
+  const faces = (b.faces ?? {}) as Record<string, ResolvedEntry>;
+  const roleFace = layered ? faces[name] : undefined;
+  const xp = (b.xp ?? undefined) as ResolvedEntry | undefined;
+  const xpFace = colorStops(xp?.face);
+  const xpPressed = colorStops(xp?.pressedFace);
+  const bevel = asBevel(b.bevel);
+  if (variant === "xp" && (!layered || xpFace === undefined || xpPressed === undefined)) variant = "fill";
+  else if (variant === "classic" && (!layered || bevel === undefined)) variant = "fill";
   const radius: unknown = b.radius ?? 0;
   const pill = b.pill === true;
-  const base: Color = isColor(role.fill) ? role.fill : WHITE;
+  const roleFill: unknown = roleFace !== undefined && isColor(roleFace.fill) ? roleFace.fill : role.fill;
+  const roleText: unknown = roleFace !== undefined && isColor(roleFace.text) ? roleFace.text : role.text;
+  const base: Color = isColor(roleFill) ? roleFill : WHITE;
   let tone: Color | undefined = isColor(role.edge) ? role.edge : undefined;
   if (tone === undefined && name === "secondary") tone = p.text;
   else if (tone === undefined && name === "disabled" && isColor(role.text)) tone = role.text;
   tone = tone ?? base;
   // A tone too faint to see draws in the role's text colour instead (Button.VisibleTone).
-  if (tone.A < MIN_TONE_ALPHA && isColor(role.text)) tone = role.text;
+  if (tone.A < MIN_TONE_ALPHA && isColor(roleText)) tone = roleText;
 
   let outline: unknown;
   if (variant === "ghost") outline = tone;
@@ -280,9 +308,43 @@ export function buttonLook(ps: PreviewStyle, item: ButtonOpts, over?: Record<str
   const flat = largestRadius(radius) <= 0 && !pill && edge === undefined;
   const className = variantClass("button", variant);
 
+  // A theme that sets a button height gives the button that minimum height (Button.States, height).
+  const minHeight = typeof b.height === "number" && b.height > 0 ? `${b.height}px` : undefined;
+
   if (variant === "fill" && flat && item.look === undefined && over === undefined) {
-    const style = buttonChrome({ enabled: item.enabled, active: item.active, variant: item.variant as ButtonVariant });
+    const style: VarStyle = buttonChrome({ enabled: item.enabled, active: item.active, variant: item.variant as ButtonVariant });
+    if (minHeight !== undefined) style.minHeight = minHeight;
     return { variant, className, style, shaped: false, flat: true };
+  }
+
+  if (variant === "xp" || variant === "classic") {
+    const text = isColor(roleText) ? roleText : p.text;
+    const style: VarStyle = { color: ps.css(text), borderRadius: radiusCss(radius, pill) };
+    if (variant === "xp") {
+      // A dark rounded edge around a gradient face. The default ring sits inside the edge on a primary
+      // button; hover swaps it for the glow, and pressed takes the darker face with no ring.
+      const edgeRing = `inset 0 0 0 1px ${ps.css(isColor(xp?.edge) ? xp.edge : BLACK)}`;
+      const ring = (c: unknown) => (isColor(c) ? `, inset 0 0 0 2px ${ps.css(c)}` : "");
+      const faceCss = stopsToCss(xpFace as Color[], false, ps.css);
+      style.background = faceCss;
+      style.boxShadow = edgeRing + (name === "primary" ? ring(xp?.defaultRing) : "");
+      style["--mm-btn-hover"] = faceCss;
+      style["--mm-btn-pressed"] = stopsToCss(xpPressed as Color[], false, ps.css);
+      style["--mm-btn-hover-shadow"] = edgeRing + ring(xp?.glow);
+      style["--mm-btn-pressed-shadow"] = edgeRing;
+    } else {
+      // A raised two-ring bevel that turns sunken while pressed; hover looks like rest.
+      const raised = bevelToCss(bevel, false, ps.css);
+      style.background = ps.css(base);
+      style.boxShadow = raised;
+      style["--mm-btn-hover"] = ps.css(base);
+      style["--mm-btn-pressed"] = ps.css(base);
+      style["--mm-btn-hover-shadow"] = raised;
+      style["--mm-btn-pressed-shadow"] = bevelToCss(bevel, true, ps.css);
+    }
+    if (minHeight !== undefined) style.minHeight = minHeight;
+    typography(b, style);
+    return { variant, className: `${className} mm-btn-shaped mm-btn-layered`, style, shaped: true, flat: false };
   }
 
   let normal: Color;
@@ -291,7 +353,7 @@ export function buttonLook(ps: PreviewStyle, item: ButtonOpts, over?: Record<str
   let text: Color;
   if (variant === "fill") {
     normal = base;
-    text = isColor(role.text) ? role.text : p.text;
+    text = isColor(roleText) ? roleText : p.text;
     if (flat) {
       hover = shade(base, 0.12);
       pressed = shade(base, -0.12);
@@ -327,11 +389,8 @@ export function buttonLook(ps: PreviewStyle, item: ButtonOpts, over?: Record<str
   if (variant === "underline") {
     style["--mm-btn-underline"] = ps.css(tone);
   }
-  const face = typefaceCss(b.typeface);
-  if (face.weight) style.fontWeight = face.weight;
-  if (face.style) style.fontStyle = face.style;
-  if (typeof b.spacing === "number") style.letterSpacing = `${b.spacing / 1000}em`;
-  if (b.upper === true) style.textTransform = "uppercase";
+  if (minHeight !== undefined) style.minHeight = minHeight;
+  typography(b, style);
   return { variant, className: `${className} mm-btn-shaped`, style, shaped: true, flat: variant === "fill" && flat };
 }
 
@@ -436,7 +495,38 @@ export type ProgressLook = {
   fill: string;
   /** The colour of each segment when lit, for the segments variant. */
   segmentColors: string[];
+  /** A lit block's vertical shading, when the theme gives progress.block; it replaces the segment colour. */
+  block?: string;
+  /** The frame around the trough: kind edge or bevel, drawn as the padded wrapper's style. */
+  frame?: { kind: "edge" | "bevel"; style: VarStyle };
 };
+
+// A frame with an edge or a usable bevel gets this much room around the trough when it names none
+// (Progress.FrameSpec). A bevel wins over an edge in the kind, and both are drawn when both are set.
+function progressFrame(ps: PreviewStyle, entry: ResolvedEntry): ProgressLook["frame"] {
+  const f = entry.frame as ResolvedEntry | undefined;
+  if (typeof f !== "object" || f === null) {
+    return undefined;
+  }
+  const bevel = asBevel(f.bevel);
+  const edge = isColor(f.edge) ? f.edge : undefined;
+  if (bevel === undefined && edge === undefined) {
+    return undefined;
+  }
+  const shadows: string[] = [];
+  if (bevel !== undefined) shadows.push(bevelToCss(bevel, true, ps.css));
+  if (edge !== undefined) shadows.push(`inset 0 0 0 1px ${ps.css(edge)}`);
+  return {
+    kind: bevel !== undefined ? "bevel" : "edge",
+    style: {
+      padding: `${typeof f.pad === "number" ? f.pad : 2}px`,
+      // A frame that names no fill is white, as StyleLab's trough frame is.
+      background: ps.css(isColor(f.fill) ? f.fill : WHITE),
+      borderRadius: radiusCss(f.radius),
+      boxShadow: shadows.join(", "),
+    },
+  };
+}
 
 /**
  * A progress bar's look. An item naming a button role fills with that role's colour, as
@@ -459,7 +549,15 @@ export function progressLook(ps: PreviewStyle, item: { variant?: string; look?: 
     }
     segmentColors.push(ps.css(c));
   }
-  return { variant, entry, fill: ps.css(fillColor), segmentColors };
+  const block = colorStops(entry.block);
+  return {
+    variant,
+    entry,
+    fill: ps.css(fillColor),
+    segmentColors,
+    block: block !== undefined ? stopsToCss(block, false, ps.css) : undefined,
+    frame: variant === "stock" ? undefined : progressFrame(ps, entry),
+  };
 }
 
 /** A choice strip's drawing settings, from the choice style for radio and multiselect or the tabs style for tabs. */

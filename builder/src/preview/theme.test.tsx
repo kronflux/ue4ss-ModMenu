@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { StyleOverrides } from "../schema";
 import { fullDocument } from "../schema/fullFixture";
-import { colorCss, fontFamily, linearToSrgb, styleVars, themeVars } from "../theme/css";
+import { bevelToCss, colorCss, fontFamily, linearToSrgb, stopsToCss, styleVars, themeVars } from "../theme/css";
 import { PRESET_ORDER } from "../theme/presets.generated";
 import { hex, resolve } from "../theme/resolve";
 import {
@@ -163,6 +163,157 @@ describe("parity with the Lua widgets", () => {
   });
 });
 
+describe("stage 2 looks", () => {
+  const doc = fullDocument();
+  const html = (theme: string, style?: StyleOverrides) =>
+    renderToStaticMarkup(<MenuPreview document={{ ...doc, init: { ...doc.init, theme, style } }} />);
+  const count = (text: string, needle: RegExp) => (text.match(needle) ?? []).length;
+  // Slate with an XP title bar, XP buttons, a status bar and framed gradient progress blocks.
+  const XP_HEADER = {
+    variant: "xpbar",
+    barStops: ["#5AA6FF", "#0058E6", "#003FB8"],
+    controlStops: ["#D8E6FF", "#3C78EA", "#3A72E0"],
+    closeStops: ["#F8C8B4", "#E2582E", "#D9542A"],
+  };
+  const XP_BUTTON = {
+    variant: "xp",
+    xp: {
+      edge: "#003C74",
+      glow: "#F8B33A",
+      defaultRing: "#8CB4F0",
+      face: ["#FFFFFF", "#EEEDE7", "#D6D0C5"],
+      pressedFace: ["#CDC9B8", "#EFEEE7"],
+    },
+  };
+  const XP = {
+    panel: { statusBar: { text: "Ready", fill: "#ECE9D8", line: "#C5C2B2" } },
+    header: XP_HEADER,
+    button: XP_BUTTON,
+    progress: {
+      variant: "segments",
+      block: ["#A6F09C", "#37D52C", "#3AC22E"],
+      frame: { edge: "#686868", radius: 4, pad: 2, fill: "#FFFFFF" },
+    },
+  } as StyleOverrides;
+  // Slate with Classic two-ring bevels on the panel, buttons, check box, field and progress frame.
+  const BEVEL = { light: "#DFDFDF", dark: "#0A0A0A", innerLight: "#FFFFFF", innerDark: "#808080" };
+  const CLASSIC = {
+    panel: { bevel: BEVEL },
+    header: { variant: "classic", barStops: ["#000080", "#1084D0"], controlFace: "#C0C0C0" },
+    button: { variant: "classic", height: 30, bevel: BEVEL },
+    toggle: { variant: "check", checkBevel: BEVEL },
+    field: { bevel: BEVEL },
+    progress: { variant: "segments", frame: { fill: "#FFFFFF", pad: 2, bevel: BEVEL } },
+  } as StyleOverrides;
+  const white = { R: 1, G: 1, B: 1, A: 1 };
+  const black = { R: 0, G: 0, B: 0, A: 1 };
+
+  it("turns stops into a vertical or horizontal sRGB gradient", () => {
+    expect(stopsToCss([black, white], false)).toBe("linear-gradient(180deg, rgb(0, 0, 0), rgb(255, 255, 255))");
+    expect(stopsToCss([black, white], true)).toBe("linear-gradient(90deg, rgb(0, 0, 0), rgb(255, 255, 255))");
+    // Linear 0.21586 is sRGB 128 of 255, so a linear colour is converted, not painted as it is.
+    expect(stopsToCss([{ R: 0.21586, G: 0.21586, B: 0.21586, A: 1 }, white], false)).toContain("rgb(128, 128, 128)");
+  });
+
+  it("draws a raised bevel as light top and left lines and dark bottom and right lines, per ring", () => {
+    const bevel = { light: white, dark: black, innerLight: white, innerDark: black, width: 1 };
+    const lines = (css: string) => css.split(/, (?=inset)/);
+    const raised = bevelToCss(bevel, false);
+    expect(count(raised, /inset/g)).toBe(4);
+    expect(lines(raised)[0]).toBe("inset 1px 1px 0 0 rgb(255, 255, 255)");
+    expect(lines(raised)[1]).toBe("inset -1px -1px 0 0 rgb(0, 0, 0)");
+    expect(lines(raised)[2]).toBe("inset 2px 2px 0 0 rgb(255, 255, 255)");
+    // Sunken swaps light and dark in both rings.
+    expect(lines(bevelToCss(bevel, true))[0]).toBe("inset 1px 1px 0 0 rgb(0, 0, 0)");
+    // The inner ring needs both of its colours, and a bevel without light or dark is no bevel.
+    expect(count(bevelToCss({ light: white, dark: black, innerLight: white }, false), /inset/g)).toBe(2);
+    expect(bevelToCss({ width: 2 }, false)).toBe("none");
+  });
+
+  it("draws an xp style with a gradient title bar, 3 caption buttons and a status bar", () => {
+    const out = html("slate", XP);
+    expect(out).toContain("mm-header-xpbar");
+    expect(out).toMatch(/class="mm-band-window mm-band-xpbar" style="background:linear-gradient/);
+    expect(count(out, /class="mm-cap /g)).toBe(3);
+    expect(out).toContain('class="mm-status"');
+    expect(out).toContain("Ready");
+  });
+
+  it("draws only the close button when header.captions is close", () => {
+    const closeOnly = { ...XP, header: { ...XP_HEADER, captions: "close" } } as StyleOverrides;
+    expect(count(html("slate", closeOnly), /class="mm-cap /g)).toBe(1);
+  });
+
+  it("gives classic buttons a two-ring bevel and a sunken pressed look", () => {
+    const look = buttonLook(previewStyle(resolve("slate", CLASSIC)), { variant: "primary" });
+    expect(look.className).toContain("mm-variant-button-classic");
+    expect(count(String(look.style.boxShadow), /inset/g)).toBe(4);
+    expect(look.style.minHeight).toBe("30px");
+    expect(look.style["--mm-btn-pressed-shadow"]).toBeDefined();
+    expect(look.style["--mm-btn-pressed-shadow"]).not.toBe(look.style.boxShadow);
+    const out = html("slate", CLASSIC);
+    expect(out).toContain("mm-header-classic");
+    expect(out).toContain("mm-pr-frame");
+  });
+
+  it("gives an xp button a face gradient, its edge, and the default ring only on primary", () => {
+    const ps = previewStyle(resolve("slate", XP));
+    const primary = buttonLook(ps, { variant: "primary" });
+    const secondary = buttonLook(ps, { variant: "secondary" });
+    expect(String(primary.style.background)).toContain("linear-gradient");
+    expect(String(primary.style.boxShadow)).toContain("rgb(140, 180, 240)");
+    expect(String(secondary.style.boxShadow)).not.toContain("rgb(140, 180, 240)");
+    // Hover drops the default ring and adds the glow, #F8B33A.
+    expect(String(primary.style["--mm-btn-hover-shadow"])).toContain("rgb(248, 179, 58)");
+    expect(String(primary.style["--mm-btn-hover-shadow"])).not.toContain("rgb(140, 180, 240)");
+    expect(String(primary.style["--mm-btn-pressed"])).toContain("linear-gradient");
+  });
+
+  it("keeps a pill over a radius and an xp or classic button without its table as a fill", () => {
+    const custom = { ...XP, button: { ...XP_BUTTON, radius: 2, pill: true } } as StyleOverrides;
+    expect(buttonLook(previewStyle(resolve("slate", custom)), {}).style.borderRadius).toBe("999px");
+    const plain = buttonLook(previewStyle(resolve("slate", { button: { variant: "classic" } })), {});
+    expect(plain.className).toContain("mm-variant-button-fill");
+  });
+
+  it("draws mac-light with 3 traffic lights and no band", () => {
+    const out = html("mac-light");
+    expect(out).toContain("mm-header-mac");
+    expect(count(out, /class="mm-light /g)).toBe(3);
+    expect(out).not.toContain("mm-band-window");
+  });
+
+  it("draws window captions with a close control", () => {
+    const out = html("slate", { header: { variant: "window" } } as StyleOverrides);
+    expect(count(out, /class="mm-cap /g)).toBe(3);
+    expect(out).toContain("mm-cap-close");
+  });
+
+  it("draws the terminal's scanlines, the hologram's sweep and the frost's glints, still", () => {
+    expect(html("terminal")).toContain("mm-fx-scan");
+    expect(html("terminal")).toContain("mm-cursor");
+    const holo = html("hologram");
+    expect(holo).toContain("mm-fx-scan");
+    expect(holo).toContain("mm-fx-sweep");
+    expect(count(html("frost"), /class="mm-fx-sparkle"/g)).toBe(6);
+    expect(html("slate")).not.toContain("mm-fx-");
+    expect(html("light")).not.toContain("mm-fx-");
+  });
+
+  it("draws progress blocks as gradients and frames the trough", () => {
+    const out = html("slate", XP);
+    expect(out).toMatch(/class="mm-pr-seg"[^>]*linear-gradient/);
+    expect(out).toContain("mm-pr-frame");
+  });
+
+  it("draws a bevelled check box, field and panel with classic bevels", () => {
+    const vars = styleVars(resolve("slate", CLASSIC));
+    expect(vars["--mm-toggle-check-bevel"]).toContain("inset");
+    expect(vars["--mm-field-bevel"]).toContain("inset");
+    expect(vars["--mm-panel-shadow"]).toContain("inset");
+  });
+});
+
 describe("MenuPreview", () => {
   const doc = fullDocument();
 
@@ -172,6 +323,11 @@ describe("MenuPreview", () => {
     expect(html).not.toContain("mm-panel-themed");
     expect(html).not.toContain("mm-btn-shaped");
     expect(html).toContain("mm-variant-toggle-stock");
+  });
+
+  it.each(["light", "dark"])("draws %s with the same markup as before stage 2", (id) => {
+    // The snapshot was taken before stage 2's preview code, so a change to it shows as a diff here.
+    expect(renderToStaticMarkup(<MenuPreview document={doc} theme={id} />)).toMatchSnapshot();
   });
 
   it.each([...PRESET_ORDER])("draws %s with every item type", (id) => {

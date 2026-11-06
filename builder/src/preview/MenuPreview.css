@@ -932,7 +932,8 @@
   justify-content: center;
   border-radius: var(--mm-toggle-box-radius);
   background: var(--mm-toggle-check-off);
-  box-shadow: inset 0 0 0 var(--mm-toggle-check-edge-width) var(--mm-toggle-check-edge);
+  /* A sunken bevel, when the theme gives one, sits over the edge (Windows Classic). */
+  box-shadow: var(--mm-toggle-check-bevel, inset 0 0 0 0 transparent), inset 0 0 0 var(--mm-toggle-check-edge-width) var(--mm-toggle-check-edge);
   color: var(--mm-toggle-check-mark);
   font-size: 14px;
   line-height: 1;
@@ -940,7 +941,7 @@
 
 .mm-tg-check.is-on {
   background: var(--mm-toggle-check-on);
-  box-shadow: inset 0 0 0 var(--mm-toggle-check-edge-width) var(--mm-toggle-check-edge-on);
+  box-shadow: var(--mm-toggle-check-bevel, inset 0 0 0 0 transparent), inset 0 0 0 var(--mm-toggle-check-edge-width) var(--mm-toggle-check-edge-on);
 }
 
 .mm-tg-text {
@@ -1171,13 +1172,13 @@
    keybind chip take the field's fill, outline and radius; list options wash in the list hover. */
 .mm-variant-field-frame .mm-field-box {
   border-radius: var(--mm-field-radius);
-  box-shadow: inset 0 0 0 var(--mm-field-width) var(--mm-field-outline);
+  box-shadow: var(--mm-field-bevel, inset 0 0 0 0 transparent), inset 0 0 0 var(--mm-field-width) var(--mm-field-outline);
   padding: 5px 10px;
 }
 
 .mm-variant-field-frame .mm-drop-header {
   border-radius: var(--mm-field-radius);
-  box-shadow: inset 0 0 0 var(--mm-field-width) var(--mm-field-outline);
+  box-shadow: var(--mm-field-bevel, inset 0 0 0 0 transparent), inset 0 0 0 var(--mm-field-width) var(--mm-field-outline);
 }
 
 .mm-variant-field-frame .mm-drop-list {
@@ -1194,7 +1195,7 @@
   border-radius: var(--mm-field-radius);
   background: var(--mm-field-bg);
   color: var(--mm-field-text);
-  box-shadow: inset 0 0 0 var(--mm-field-width) var(--mm-field-outline);
+  box-shadow: var(--mm-field-bevel, inset 0 0 0 0 transparent), inset 0 0 0 var(--mm-field-width) var(--mm-field-outline);
 }
 
 /* Section headers (shell/collapse.lua): label is the caption in the section text style, rule adds a
@@ -1347,4 +1348,431 @@
 .mm-stepper-themed .mm-stepper-btn {
   padding: 2px 10px;
   cursor: pointer;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Stage 2 looks: layered buttons, window frames, the status bar, progress frames and still effects.
+   Everything here draws standing still.
+   --------------------------------------------------------------------------------------------- */
+
+/* Windows XP and Classic buttons (Button.States): hover and pressed swap the shadow as well as the
+   background, because the edge, rings and bevels are shadows. Classic moves its caption one unit down and
+   right while pressed, as the library's shift does. */
+.mm-btn-layered:hover:not(:disabled) {
+  box-shadow: var(--mm-btn-hover-shadow) !important;
+}
+
+.mm-btn-layered:active:not(:disabled) {
+  box-shadow: var(--mm-btn-pressed-shadow) !important;
+}
+
+.mm-variant-button-classic:active:not(:disabled) {
+  padding: 8px 9px 6px 11px;
+}
+
+/* A progress trough inside its frame (Progress.FrameSpec): the frame's own style carries the pad, fill,
+   radius and shadows, and the bar keeps its width inside it. */
+.mm-pr-frame {
+  display: block;
+  flex: 0 0 auto;
+  box-sizing: content-box;
+}
+
+/* Window frames (shell/chrome.lua). The title bar sits across the top of the panel; every cross is two bars. */
+.mm-band-window {
+  --mm-glyph: var(--mm-text);
+  display: flex;
+  align-items: flex-start;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+}
+
+.mm-band-window .mm-band-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  align-self: center;
+}
+
+.mm-caps {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-start;
+}
+
+.mm-cap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+  background: transparent;
+}
+
+.mm-cross {
+  position: relative;
+  display: block;
+  width: 0;
+  height: 0;
+}
+
+.mm-cross b {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--mm-cross-len, 13px);
+  height: var(--mm-cross-thick, 1px);
+  margin: calc(var(--mm-cross-thick, 1px) / -2) 0 0 calc(var(--mm-cross-len, 13px) / -2);
+  background: var(--mm-glyph);
+  transform: rotate(45deg);
+}
+
+.mm-cross b + b {
+  transform: rotate(-45deg);
+}
+
+.mm-g-min,
+.mm-g-max,
+.mm-g-plus {
+  display: block;
+  box-sizing: border-box;
+}
+
+.mm-g-min {
+  width: var(--mm-min-w, 10px);
+  height: var(--mm-min-h, 1px);
+  background: var(--mm-glyph);
+}
+
+.mm-g-max {
+  width: var(--mm-max-size, 10px);
+  height: var(--mm-max-size, 10px);
+  border: 1px solid var(--mm-glyph);
+}
+
+/* Windows 11: full-height buttons flush with the top edge. Close turns red with a white cross. */
+.mm-band-window {
+  height: 32px;
+}
+
+.mm-band-window .mm-band-title {
+  padding: 0 10px 0 14px;
+  font-size: calc(var(--mm-font-item) - 2px);
+  color: var(--mm-text);
+}
+
+.mm-band-window .mm-cap {
+  width: 46px;
+  height: 32px;
+}
+
+.mm-band-window .mm-cap:hover {
+  background: var(--mm-cap-hover);
+}
+
+.mm-band-window .mm-cap:active {
+  background: var(--mm-cap-press);
+}
+
+.mm-band-window .mm-cap-close {
+  border-radius: var(--mm-cap-close-radius, 0);
+}
+
+.mm-band-window .mm-cap-close:hover {
+  --mm-glyph: #fff;
+  background: rgb(196, 43, 28);
+}
+
+.mm-band-window .mm-cap-close:active {
+  --mm-glyph: #fff;
+  background: rgba(196, 43, 28, 0.9);
+}
+
+/* Windows XP: a glossy bar rounded at the top, bubble caption buttons with a white ring and shine. */
+.mm-band-xpbar {
+  --mm-glyph: #fff;
+  --mm-cross-thick: 2px;
+  --mm-min-w: 7px;
+  --mm-min-h: 3px;
+  --mm-max-size: 10px;
+  height: 30px;
+  align-items: center;
+  padding: 5px 6px 5px 10px;
+  background: var(--mm-band-fill);
+  border-radius: var(--mm-band-radius, 0);
+}
+
+.mm-band-xpbar .mm-band-title {
+  padding: 0;
+  font-size: var(--mm-font-title);
+  color: #fff;
+  text-shadow: var(--mm-band-title-shadow, none);
+}
+
+.mm-band-xpbar .mm-caps {
+  align-items: center;
+}
+
+.mm-band-xpbar .mm-cap {
+  width: 21px;
+  height: 21px;
+  margin-left: 2px;
+  border-radius: 3px;
+  background: var(--mm-cap-xp);
+}
+
+.mm-band-xpbar .mm-cap::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px #fff;
+}
+
+.mm-band-xpbar .mm-cap-close {
+  background: var(--mm-cap-xp-close);
+}
+
+.mm-band-xpbar .mm-cap:hover {
+  background: var(--mm-cap-xp-hover);
+}
+
+.mm-band-xpbar .mm-cap-close:hover {
+  background: var(--mm-cap-xp-close-hover);
+}
+
+.mm-band-xpbar .mm-cap:active {
+  background: var(--mm-cap-xp-pressed);
+}
+
+.mm-band-xpbar .mm-cap-close:active {
+  background: var(--mm-cap-xp-close-pressed);
+}
+
+.mm-cap-shine {
+  position: absolute;
+  left: 3px;
+  top: 2px;
+  width: 11px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.mm-band-xpbar .mm-g-min {
+  align-self: flex-end;
+  margin: 0 0 5px -4px;
+}
+
+.mm-band-xpbar .mm-g-max {
+  border-top-width: 3px;
+}
+
+/* Windows Classic: a left-to-right bar and small raised caption buttons that sink when pressed. */
+.mm-band-classic {
+  --mm-glyph: var(--mm-cap-ink);
+  --mm-cross-len: 12px;
+  --mm-cross-thick: 2px;
+  --mm-min-w: 7px;
+  --mm-min-h: 2px;
+  --mm-max-size: 7px;
+  height: 20px;
+  align-items: center;
+  margin: var(--mm-band-inset, 0);
+  padding: 2px 3px 2px 6px;
+  background: var(--mm-band-fill);
+}
+
+.mm-band-classic .mm-band-title {
+  padding: 0;
+  font-size: var(--mm-font-title);
+  color: #fff;
+}
+
+.mm-band-classic .mm-caps {
+  align-items: center;
+}
+
+.mm-band-classic .mm-cap {
+  width: 16px;
+  height: 14px;
+  background: var(--mm-cap-face);
+  box-shadow: var(--mm-cap-bevel);
+}
+
+.mm-band-classic .mm-cap-close {
+  margin-left: 2px;
+}
+
+.mm-band-classic .mm-cap:active {
+  box-shadow: var(--mm-cap-bevel-pressed);
+}
+
+.mm-band-classic .mm-cap:active > * {
+  transform: translate(1px, 1px);
+}
+
+/* macOS: the lights on the left and the title centred over the whole bar. A symbol shows on all three
+   lights while any one is hovered. */
+.mm-mac-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  margin-bottom: 8px;
+}
+
+.mm-mac-bar .mm-mac-title {
+  margin: 0;
+  flex: 0 1 auto;
+}
+
+.mm-lights {
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  display: flex;
+  gap: 8px;
+  transform: translateY(-50%);
+}
+
+.mm-light {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 999px;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.mm-light-close {
+  --mm-glyph: #4d0000;
+  --mm-cross-len: 10px;
+  --mm-cross-thick: 1.5px;
+  background: #ff5f57;
+}
+
+.mm-light-min {
+  --mm-glyph: #995700;
+  --mm-min-w: 6px;
+  --mm-min-h: 1.5px;
+  background: #febc2e;
+}
+
+.mm-light-max {
+  --mm-glyph: #006500;
+  background: #28c840;
+}
+
+.mm-light:active {
+  filter: brightness(0.82);
+}
+
+.mm-light > * {
+  visibility: hidden;
+}
+
+.mm-lights:hover .mm-light > * {
+  visibility: visible;
+}
+
+.mm-g-plus {
+  position: relative;
+  width: 6px;
+  height: 1.5px;
+  background: var(--mm-glyph);
+}
+
+.mm-g-plus::after {
+  content: "";
+  position: absolute;
+  left: 2.25px;
+  top: -2.25px;
+  width: 1.5px;
+  height: 6px;
+  background: var(--mm-glyph);
+}
+
+.mm-frame-hint {
+  margin: 8px 0 10px;
+}
+
+.mm-frame-hint-center {
+  margin: 0 0 10px;
+  text-align: center;
+}
+
+/* The status bar (Chrome.StatusBar): a dividing line and a short message along the bottom edge. */
+.mm-status {
+  flex: 0 0 auto;
+  padding: 3px 8px 4px;
+  border-top: 1px solid var(--mm-status-line);
+  background: var(--mm-status-fill);
+  font-size: calc(var(--mm-font-item) - 2px);
+  color: var(--mm-text);
+}
+
+/* The bar header's cursor block follows the titles, and a spacer keeps Close on the right. */
+.mm-cursor {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 20px;
+  margin: 2px 0 0 8px;
+}
+
+.mm-band-spacer {
+  flex: 1;
+}
+
+.mm-band-bar.has-cursor .mm-band-titles {
+  flex: 0 1 auto;
+}
+
+/* The drawn effects (shell/effects.lua) sit over the panel and let clicks through. Scanlines run inside
+   the panel's outline, and the sweep and noise are one still band each. */
+.mm-fx {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.mm-fx-scan {
+  position: absolute;
+  inset: calc(var(--mm-panel-width) + 1px);
+}
+
+.mm-fx-sweep {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 30%;
+}
+
+.mm-fx-sweep span {
+  display: block;
+}
+
+.mm-fx-noise {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 62%;
+  height: 30px;
+}
+
+.mm-fx-sparkle {
+  position: absolute;
+  border-radius: 999px;
+  background: #fff;
+  opacity: 0.9;
 }

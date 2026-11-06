@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { ButtonItem, DockSide, MenuDocument, ThemeName } from "../schema";
 import { barColors, headerVariant, styleVars } from "../theme/css";
+import { EffectsLayer, MacHeader, StatusBar, WindowBand } from "./frames";
 import { ChoiceStrip, PreviewItem, type PreviewActions } from "./Items";
 import {
   buttonLook,
@@ -119,6 +120,20 @@ function hintText(document: MenuDocument): string {
 function Header({ document, variant }: { document: MenuDocument; variant: string }) {
   const ps = usePreviewStyle();
   const title = document.init.title;
+  // The window frames keep the hint as the first line of the content, under the title bar. The macOS
+  // frame puts the lights and the title in a row and centres the hint (Build.Header).
+  if (variant === "window" || variant === "xpbar" || variant === "classic") {
+    return <p className="mm-hint mm-frame-hint">{hintText(document)}</p>;
+  }
+  if (variant === "mac") {
+    return (
+      <>
+        <MacHeader title={title} />
+        <p className="mm-hint mm-frame-hint mm-frame-hint-center">{hintText(document)}</p>
+        {ps.resolved.header.line !== undefined && <div className="mm-header-line" />}
+      </>
+    );
+  }
   const close = closeLook(ps);
   const closeButton = (
     <button type="button" className={`mm-btn mm-btn-inline mm-close ${close.className}`} style={close.style}>
@@ -164,16 +179,27 @@ function TopBand({ document, variant }: { document: MenuDocument; variant: strin
   if (variant === "strip") {
     return <div className="mm-band-strip" aria-hidden="true" />;
   }
+  if (variant === "window" || variant === "xpbar" || variant === "classic") {
+    return <WindowBand title={document.init.title} variant={variant} />;
+  }
   if (variant !== "bar") {
     return null;
   }
+  const cursor = ps.resolved.motion?.cursor === true;
   const close = closeLook(ps, barColors(ps.resolved).text);
   return (
-    <div className="mm-band-bar">
+    <div className={`mm-band-bar${cursor ? " has-cursor" : ""}`}>
       <div className="mm-band-titles">
         <h2 className="mm-title">{document.init.title}</h2>
         <p className="mm-hint">{hintText(document)}</p>
       </div>
+      {cursor && (
+        // The cursor block follows the titles, and a spacer keeps Close at the right edge (Effects.Cursor).
+        <>
+          <span className="mm-cursor" style={{ background: ps.css(ps.resolved.palette.accentText) }} aria-hidden="true" />
+          <span className="mm-band-spacer" />
+        </>
+      )}
       <button type="button" className={`mm-btn mm-btn-inline mm-close ${close.className}`} style={close.style}>
         Close
       </button>
@@ -198,21 +224,15 @@ export function MenuPreview({
   const tabsLook = choiceLook(ps, "tabs", undefined);
   const tabs = document.init.tabs;
   const dock = document.init.dock;
-  const [activeTab, setActiveTab] = useState(tabs?.[0] ?? null);
+  const [chosenTab, setActiveTab] = useState(tabs?.[0] ?? null);
+  // The tab in use is the chosen one while it still exists, else the first, so a changed tab list needs no effect.
+  const activeTab = tabs && tabs.length > 0 ? (chosenTab && tabs.includes(chosenTab) ? chosenTab : tabs[0]) : null;
   const [collapsed, setCollapsed] = useState(() => seedCollapsed(document));
   const [foldCollapsed, setFoldCollapsed] = useState(() => seedFolds(document));
   const [checks, setChecks] = useState(() => seedChecks(document));
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [dockOpen, setDockOpen] = useState(false);
   const [confirm, setConfirm] = useState<ButtonItem | null>(null);
-
-  useEffect(() => {
-    if (!tabs || tabs.length === 0) {
-      setActiveTab(null);
-      return;
-    }
-    setActiveTab((current) => (current && tabs.includes(current) ? current : tabs[0]));
-  }, [tabs]);
 
   const visible = useMemo(() => {
     return document.sections.filter((section) => {
@@ -376,6 +396,8 @@ export function MenuPreview({
           })}
           <div className="mm-foot" />
         </div>
+        <StatusBar ps={ps} />
+        <EffectsLayer />
         {ps.resolved.panel.corners === true && (
           <>
             <span className="mm-corner mm-corner-tl" aria-hidden="true" />

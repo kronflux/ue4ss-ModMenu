@@ -365,19 +365,27 @@ function MmProgress({ item }: { item: ProgressItem }) {
   if (pr.variant === "bar" || pr.variant === "segments") {
     const n = pr.segmentColors.length;
     const lit = segmentsLit(value, low, high, n);
+    const trough =
+      pr.variant === "bar" ? (
+        <span className="mm-pr-bar">
+          <span className="mm-pr-fill" style={{ width: `${fraction * 100}%`, background: pr.fill }} />
+        </span>
+      ) : (
+        <span className="mm-pr-segments">
+          {pr.segmentColors.map((color, i) => (
+            <span key={i} className="mm-pr-seg" style={i < lit ? { background: pr.block ?? color } : undefined} />
+          ))}
+        </span>
+      );
     return (
       <div className={`mm-progress ${variantClass("progress", pr.variant)}`} style={lookVars(ps, "progress", item.look)}>
         <span className="mm-progress-label">{item.label}</span>
-        {pr.variant === "bar" ? (
-          <span className="mm-pr-bar">
-            <span className="mm-pr-fill" style={{ width: `${fraction * 100}%`, background: pr.fill }} />
+        {pr.frame ? (
+          <span className={`mm-pr-frame mm-pr-frame-${pr.frame.kind}`} style={pr.frame.style}>
+            {trough}
           </span>
         ) : (
-          <span className="mm-pr-segments">
-            {pr.segmentColors.map((color, i) => (
-              <span key={i} className="mm-pr-seg" style={i < lit ? { background: color } : undefined} />
-            ))}
-          </span>
+          trough
         )}
         <span className="mm-progress-readout">{text}</span>
       </div>

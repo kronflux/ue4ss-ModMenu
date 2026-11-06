@@ -2,7 +2,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { FIELDS } from "./fields.generated";
-import { PRESET_ORDER } from "./presets.generated";
+import { PRESETS, PRESET_ORDER } from "./presets.generated";
 import { OBJECT_TYPES, forItem, legacyColors, resolve, type ResolvedStyle } from "./resolve";
 import { DARK, LIGHT, PANEL_PAD, THEME_KEYS, preset } from "./tokens";
 
@@ -11,8 +11,16 @@ const REPO = new URL("../../../", import.meta.url);
 const FIXTURE_DIR = new URL("tooling/lua/fixtures/style/", REPO);
 
 type Fixture = {
-  input: { theme?: unknown; style?: unknown; colors?: unknown; look?: Record<string, unknown>; lookType?: string };
+  input: {
+    theme?: unknown;
+    style?: unknown;
+    colors?: unknown;
+    look?: Record<string, unknown>;
+    lookType?: string;
+    presets?: Record<string, unknown>;
+  };
   expect: Record<string, unknown>;
+  absent?: string[];
 };
 
 function fixtureNames(): string[] {
@@ -84,19 +92,37 @@ describe("resolve against the shared style fixtures", () => {
 
   for (const name of fixtureNames()) {
     it(`style fixture ${name}`, () => {
-      const { input, expect: want } = readFixture(name);
-      const resolved = resolve(
-        input.theme as Parameters<typeof resolve>[0],
-        input.style as Parameters<typeof resolve>[1],
-        input.colors as Parameters<typeof resolve>[2],
-      ) as ResolvedStyle & Record<string, unknown>;
+      const { input, expect: want, absent } = readFixture(name);
+      // A fixture may name temporary presets, because no shipped preset holds every stage 2 kind.
+      // They are registered for this resolve only and removed straight after it.
+      const registry = PRESETS as Record<string, unknown>;
+      const temporary = Object.keys(input.presets ?? {});
+      for (const id of temporary) {
+        registry[id] = input.presets?.[id];
+      }
+      let resolved: ResolvedStyle & Record<string, unknown>;
+      try {
+        resolved = resolve(
+          input.theme as Parameters<typeof resolve>[0],
+          input.style as Parameters<typeof resolve>[1],
+          input.colors as Parameters<typeof resolve>[2],
+        ) as ResolvedStyle & Record<string, unknown>;
+      } finally {
+        for (const id of temporary) {
+          delete registry[id];
+        }
+      }
       if (input.look !== undefined && input.lookType !== undefined) {
         resolved[input.lookType] = forItem(resolved, input.lookType, input.look);
       }
-      const mismatches = Object.keys(want)
-        .sort()
-        .filter((path) => !near(getPath(resolved, path), want[path]))
-        .map((path) => `${path} = ${JSON.stringify(round4(getPath(resolved, path)))}`);
+      const mismatches = [
+        ...Object.keys(want)
+          .sort()
+          .filter((path) => !near(getPath(resolved, path), want[path]))
+          .map((path) => `${path} = ${JSON.stringify(round4(getPath(resolved, path)))}`),
+        // A path listed under `absent` must resolve to nothing, as a borrowed field with no keys left does.
+        ...(absent ?? []).filter((path) => getPath(resolved, path) !== undefined).map((path) => `${path} should be absent`),
+      ];
       expect(mismatches, name).toEqual([]);
     });
   }
@@ -131,6 +157,31 @@ describe("resolve", () => {
     expect(() => resolve("slate", { button: { wobble: 1 } })).toThrow("style.button.wobble: unknown field");
     expect(() => resolve("slate", { button: { radius: "big" } })).toThrow("style.button.radius: must be radius");
     expect(() => resolve("slate", { button: "nope" })).toThrow("style.button: unknown preset nope");
+  });
+
+  it("turns the open, pop and shake motions off for light and dark and on for slate", () => {
+    for (const id of ["light", "dark"]) {
+      const motion = resolve(id).motion;
+      expect([motion.open, motion.pop, motion.shake], id).toEqual([false, false, false]);
+    }
+    const motion = resolve("slate").motion;
+    expect([motion.open, motion.pop, motion.shake]).toEqual([true, true, true]);
+  });
+
+  it("shows every caption control unless a theme says only the close control", () => {
+    expect(resolve("slate").header.captions).toBe("all");
+    expect(resolve("light").header.captions).toBe("all");
+  });
+
+  it("gives a look bevel the default width", () => {
+    const look = { bevel: { light: "#FFFFFF", dark: "#000000" } };
+    expect(forItem(resolve("slate"), "field", look).bevel.width).toBe(1);
+  });
+
+  it("sets no button height unless a theme does, and fills a bevel's default width", () => {
+    expect(resolve("slate").button.height).toBeUndefined();
+    const bevel = { light: "#FFFFFF", dark: "#000000" };
+    expect(resolve("slate", { panel: { bevel } }).panel.bevel.width).toBe(1);
   });
 
   it("copies a free-form table's __proto__ key as an own key, not as the prototype", () => {
