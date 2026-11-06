@@ -1,0 +1,27 @@
+{
+  "input": { "theme": "light" },
+  "expect": {
+    "id": "light",
+    "panel.fill": { "R": 0.05, "G": 0.07, "B": 0.12, "A": 0.92 },
+    "panel.outline": { "R": 0.05, "G": 0.07, "B": 0.12, "A": 0.92 },
+    "panel.radius": 0,
+    "panel.width": 0,
+    "panel.blurRadius": 0,
+    "panel.pad": [20, 18, 20, 18],
+    "button.variant": "fill",
+    "button.radius": 0,
+    "button.width": 0,
+    "button.roles.primary.fill": { "R": 0.05, "G": 0.43, "B": 0.99, "A": 1 },
+    "button.roles.warning.text": { "R": 0.08, "G": 0.09, "B": 0.1, "A": 1 },
+    "button.roles.active.fill": { "R": 0.12, "G": 0.4, "B": 0.28, "A": 1 },
+    "field.fill": { "R": 0.88, "G": 0.9, "B": 0.94, "A": 1 },
+    "field.headerFill": { "R": 0.22, "G": 0.28, "B": 0.4, "A": 1 },
+    "list.more": { "R": 0.7, "G": 0.75, "B": 0.85, "A": 1 },
+    "confirm.dim": { "R": 0.02, "G": 0.03, "B": 0.05, "A": 0.62 },
+    "tooltip.fill": { "R": 0.24, "G": 0.3, "B": 0.45, "A": 0.98 },
+    "data.statusColor": { "R": 0.83, "G": 0.69, "B": 0.22, "A": 1 },
+    "toggle.variant": "stock",
+    "toggle.radius": 0,
+    "section.variant": "stock"
+  }
+}

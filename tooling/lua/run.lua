@@ -153,6 +153,8 @@ local specs = {
     "run_json_spec.lua",
     "widgets_number_spec.lua",
     "theme_spec.lua",
+    "style_spec.lua",
+    "paint_spec.lua",
     "widgets_spec.lua",
     "widgets_slider_spec.lua",
     "widgets_stepper_spec.lua",

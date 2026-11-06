@@ -1,0 +1,14 @@
+{
+  "input": { "theme": "slate", "style": { "button": "light", "title": "light" } },
+  "expect": {
+    "button.radius": 0,
+    "button.width": 0,
+    "button.pill": false,
+    "button.roles.primary.fill": { "R": 0.0723, "G": 0.2664, "B": 1, "A": 1 },
+    "button.roles.primary.text": { "R": 1, "G": 1, "B": 1, "A": 1 },
+    "button.roles.default.fill": { "R": 0.0232, "G": 0.0284, "B": 0.0409, "A": 1 },
+    "button.roles.danger.fill": { "R": 0.7835, "G": 0.0648, "B": 0.0742, "A": 1 },
+    "title.color": { "R": 0.7991, "G": 0.8148, "B": 0.855, "A": 1 },
+    "panel.radius": 14
+  }
+}

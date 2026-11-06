@@ -1,0 +1,25 @@
+{
+  "input": {
+    "theme": {
+      "name": "Mine",
+      "base": "slate",
+      "palette": { "accent": "#00AAFF" },
+      "button": { "radius": 3 },
+      "parts": { "toggle": "light" }
+    }
+  },
+  "expect": {
+    "id": "custom",
+    "name": "Mine",
+    "palette.accent": { "R": 0, "G": 0.402, "B": 1, "A": 1 },
+    "palette.bg": { "R": 0.0116, "G": 0.0137, "B": 0.0194, "A": 0.9686 },
+    "panel.radius": 14,
+    "button.radius": 3,
+    "button.roles.primary.fill": { "R": 0, "G": 0.402, "B": 1, "A": 1 },
+    "choice.radius": 3,
+    "toggle.variant": "stock",
+    "toggle.radius": 0,
+    "toggle.trackOff": { "R": 0.1849, "G": 0.19, "B": 0.2032, "A": 0.9755 },
+    "toggle.trackOn": { "R": 0, "G": 0.402, "B": 1, "A": 1 }
+  }
+}

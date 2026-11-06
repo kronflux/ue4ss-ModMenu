@@ -1,0 +1,13 @@
+{
+  "input": { "theme": "dark", "style": { "panel": { "from": "slate", "radius": 6, "fill": "#102030" } } },
+  "expect": {
+    "id": "dark",
+    "panel.radius": 6,
+    "panel.blurRadius": 3,
+    "panel.pad": 18,
+    "panel.fill": { "R": 0.0052, "G": 0.0144, "B": 0.0296, "A": 1 },
+    "panel.outline": { "R": 0.3, "G": 0.3, "B": 0.32, "A": 1 },
+    "panel.shadowLayers": [[0.3, 3], [0.2, 7], [0.1, 12]],
+    "button.radius": 0
+  }
+}

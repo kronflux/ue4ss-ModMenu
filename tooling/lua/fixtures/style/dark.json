@@ -1,0 +1,23 @@
+{
+  "input": { "theme": "dark" },
+  "expect": {
+    "id": "dark",
+    "panel.fill": { "R": 0.11, "G": 0.11, "B": 0.12, "A": 0.9 },
+    "panel.outline": { "R": 0.62, "G": 0.62, "B": 0.64, "A": 0.9 },
+    "panel.radius": 0,
+    "panel.width": 0,
+    "panel.pad": [16, 14, 16, 14],
+    "button.variant": "fill",
+    "button.radius": 0,
+    "button.roles.default.fill": { "R": 0.2, "G": 0.2, "B": 0.21, "A": 1 },
+    "button.roles.info.text": { "R": 0.9, "G": 0.98, "B": 0.98, "A": 1 },
+    "button.roles.disabled.text": { "R": 0.4, "G": 0.4, "B": 0.42, "A": 1 },
+    "field.fill": { "R": 0.06, "G": 0.06, "B": 0.07, "A": 1 },
+    "list.fill": { "R": 0.08, "G": 0.08, "B": 0.09, "A": 1 },
+    "confirm.fill": { "R": 0.16, "G": 0.16, "B": 0.17, "A": 0.98 },
+    "tooltip.fill": { "R": 0.32, "G": 0.33, "B": 0.36, "A": 0.98 },
+    "palette.accent": { "R": 0.12, "G": 0.72, "B": 0.7, "A": 1 },
+    "toggle.variant": "stock",
+    "choice.variant": "stock"
+  }
+}
