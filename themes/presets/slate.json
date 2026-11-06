@@ -1,0 +1,54 @@
+{
+  "id": "slate",
+  "stage": 1,
+  "name": "Slate",
+  "subtitle": "Modern dark",
+  "footer": "Rounded shapes, native hover and pressed states, an offset shadow, Roboto.",
+  "palette": {
+    "bg": "#1C1F26F7",
+    "text": "#E7E9EE",
+    "muted": "#8A93A3",
+    "accent": "#4C8DFF",
+    "accentText": "#FFFFFF",
+    "danger": "#E5484D",
+    "surface": "#2A2F39",
+    "line": "#2D323C",
+    "track": "#2F3541"
+  },
+  "panel": {
+    "radius": 14,
+    "shadowColor": "#000000",
+    "shadowLayers": [
+      [
+        0.3,
+        3
+      ],
+      [
+        0.2,
+        7
+      ],
+      [
+        0.1,
+        12
+      ]
+    ]
+  },
+  "title": {
+    "font": "roboto",
+    "typeface": "Bold",
+    "size": 20
+  },
+  "body": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 14
+  },
+  "data": {
+    "font": "roboto",
+    "typeface": "Bold",
+    "size": 22
+  },
+  "toggle": {
+    "trackOff": "#3A404C"
+  }
+}

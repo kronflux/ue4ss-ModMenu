@@ -1,0 +1,148 @@
+{
+  "id": "dark",
+  "stage": 1,
+  "name": "Dark",
+  "subtitle": "Charcoal with teal and gold",
+  "footer": "A charcoal panel, dark fields and teal and gold accents, drawn flat and square.",
+  "palette": {
+    "bg": { "R": 0.11, "G": 0.11, "B": 0.12, "A": 0.9 },
+    "text": { "R": 0.92, "G": 0.92, "B": 0.93, "A": 1 },
+    "muted": { "R": 0.62, "G": 0.62, "B": 0.64, "A": 1 },
+    "accent": { "R": 0.12, "G": 0.72, "B": 0.7, "A": 1 },
+    "accentText": { "R": 0.06, "G": 0.06, "B": 0.07, "A": 1 },
+    "danger": { "R": 0.72, "G": 0.18, "B": 0.22, "A": 1 },
+    "dangerText": { "R": 1, "G": 1, "B": 1, "A": 1 },
+    "surface": { "R": 0.2, "G": 0.2, "B": 0.21, "A": 1 },
+    "line": { "R": 0.3, "G": 0.3, "B": 0.32, "A": 1 },
+    "track": { "R": 0.2, "G": 0.2, "B": 0.21, "A": 1 },
+    "secondaryText": { "R": 0.92, "G": 0.92, "B": 0.93, "A": 1 },
+    "success": { "R": 0.08, "G": 0.42, "B": 0.28, "A": 1 },
+    "warning": { "R": 0.9, "G": 0.68, "B": 0.1, "A": 1 },
+    "info": { "R": 0.08, "G": 0.52, "B": 0.58, "A": 1 }
+  },
+  "panel": {
+    "fill": { "R": 0.11, "G": 0.11, "B": 0.12, "A": 0.9 },
+    "outline": { "R": 0.62, "G": 0.62, "B": 0.64, "A": 0.9 },
+    "width": 0,
+    "radius": 0,
+    "pad": [16, 14, 16, 14],
+    "blur": 0,
+    "hardShadow": 0,
+    "rim": false,
+    "corners": false
+  },
+  "header": {
+    "variant": "stock"
+  },
+  "title": {
+    "color": { "R": 0.92, "G": 0.92, "B": 0.93, "A": 1 }
+  },
+  "section": {
+    "variant": "stock",
+    "fill": { "R": 0.16, "G": 0.16, "B": 0.17, "A": 1 },
+    "mark": { "R": 0.62, "G": 0.62, "B": 0.64, "A": 1 }
+  },
+  "body": {
+    "color": { "R": 0.92, "G": 0.92, "B": 0.93, "A": 1 }
+  },
+  "data": {
+    "statusColor": { "R": 0.83, "G": 0.69, "B": 0.22, "A": 1 }
+  },
+  "tabs": {
+    "variant": "stock",
+    "radius": 0,
+    "pill": false
+  },
+  "button": {
+    "variant": "fill",
+    "radius": 0,
+    "pill": false,
+    "width": 0,
+    "roles": {
+      "default": {
+        "fill": { "R": 0.2, "G": 0.2, "B": 0.21, "A": 1 },
+        "text": { "R": 0.92, "G": 0.92, "B": 0.93, "A": 1 }
+      },
+      "primary": {
+        "fill": { "R": 0.08, "G": 0.34, "B": 0.78, "A": 1 },
+        "text": { "R": 1, "G": 1, "B": 1, "A": 1 }
+      },
+      "secondary": {
+        "fill": { "R": 0.32, "G": 0.32, "B": 0.34, "A": 1 },
+        "text": { "R": 0.92, "G": 0.92, "B": 0.93, "A": 1 }
+      },
+      "success": {
+        "fill": { "R": 0.08, "G": 0.42, "B": 0.28, "A": 1 },
+        "text": { "R": 0.92, "G": 0.98, "B": 0.94, "A": 1 }
+      },
+      "danger": {
+        "fill": { "R": 0.72, "G": 0.18, "B": 0.22, "A": 1 },
+        "text": { "R": 1, "G": 1, "B": 1, "A": 1 }
+      },
+      "warning": {
+        "fill": { "R": 0.9, "G": 0.68, "B": 0.1, "A": 1 },
+        "text": { "R": 0.1, "G": 0.09, "B": 0.06, "A": 1 }
+      },
+      "info": {
+        "fill": { "R": 0.08, "G": 0.52, "B": 0.58, "A": 1 },
+        "text": { "R": 0.9, "G": 0.98, "B": 0.98, "A": 1 }
+      },
+      "active": {
+        "fill": { "R": 0.1, "G": 0.36, "B": 0.28, "A": 1 },
+        "text": { "R": 0.72, "G": 0.95, "B": 0.84, "A": 1 }
+      },
+      "disabled": {
+        "fill": { "R": 0.14, "G": 0.14, "B": 0.15, "A": 1 },
+        "text": { "R": 0.4, "G": 0.4, "B": 0.42, "A": 1 }
+      }
+    }
+  },
+  "toggle": {
+    "variant": "stock",
+    "radius": 0
+  },
+  "slider": {
+    "variant": "stock"
+  },
+  "progress": {
+    "variant": "stock",
+    "radius": 0
+  },
+  "choice": {
+    "variant": "stock",
+    "radius": 0,
+    "pill": false
+  },
+  "field": {
+    "variant": "stock",
+    "width": 0,
+    "radius": 0,
+    "pill": false,
+    "fill": { "R": 0.06, "G": 0.06, "B": 0.07, "A": 1 },
+    "text": { "R": 0.94, "G": 0.94, "B": 0.94, "A": 1 },
+    "hint": { "R": 0.5, "G": 0.5, "B": 0.52, "A": 1 },
+    "headerFill": { "R": 0.2, "G": 0.2, "B": 0.21, "A": 1 },
+    "headerText": { "R": 0.92, "G": 0.92, "B": 0.93, "A": 1 }
+  },
+  "list": {
+    "fill": { "R": 0.08, "G": 0.08, "B": 0.09, "A": 1 },
+    "text": { "R": 0.92, "G": 0.92, "B": 0.93, "A": 1 },
+    "more": { "R": 0.62, "G": 0.62, "B": 0.64, "A": 1 },
+    "radius": 0
+  },
+  "stepper": {
+    "radius": 0,
+    "pill": false
+  },
+  "tooltip": {
+    "fill": { "R": 0.32, "G": 0.33, "B": 0.36, "A": 0.98 },
+    "radius": 0,
+    "width": 0
+  },
+  "confirm": {
+    "fill": { "R": 0.16, "G": 0.16, "B": 0.17, "A": 0.98 },
+    "dim": { "R": 0.04, "G": 0.04, "B": 0.05, "A": 0.62 },
+    "divider": { "R": 0.3, "G": 0.3, "B": 0.32, "A": 1 },
+    "radius": 0
+  }
+}
