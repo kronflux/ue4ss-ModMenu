@@ -30,7 +30,7 @@ local getCursorMode = function()
     return "engine"
 end
 
----@param hooks { getMenuRoot: fun(): any, getIgnoreLook: fun(): boolean, isMenuOpen: fun(): boolean, getCursorMode?: fun(): string }
+---@param hooks { getMenuRoot: (fun(): any), getIgnoreLook: (fun(): boolean), isMenuOpen: (fun(): boolean), getCursorMode?: (fun(): string) }
 function M.Bind(hooks)
     getMenuRoot = hooks.getMenuRoot
     getIgnoreLook = hooks.getIgnoreLook

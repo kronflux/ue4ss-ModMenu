@@ -136,7 +136,8 @@ end
 ---@param item table
 ---@return table
 function Colorpicker._default(item)
-    return Colorpicker._coerce(item.default, item) or Colorpicker._coerce({ R = 1, G = 1, B = 1, A = 1 }, item)
+    -- Coercing a table never returns nil, so the white fallback always gives a colour.
+    return (Colorpicker._coerce(item.default, item) or Colorpicker._coerce({ R = 1, G = 1, B = 1, A = 1 }, item)) --[[@as table]]
 end
 
 local function SameColor(a, b)

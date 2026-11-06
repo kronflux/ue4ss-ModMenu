@@ -194,7 +194,7 @@ local function InstallConsoleCommand(opts)
 end
 
 --- Bind toggle + LMB once. Same backend for both.
----@param opts { backend: string, key: any, keyName: string, onToggle: function, onOpen?: function, onClose?: function, isMenuOpen: fun(): boolean, consoleCommand?: string }
+---@param opts { backend: string, key: any, keyName: string, onToggle: function, onOpen?: function, onClose?: function, isMenuOpen: (fun(): boolean), consoleCommand?: string }
 function M.Install(opts)
     if installed then
         return
