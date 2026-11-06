@@ -1163,8 +1163,11 @@ ModMenu.Init({
 | `material` | Material | Material Design, dark |
 | `monokai` | Monokai | The classic editor theme |
 | `nord` | Nord | Arctic, north-bluish |
-
-Ten more presets come in stage 2: Terminal, Hologram, Frost and the operating-system looks (Windows 11, macOS, Windows XP and Windows Classic). They need gradients, bevels and window chrome that stage 1 does not draw.
+| `terminal` | Terminal | Green phosphor with a blinking cursor |
+| `hologram` | Hologram | Projected glass with a sweep, scanlines and glitches |
+| `frost` | Frost | Ice with glints |
+| `mac-light` | macOS Light | Window with traffic lights |
+| `mac-dark` | macOS Dark | Window with traffic lights |
 
 `theme` also takes a theme definition table with the same shape as a preset file, so you can write a custom theme in code. `ModMenu.ResolveStyle(theme, style, colors)` returns the complete style that `Init` would draw, without building any widget, for tests and tools.
 
@@ -1189,9 +1192,62 @@ A theme is split into object types. Each type styles one kind of part, and `styl
 | `stepper` | `stepper` items |
 | `tooltip` | The tooltip card |
 | `confirm` | The confirm card and the dim overlay behind it |
-| `motion` | Animations, which come in stage 2 |
+| `motion` | Animations, listed under **Motion** below |
 
 The field names and kinds of every type are listed once, in `themes/fields.json`. An unknown type or field makes `Init` raise an error that names it.
+
+### Motion
+
+The `motion` type holds the animation switches. Each is a boolean.
+
+| Field | Effect | Default |
+|-------|--------|---------|
+| `open` | Sections fade in one after another when the menu opens | on for every preset except `light` and `dark` |
+| `pop` | A button pops slightly when clicked, and so does the close control | on for every preset except `light` and `dark` |
+| `shake` | The menu shakes when a `danger` button is clicked, including the confirm dialog's | on for every preset except `light` and `dark` |
+| `pulse` | The title pulses | set per preset; on in `neon` |
+| `cursor` | A cursor in the header blinks once a second | set per preset; on in `terminal` |
+| `glitch` | Interference bands and glitches appear at irregular times | set per preset; on in `hologram` |
+| `sparkle` | Glints come and go | set per preset; on in `frost` |
+
+Turn the default motion off with one table:
+
+```lua
+ModMenu.Init({
+    theme = "slate",
+    style = { motion = { open = false, pop = false, shake = false } },
+})
+```
+
+### Window frames and caption buttons
+
+`header.variant` picks the title bar. `window` draws a window title bar with caption buttons, `mac` draws traffic lights, `xpbar` draws the XP gradient bar, and `classic` draws the Windows 98 bar.
+
+The caption buttons do not move or resize the menu. Minimise and close both close it. Maximise shows its hover and pressed looks and makes the menu pop, without closing it. On `mac`, the red and yellow lights close the menu, the green light behaves like maximise, and all three show their symbols while the pointer is over any of them.
+
+Set `header.captions = "close"` to draw only the close button. The default is `"all"`.
+
+```lua
+ModMenu.Init({
+    theme = "slate",
+    style = { header = { variant = "window", captions = "close" } },
+})
+```
+
+### Fields for window frames, gradients and bevels
+
+These field kinds are new. Each is listed in `themes/fields.json`.
+
+- `stops`: a list of at least two colours, drawn as a gradient.
+- `bevel`: raised or sunken light and dark edge lines, with an optional inner ring.
+- `faces`: a fill and text colour for each button role.
+- `xpface`: an XP button's `edge`, `glow` and `defaultRing` colours, plus its `face` and `pressedFace` gradients.
+- `frame`: an outlined or bevelled box around a trough, with padding.
+- `statusbar`: a status strip with its fill, line and text.
+
+An override of a `bevel`, `frame`, `statusbar`, `xpface` or `faces` field merges key by key, so you change one key and keep the rest. An override of a `stops` field replaces the whole list.
+
+The `button` type has two new variants: `xp` and `classic`. Set `button.variant` in a theme to use one. `header.variant` takes `window`, `mac`, `xpbar` or `classic`, as above.
 
 ### Borrowing an object type from another preset
 
@@ -1356,7 +1412,7 @@ ModMenu.Init({
 })
 ```
 
-North-star look is the README hero shots (`ModMenuHero.png` / `ModMenuHero2.png`). `light` and `dark` draw flat colours; the other presets add rounded corners, outlines and blur (see **Themes and styles**), and bevels come in stage 2. 2-column grids and hover glow are optional leftovers in `vision.md`.
+North-star look is the README hero shots (`ModMenuHero.png` / `ModMenuHero2.png`). `light` and `dark` draw flat colours; the other presets add rounded corners, outlines, blur, gradients, bevels and window frames (see **Themes and styles**). 2-column grids and hover glow are optional leftovers in `vision.md`.
 
 Collapsible sections: `Register({ collapsible = true, collapsed = true })`. Nested groups: `{ type = "fold", id, label, items = { ... } }`. Tabs: `Init({ tabs = { "Cheats", "Give" } })` + `Register({ tab = "Cheats", ... })`.
 

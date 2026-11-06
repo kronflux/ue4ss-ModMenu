@@ -59,12 +59,21 @@ Each switch writes two lines. The lab writes `theme -> <id>`, and the library wr
 |---|---|---|
 | T1 | Press F7, then click the Theme tab | `[ModMenu] OPEN tag=ModMenuLab`; the dropdown shows `dark` |
 | T2 | Click `Next theme` | `theme -> slate`, then `[ModMenu] built theme=slate ...`; the menu stays open in Slate and the dropdown shows `slate` |
-| T3 | Click `Next theme` until the dropdown shows `dark` again, taking a screenshot of each preset | one `theme -> <id>` and one `built theme=<id>` line per click, for all 29 ids in order; no crash |
-| T4 | Pick `light` in the dropdown first, then click `Previous theme` | `theme -> nord`; the list wraps to the last preset |
+| T3 | Click `Next theme` until the dropdown shows `dark` again, taking a screenshot of each preset | one `theme -> <id>` and one `built theme=<id>` line per click, for every id from `ModMenu.Themes()` in order; no crash |
+| T4 | Pick `light` in the dropdown first, then click `Previous theme` | `theme -> mac-dark`; the list wraps to the last preset |
 | T5 | Pick `glass` in the dropdown | `theme -> glass`, then `built theme=glass ...` |
 | T6 | Pick `slate`, then `light`, and compare the two `built` lines | `ms` under 250 for slate; slate's `widgets` at most 3 times light's |
 | T7 | In each screenshot, check the buttons, toggles, choices and panel corners | no engine-default grey button, no light rim on a rounded shape, no blur outside the panel's corners |
 | T8 | In a preset that names a game font, such as `loadout`, read the log | at most one line per missing path per session, for any of the four paths the lab passes; none in Funnel Runners |
+| T9 | Click `Next theme` through `terminal`, `hologram`, `frost`, `mac-light` and `mac-dark` | one `theme -> <id>` and one `built theme=<id>` line per preset; no crash |
+| T10 | On `mac-light`, hover any traffic light, then click red, yellow and green in turn, reopening with F7 | all three show their symbols on hover; red and yellow log `CLOSED tag=ModMenuLab`; green logs nothing, the menu pops and stays open |
+| T11 | Watch `hologram` for 30 seconds, then `frost` for 30 seconds | hologram shows a sweep, scanlines and glitches at irregular times, and the menu stays clickable; frost glints come and go |
+| T12 | On `terminal`, watch the header cursor. On `neon`, watch the title | the cursor blinks once a second; the title pulses |
+| T13 | On a preset with motion, click `Shake test`, then any other button | `[ModMenuLab] shake test` and the menu shakes; any other button makes the menu pop slightly |
+| T14 | Switch to `hologram` and read the `built theme=hologram` line | `ms` under 250 |
+| T15 | On any preset except `light` and `dark`, open the tab with the most sections | sections fade in one after another with no visible stutter |
+| T16 | Check the values that need an in-game look: the macOS title bar's vertical position and `cozy` buttons at least 38 tall | each matches the intended look |
+| T17 | On `light` and `dark`, open the menu and click any button | nothing animates: no fade on open and no pop |
 
 ## Comparing runs
 

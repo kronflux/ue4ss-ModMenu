@@ -210,6 +210,10 @@ reg({
                 applyTheme(themeIndex + 1)
             end },
         } },
+        -- A danger button shows the danger-click shake. It logs one line and changes nothing else.
+        { type = "button", id = "theme_shake", label = "Shake test", variant = "danger", onClick = function()
+            say("shake test")
+        end },
     },
 })
 -- Autosave restores the dropdown's last value, but Init above drew START_THEME, so the dropdown is set back to match.
