@@ -8,10 +8,16 @@
   created on the first show, under the menu canvas, and reused for every item after that.
   Visibility changes only when the shown state changes, so a steady hover or no hover costs no
   SetVisibility call.
+
+  The card draws from the resolved tooltip style. A flat card is recoloured on every show, as it
+  always was. A rounded or outlined card is written into its brush when the widget is built and is
+  never recoloured, because a recoloured rounded brush shows a rim (field note 30); the widget is
+  built again when the canvas or the resolved style changes.
 ]]
 
 local Util = require("ModMenu.core.util")
 local Umg = require("ModMenu.core.umg")
+local Paint = require("ModMenu.core.paint")
 local Theme = require("ModMenu.core.theme")
 
 local IsValid = Util.IsValid
@@ -50,6 +56,9 @@ end
 ---@field border any|nil
 ---@field text any|nil
 ---@field slot any|nil
+---@field canvas any|nil the menu canvas the widget was built under
+---@field shaped boolean|nil true when the card's brush was written as a rounded or outlined shape
+---@field resolved table|nil the resolved style the card was built from
 
 ---@return ModMenuTooltipState
 local function TipState(state)
@@ -173,25 +182,76 @@ local function SetVisibility(widget, vis)
     end)
 end
 
+--- The resolved tooltip style and the hint text style, or nil when the config has no resolved style.
+---@return table|nil look, table|nil hint
+local function Looks(config)
+    local resolved = config.resolved
+    if type(resolved) ~= "table" or type(resolved.tooltip) ~= "table" then
+        return nil, nil
+    end
+    return resolved.tooltip, resolved.hint
+end
+
+--- The card's shape from the tooltip style, for Paint.Brush and Paint.IsFlat.
+local function CardSpec(look)
+    if look == nil then
+        return nil
+    end
+    return { fill = look.fill, radius = look.radius, outline = look.outline, width = look.width }
+end
+
+--- The tooltip text size: the hint style's size when the theme sets one, else fontHint.
+local function TextSize(config, hint)
+    return Paint.TextSize(config, hint and hint.size or nil, "fontHint")
+end
+
+--- True when the built widget no longer matches the shell: the canvas was rebuilt, or a rounded
+--- card was written for a resolved style that a later Init replaced. A flat card is recoloured on
+--- every show, so a new style alone does not rebuild it.
+local function IsStale(state, tip)
+    if tip.canvas ~= state.menuCanvas then
+        return true
+    end
+    return tip.shaped == true and tip.resolved ~= (state.config or {}).resolved
+end
+
 --- Build the shared tooltip under the menu canvas. Returns false when the canvas is gone.
 local function EnsureWidget(state, tip)
-    if tip.root ~= nil and IsValid(tip.root) then
+    if tip.root ~= nil and IsValid(tip.root) and not IsStale(state, tip) then
         return true
     end
     if not IsValid(state.menuCanvas) then
         return false
     end
+    if tip.root ~= nil and IsValid(tip.root) then
+        local old = tip.root
+        pcall(function()
+            old:RemoveFromParent()
+        end)
+    end
+    tip.root, tip.border, tip.text, tip.slot = nil, nil, nil, nil
     createGen = createGen + 1
     local suffix = tostring(createGen)
     local canvas = state.menuCanvas
+    local config = state.config or {}
+    local look, hint = Looks(config)
+    local spec = CardSpec(look)
     local ok = pcall(function()
         local size = Umg.Construct("/Script/UMG.SizeBox", canvas, "ModMenu_TooltipSize_" .. suffix)
         local border = Umg.Construct("/Script/UMG.Border", size, "ModMenu_TooltipBorder_" .. suffix)
+        -- A rounded or outlined card is written into the Border's own brush now, before it is first
+        -- shown, because only then does Slate read it (field note 29).
+        tip.shaped = spec ~= nil and not Paint.IsFlat(spec)
+        if tip.shaped then
+            pcall(function()
+                Paint.Brush(border.Background, spec)
+            end)
+        end
         local text = Umg.Construct("/Script/UMG.TextBlock", border, "ModMenu_TooltipText_" .. suffix)
         -- The font size must be set before the block is slotted, as widgets/label.lua does, because a
         -- Font.Size written after construction is not read by the drawn text, which then keeps the
         -- stock 24 px size whatever the menu's fontScale.
-        Umg.StyleText(text, (state.config or {}).fontHint)
+        Umg.StyleText(text, TextSize(config, hint), nil, hint)
         Umg.EnableAutoWrap(text)
         pcall(function()
             border:SetContent(text)
@@ -210,6 +270,8 @@ local function EnsureWidget(state, tip)
         tip.border = border
         tip.text = text
         tip.slot = slot
+        tip.canvas = canvas
+        tip.resolved = config.resolved
     end)
     return ok and tip.root ~= nil
 end
@@ -223,17 +285,28 @@ local function Show(state, tip, target)
     local config = state.config or {}
     local spacing = config.spacing or {}
     local colors = Theme.Of(config)
+    local look, hint = Looks(config)
     local pad = spacing.tooltipPad or 6
     local gap = spacing.tooltipGap or 12
     pcall(function()
         tip.root:SetMaxDesiredWidth(spacing.tooltipMaxWidth or 320)
     end)
     pcall(function()
-        tip.border:SetBrushColor(colors.tooltipBg or colors.panelBg)
+        -- A rounded or outlined card keeps the brush written at build (see EnsureWidget).
+        if not tip.shaped then
+            tip.border:SetBrushColor((look and look.fill) or colors.tooltipBg or colors.panelBg)
+        end
         tip.border:SetPadding({ Left = pad, Top = pad, Right = pad, Bottom = pad })
     end)
+    -- The tooltip text once followed textPrimary, so a host's legacy textPrimary override still
+    -- colours it; otherwise the tooltip style's text colour applies.
+    local overrides = config._colorOverrides
+    local textColor = (look and look.text) or colors.textPrimary
+    if type(overrides) == "table" and overrides.textPrimary ~= nil then
+        textColor = colors.textPrimary
+    end
     -- Only the colour applies here; the size was fixed at construction (see EnsureWidget).
-    Umg.StyleText(tip.text, config.fontHint, colors.textPrimary)
+    Umg.StyleText(tip.text, TextSize(config, hint), textColor, hint)
     Umg.SetLabelText(tip.text, target.text)
 
     -- The tooltip opens toward the screen centre, away from the docked edge, so it does not run off screen.

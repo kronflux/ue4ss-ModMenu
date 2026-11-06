@@ -4,10 +4,15 @@
   Covers the docked panel (same canvas, higher Z). Blocks other widget polls
   while open. Cancel / close menu runs nothing. Confirm runs onConfirm once.
   A new Show replaces the current prompt (treated as Cancel).
+
+  The card, dim and dividers draw from the resolved confirm style, and the two buttons from the
+  button style. The dialog is built fresh on every Show, so each look is written before it is
+  first shown.
 ]]
 
 local Util = require("ModMenu.core.util")
 local Umg = require("ModMenu.core.umg")
+local Paint = require("ModMenu.core.paint")
 local Theme = require("ModMenu.core.theme")
 local Input = require("ModMenu.core.input")
 local InputMode = require("ModMenu.core.inputmode")
@@ -112,33 +117,67 @@ local function AddHairline(parent, name, color)
     parent:AddChildToVerticalBox(box)
 end
 
+local function Alpha(color, a)
+    return { R = color.R, G = color.G, B = color.B, A = a }
+end
+
+local WHITE = { R = 1, G = 1, B = 1, A = 1 }
+
+-- An underline role draws as ghost in the dialog, because its stacked bar belongs to the button
+-- widget's own face and the dialog builds its buttons through Paint.StateButton alone.
+local function GhostRoles(roles)
+    local out = {}
+    for name, role in pairs(roles or {}) do
+        local copy = {}
+        for k, v in pairs(role) do
+            copy[k] = v
+        end
+        if copy.variant == "underline" then
+            copy.variant = "ghost"
+        end
+        out[name] = copy
+    end
+    return out
+end
+
+--- The pointer looks and caption style of a confirm button for a role, built as button items are
+--- built, from Button.States and Button.CaptionStyle, so a ghost theme or role outlines the dialog
+--- buttons as it outlines button items. A flat fill button keeps the legacy hover and pressed
+--- colours, so light and dark keep today's dialog.
+---@param config table the menu instance's config
+---@param variant string the button role, such as "danger" or "secondary"
+---@return table states for Paint.StateButton
+---@return table labelStyle { color, size, textSpec, pad }
+function M.ButtonLook(config, variant)
+    local resolved = config.resolved or {}
+    local item = { variant = variant }
+    local states = Button.States(resolved, item)
+    if states.variant == "underline" then
+        states = Button.States(resolved, item, { variant = "ghost", roles = GhostRoles(states.style.roles) })
+    end
+    if states.variant == "fill" and states.edge == nil and not Paint.NeedsShapes(states) then
+        local roles = states.style.roles or {}
+        local role = roles[Button.NormalizeVariant(variant) or "default"] or roles.default or {}
+        local legacy = Theme.ButtonStates(Theme.Of(config), variant)
+        states.hover = { fill = role.hover or legacy.hover, radius = states.hover.radius, pill = states.hover.pill }
+        states.pressed = { fill = role.pressed or legacy.pressed, radius = states.pressed.radius,
+            pill = states.pressed.pill }
+    end
+    local caption = Button.CaptionStyle({ config = config }, states)
+    caption.pad = { 12, 4, 12, 4 }
+    return states, caption
+end
+
 local function MakeButton(S, parent, namePrefix, label, variant, role)
-    local colors = Theme.Of(S.config)
-    local keys = {
-        default = { "buttonBg", "buttonText" },
-        primary = { "buttonBgPrimary", "buttonTextPrimary" },
-        secondary = { "buttonBgSecondary", "buttonTextSecondary" },
-        success = { "buttonBgSuccess", "buttonTextSuccess" },
-        danger = { "buttonBgDanger", "buttonTextDanger" },
-        warning = { "buttonBgWarning", "buttonTextWarning" },
-        info = { "buttonBgInfo", "buttonTextInfo" },
-    }
-    local pair = keys[variant] or keys.default
-    local bg = colors[pair[1]] or colors.buttonBg
-    local fg = colors[pair[2]] or colors.buttonText
-    local fill, button, text = Umg.CreateFilledButton(parent, namePrefix, label, fg, S.config.fontItem)
-    local ctrl = {
-        kind = "confirm",
-        role = role,
-        widget = button,
-        fill = fill,
-        labelWidget = text,
-        item = { variant = variant, enabled = true, label = label },
-        wasPressed = false,
-    }
-    local states = Theme.ButtonStates(colors, variant)
-    Umg.SetFillColors(ctrl, bg, states.hover, states.pressed)
-    return ctrl
+    local states, labelStyle = M.ButtonLook(S.config, variant)
+    local button = Paint.StateButton(parent, namePrefix, states, label, labelStyle)
+    -- The live entry keeps its confirm kind and fields; the button fields come from the state button.
+    button.kind = "confirm"
+    button.role = role
+    button.labelWidget = button.label
+    button.item = { variant = variant, enabled = true, label = label }
+    button.wasPressed = false
+    return button
 end
 
 local function BuildOverlay(S, spec)
@@ -151,14 +190,35 @@ local function BuildOverlay(S, spec)
     local suffix = tostring(S.confirmGen)
     local colors = Theme.Of(S.config)
     local canvas = S.menuCanvas
+    local resolved = S.config.resolved or {}
+    local look = resolved.confirm or {}
+    local panel = resolved.panel or {}
+    local dimColor = look.dim or colors.overlayDim or { R = 0, G = 0, B = 0, A = 0.55 }
+    local cardColor = look.fill or colors.confirmCardBg or colors.panelBg
 
     -- Dim fills the docked panel. The card is a separate auto-sized child so
     -- height follows title + message + buttons (Bootstrap-style), not the panel.
-    local dim = Construct("/Script/UMG.Border", canvas, "ModMenu_ConfirmDim_" .. suffix)
-    pcall(function()
-        dim:SetBrushColor(colors.overlayDim or { R = 0, G = 0, B = 0, A = 0.55 })
-        dim:SetPadding({ Left = 0, Top = 0, Right = 0, Bottom = 0 })
-    end)
+    -- On a rounded panel the dim takes the panel's corners, and it stops short of the panel's
+    -- shadow by the shadow's depth, so it covers the panel body and nothing outside it. A square
+    -- panel with no shadow keeps the single flat Border it always had.
+    local panelShape = { fill = dimColor, radius = panel.radius, pill = false }
+    local shadowDepth = Paint.ShadowDepth(panel)
+    local root, dim
+    if Paint.IsFlat(panelShape) and shadowDepth <= 0 then
+        dim = Construct("/Script/UMG.Border", canvas, "ModMenu_ConfirmDim_" .. suffix)
+        pcall(function()
+            dim:SetBrushColor(dimColor)
+            dim:SetPadding({ Left = 0, Top = 0, Right = 0, Bottom = 0 })
+        end)
+        root = dim
+    else
+        root = Paint.Box(canvas, "ModMenu_ConfirmHost_" .. suffix, { fill = Alpha(WHITE, 0) },
+            { 0, 0, shadowDepth, shadowDepth })
+        dim = Paint.Box(root, "ModMenu_ConfirmDim_" .. suffix, panelShape, 0)
+        pcall(function()
+            root:SetContent(dim)
+        end)
+    end
 
     local inner = Construct("/Script/UMG.CanvasPanel", dim, "ModMenu_ConfirmInner_" .. suffix)
     pcall(function()
@@ -175,10 +235,10 @@ local function BuildOverlay(S, spec)
         end
     end)
 
-    local card = Construct("/Script/UMG.Border", sizeBox, "ModMenu_ConfirmCard_" .. suffix)
+    -- A flat card is the recoloured Border it always was; a rounded card is written into its own
+    -- brush before the dialog is first shown, and is never recoloured (field note 30).
+    local card = Paint.Box(sizeBox, "ModMenu_ConfirmCard_" .. suffix, { fill = cardColor, radius = look.radius }, 0)
     pcall(function()
-        card:SetBrushColor(colors.confirmCardBg or colors.panelBg)
-        card:SetPadding({ Left = 0, Top = 0, Right = 0, Bottom = 0 })
         sizeBox:SetContent(card)
     end)
 
@@ -188,7 +248,7 @@ local function BuildOverlay(S, spec)
     end)
 
     local sectionPad = { Left = 16, Top = 12, Right = 16, Bottom = 12 }
-    local divider = colors.confirmDivider or colors.panelBorder
+    local divider = look.divider or colors.confirmDivider or colors.panelBorder
 
     local title = Construct("/Script/UMG.TextBlock", vbox, "ModMenu_ConfirmTitle_" .. suffix)
     StyleText(title, S.config.fontSection, colors.textPrimary)
@@ -231,7 +291,7 @@ local function BuildOverlay(S, spec)
     end)
 
     local cancel = MakeButton(S, row, "ModMenu_ConfirmNo_" .. suffix, spec.cancelLabel, "secondary", "cancel")
-    local cancelSlot = row:AddChildToHorizontalBox(cancel.fill)
+    local cancelSlot = row:AddChildToHorizontalBox(cancel.root)
     pcall(function()
         cancelSlot:SetSize({ SizeRule = 0, Value = 0.0 })
         cancelSlot:SetPadding({ Left = 0, Top = 0, Right = S.config.spacing.confirmGap, Bottom = 0 })
@@ -239,7 +299,7 @@ local function BuildOverlay(S, spec)
     end)
 
     local ok = MakeButton(S, row, "ModMenu_ConfirmYes_" .. suffix, spec.confirmLabel, spec.variant, "confirm")
-    local okSlot = row:AddChildToHorizontalBox(ok.fill)
+    local okSlot = row:AddChildToHorizontalBox(ok.root)
     pcall(function()
         okSlot:SetSize({ SizeRule = 0, Value = 0.0 })
         okSlot:SetPadding({ Left = 0, Top = 0, Right = 0, Bottom = 0 })
@@ -258,13 +318,13 @@ local function BuildOverlay(S, spec)
         cardSlot:SetZOrder(1)
     end)
 
-    local slot = canvas:AddChildToCanvas(dim)
+    local slot = canvas:AddChildToCanvas(root)
     Dock.ApplyPercentLayout(slot, S.config)
     pcall(function()
         slot:SetZOrder(20)
     end)
 
-    S.confirmRoot = dim
+    S.confirmRoot = root
     S.confirmSlot = slot
     S.confirmControls = { cancel, ok }
     return true
@@ -299,7 +359,7 @@ function M.Poll(S)
 
     local fired = nil
     for _, ctrl in ipairs(S.confirmControls or {}) do
-        Umg.TrackPointer(ctrl)
+        Paint.TrackPointer(ctrl)
         if Input.ReleaseClick(ctrl, ctrl.widget) then
             Input.DebugClick("release", ctrl, ctrl.widget)
             fired = ctrl.role

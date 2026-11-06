@@ -8,12 +8,17 @@
   Same pattern as dropdowns: keep the header widget, show/hide a body box.
   Do not rebuild the tree on toggle — that destroyed the header under a
   still-down click and caused an open/close flicker.
+
+  Section headers draw from the resolved section style. The stock variant is the library's
+  original header, and label, rule and bar are the themed variants. widgets/fold.lua draws its
+  fold headers through the same helpers, so a fold matches its section.
 ]]
 
 local Util = require("ModMenu.core.util")
 local Umg = require("ModMenu.core.umg")
 local Theme = require("ModMenu.core.theme")
 local Input = require("ModMenu.core.input")
+local Paint = require("ModMenu.core.paint")
 local Session = require("ModMenu.shell.session")
 
 local Debug = Util.Debug
@@ -126,7 +131,7 @@ function M.QueueToggle(S, sectionId, source)
 end
 
 function M.Poll(S, ctrl)
-    Umg.TrackPointer(ctrl)
+    Paint.TrackPointer(ctrl)
     if Input.ReleaseClick(ctrl, ctrl.widget) then
         Input.DebugClick("release", ctrl, ctrl.widget)
         Input.SuppressPressEdge(ctrl)
@@ -252,12 +257,272 @@ local function AddHeaderText(row, name, text, fontSize, color, fill, spacing)
     return block
 end
 
+------------------------------------------------------------------------------------------
+-- Themed section headers
+------------------------------------------------------------------------------------------
+
+local H_LEFT, H_RIGHT = 1, 3
+local V_CENTER = 2
+
+local function Alpha(color, a)
+    return { R = color.R, G = color.G, B = color.B, A = a }
+end
+
+--- The resolved section style when it draws a themed variant, or nil for the stock header. A
+--- config without a resolved style, as some specs build, draws the stock header too.
+---@param config table
+---@return table|nil section, table|nil palette
+function M.ThemedSection(config)
+    local resolved = config ~= nil and config.resolved or nil
+    if type(resolved) ~= "table" or type(resolved.section) ~= "table" then
+        return nil, nil
+    end
+    local variant = resolved.section.variant
+    if variant == nil or variant == "stock" then
+        return nil, nil
+    end
+    return resolved.section, resolved.palette or {}
+end
+
+--- The pointer looks of a themed header button. A bar keeps its band and derives hover and
+--- pressed from it, as the stock header does. Label and rule headers are clear and wash in with
+--- the text colour, as StyleLab's buttons do. Every look is flat, so the header stays one
+--- recoloured Border.
+---@param sec table resolved section style
+---@param palette table resolved palette
+---@return table states for Paint.StateButton
+function M.HeaderStates(sec, palette)
+    if sec.variant == "bar" then
+        return { normal = { fill = sec.fill } }
+    end
+    local wash = palette.text or sec.color
+    return {
+        normal = { fill = Alpha(wash, 0) },
+        hover = { fill = Alpha(wash, 0.08) },
+        pressed = { fill = Alpha(wash, 0.16) },
+    }
+end
+
+-- Header parts whose failure was already logged, so a part that fails on every build is named once.
+local loggedParts = {}
+
+--- Build one part of a themed header guarded, so a failed part logs once per session and the rest
+--- of the header still builds. Returns what fn returned, or nil when it failed.
+local function TryPart(part, fn)
+    local ok, result = pcall(fn)
+    if ok then
+        return result
+    end
+    if not loggedParts[part] then
+        loggedParts[part] = true
+        Util.Log("section header " .. part .. " failed: " .. tostring(result))
+    end
+    return nil
+end
+
+local function AddRowText(row, name, text, size, color, textSpec, pad, fill, halign)
+    local block = Umg.Construct("/Script/UMG.TextBlock", row, name)
+    Umg.StyleText(block, size, color, textSpec)
+    Umg.SetLabelText(block, text)
+    local slot = row:AddChildToHorizontalBox(block)
+    pcall(function()
+        slot:SetSize({ SizeRule = fill and 1 or 0, Value = fill and 1.0 or 0.0 })
+        slot:SetHorizontalAlignment(halign or H_LEFT)
+        slot:SetVerticalAlignment(V_CENTER)
+        slot:SetPadding(Paint.Margin(pad))
+    end)
+    return block
+end
+
+--- The row inside a themed section or fold header: the title, a rule line for the rule variant,
+--- and the + or - mark when the header folds. opts: config, sec, title, mark (string or nil),
+--- themeSize (the theme's text size or nil), fontKey ("fontSection" or "fontHint"), titlePad and
+--- markPad (left, top, right, bottom). Returns the row, the title TextBlock and the mark
+--- TextBlock, either of which is nil when that part failed to build.
+---@param outer any
+---@param name string
+---@param opts table
+---@return any row, any|nil title, any|nil mark
+function M.HeaderRow(outer, name, opts)
+    local sec = opts.sec
+    local textSpec = sec.text or {}
+    -- The size comes from the caller, because a fold header takes the hint size and a section
+    -- header the section text size.
+    local size = Paint.TextSize(opts.config, opts.themeSize, opts.fontKey)
+    local row = Umg.Construct("/Script/UMG.HorizontalBox", outer, name)
+    local tp = opts.titlePad
+    local rule = sec.variant == "rule"
+
+    -- A rule title takes its own width, so the line fills the rest of the row as in StyleLab.
+    local titlePad = tp
+    if rule then
+        titlePad = { tp[1], tp[2], 10, tp[4] }
+    end
+    local title = TryPart("title", function()
+        return AddRowText(row, name .. "_Title", Paint.Caption(opts.title, textSpec), size,
+            textSpec.color or sec.color, textSpec, titlePad, not rule)
+    end)
+
+    if rule then
+        TryPart("rule", function()
+            local box = Umg.Construct("/Script/UMG.SizeBox", row, name .. "_RuleSize")
+            local line = Paint.Box(box, name .. "_Rule", { fill = sec.line }, 0)
+            pcall(function()
+                box:SetHeightOverride(1)
+                box:SetContent(line)
+            end)
+            local slot = row:AddChildToHorizontalBox(box)
+            pcall(function()
+                slot:SetSize({ SizeRule = 1, Value = 1.0 })
+                slot:SetVerticalAlignment(V_CENTER)
+                -- The line stops at the gap before the mark, or at the title's side padding with no mark.
+                slot:SetPadding(Paint.Margin({ 0, 0, opts.mark ~= nil and tp[3] or tp[1], 0 }))
+            end)
+        end)
+    end
+
+    local mark = nil
+    if opts.mark ~= nil then
+        mark = TryPart("mark", function()
+            local markBox = Umg.Construct("/Script/UMG.SizeBox", row, name .. "_MarkSize")
+            local block = Umg.Construct("/Script/UMG.TextBlock", markBox, name .. "_Mark")
+            Umg.StyleText(block, size, sec.mark, textSpec)
+            Umg.SetLabelText(block, opts.mark)
+            pcall(function()
+                block:SetJustification(2)
+            end)
+            pcall(function()
+                markBox:SetWidthOverride(18)
+                markBox:SetContent(block)
+            end)
+            local slot = row:AddChildToHorizontalBox(markBox)
+            pcall(function()
+                slot:SetSize({ SizeRule = 0, Value = 0.0 })
+                slot:SetHorizontalAlignment(H_RIGHT)
+                slot:SetVerticalAlignment(V_CENTER)
+                slot:SetPadding(Paint.Margin(opts.markPad))
+            end)
+            return block
+        end)
+    end
+    return row, title, mark
+end
+
+--- Copy a state button's drawing fields onto a live control, so the control keeps its own kind
+--- and fields while Paint.TrackPointer repaints it.
+---@param ctrl table
+---@param button table from Paint.StateButton
+---@return table ctrl
+function M.AdoptButton(ctrl, button)
+    ctrl.widget = button.widget
+    ctrl.root = button.root
+    ctrl.fill = button.fill
+    ctrl.flat = button.flat
+    ctrl.stateColors = button.stateColors
+    ctrl.lastState = button.lastState
+    ctrl.shapes = button.shapes
+    ctrl.shownKey = button.shownKey
+    ctrl.edge = button.edge
+    return ctrl
+end
+
+local function HeaderPads(spacing)
+    local padX = spacing.sectionHeaderPadX
+    local padY = spacing.sectionHeaderPadY
+    -- The title carries the whole gap to the mark as its right padding, so the mark's left padding is 0.
+    return { padX, padY, spacing.sectionHeaderGap, padY }, { 0, padY, padX, padY }
+end
+
+--- A section title for a section that does not fold. build.lua draws these; the stock variant is
+--- the plain TextBlock it adds today, and the themed variants draw a label, a title with a rule,
+--- or a filled bar.
+---@param S table
+---@param section table
+---@param contentBox any
+---@param suffix string
+---@return any widget added to contentBox
+function M.BuildTitle(S, section, contentBox, suffix)
+    local config = S.config
+    local name = string.format("ModMenu_Sec_%s_%s", section.id, suffix)
+    local sec = M.ThemedSection(config)
+    if sec == nil then
+        local secTitle = Umg.Construct("/Script/UMG.TextBlock", contentBox, name)
+        Umg.StyleText(secTitle, config.fontSection)
+        Umg.SetLabelText(secTitle, M.TitleText(section))
+        contentBox:AddChildToVerticalBox(secTitle)
+        return secTitle
+    end
+    local titlePad = HeaderPads(config.spacing)
+    -- A label or rule title sits on the panel, so it keeps no side padding of its own; a bar does.
+    if sec.variant ~= "bar" then
+        titlePad = { 0, titlePad[2], 0, titlePad[4] }
+    end
+    local host = contentBox
+    local box = nil
+    if sec.variant == "bar" then
+        -- Without its band the title still shows, on the panel like a label title.
+        box = TryPart("bar", function()
+            return Paint.Box(contentBox, name .. "_Bar", { fill = sec.fill }, 0)
+        end)
+        host = box or contentBox
+    end
+    local row = M.HeaderRow(host, name .. "_Row", {
+        config = config,
+        sec = sec,
+        title = M.TitleText(section),
+        themeSize = (sec.text or {}).size,
+        fontKey = "fontSection",
+        titlePad = titlePad,
+    })
+    local widget = row
+    if box ~= nil then
+        pcall(function()
+            box:SetContent(row)
+        end)
+        widget = box
+    end
+    local slot = contentBox:AddChildToVerticalBox(widget)
+    Umg.FillVerticalSlot(slot)
+    return widget
+end
+
+local function BuildThemedHeader(S, section, contentBox, name, collapsed, sec, palette)
+    local titlePad, markPad = HeaderPads(S.config.spacing)
+    local row, title, mark = M.HeaderRow(contentBox, name .. "_Row", {
+        config = S.config,
+        sec = sec,
+        title = M.TitleText(section),
+        mark = M.Mark(collapsed),
+        themeSize = (sec.text or {}).size,
+        fontKey = "fontSection",
+        titlePad = titlePad,
+        markPad = markPad,
+    })
+    local button = Paint.StateButton(contentBox, name, M.HeaderStates(sec, palette), row)
+    local slot = contentBox:AddChildToVerticalBox(button.root)
+    Umg.FillVerticalSlot(slot)
+    local ctrl = M.AdoptButton({
+        kind = "collapse",
+        sectionId = section.id,
+        label = title,
+        mark = mark,
+        body = nil,
+        wasPressed = false,
+    }, button)
+    table.insert(S.liveControls, ctrl)
+    return ctrl
+end
+
 --- Accordion header: title left, + / - right, full-width click target.
 --- Caller attaches a body VerticalBox and always builds children into it.
 ---@return table ctrl
 function M.BuildHeader(S, section, contentBox, suffix)
     local collapsed = M.IsCollapsed(S, section)
     local name = string.format("ModMenu_SecHdr_%s_%s", section.id, suffix)
+    local sec, palette = M.ThemedSection(S.config)
+    if sec ~= nil then
+        return BuildThemedHeader(S, section, contentBox, name, collapsed, sec, palette)
+    end
     local colors = Theme.Of(S.config)
     local fontSize = S.config.fontSection
     local titleText = M.TitleText(section)
@@ -290,6 +555,8 @@ function M.BuildHeader(S, section, contentBox, suffix)
         mark = mark,
         body = nil,
         wasPressed = false,
+        -- The stock header is a recoloured Border, so Paint.TrackPointer repaints it as Umg.TrackPointer did.
+        flat = true,
     }
     Umg.SetFill(ctrl, colors.sectionHeaderBg)
     table.insert(S.liveControls, ctrl)

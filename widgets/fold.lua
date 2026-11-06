@@ -3,11 +3,16 @@
 
   Body is always built; toggle only SetVisibility. Same idea as section
   collapse so a still-down click cannot rebuild the header.
+
+  The header draws from the resolved section style through shell/collapse.lua's helpers, so a
+  fold looks like a section header of the same theme. The stock variant keeps the original header.
 ]]
 
 local Umg = require("ModMenu.core.umg")
 local Input = require("ModMenu.core.input")
+local Paint = require("ModMenu.core.paint")
 local Session = require("ModMenu.shell.session")
+local Collapse = require("ModMenu.shell.collapse")
 local Theme = require("ModMenu.core.theme")
 
 local Widgets ---@type table|nil
@@ -109,18 +114,10 @@ function Fold.seed(sectionId, item, values)
     end
 end
 
-function Fold.build(ctx)
+--- The original fold header: a recoloured Border around a transparent Button holding the title
+--- and the mark. It fills the control's widget, fill and mark fields.
+local function BuildStockHeader(ctx, item, collapsed, foldCtrl)
     local umg = ctx.umg
-    local item = ctx.item
-    local collapsed = item.collapsed ~= false
-    local foldKey = ctx.ValueKey(ctx.section.id, item.id)
-    local foldMap = ctx.foldCollapsedByKey
-    if type(foldMap) == "table" then
-        if foldMap[foldKey] == nil then
-            foldMap[foldKey] = collapsed
-        end
-        collapsed = foldMap[foldKey] == true
-    end
     local colors = Theme.Of(ctx.config)
     local fontSize = ctx.config.fontHint or ctx.config.fontSection or 14
     local namePrefix = ctx.namePrefix
@@ -165,6 +162,56 @@ function Fold.build(ctx)
     end)
     umg.AddToContent(ctx, headerFill, { fillVertical = true })
 
+    foldCtrl.widget = headerBtn
+    foldCtrl.fill = headerFill
+    foldCtrl.mark = mark
+    -- The stock header is a recoloured Border, so Paint.TrackPointer repaints it as Umg.TrackPointer did.
+    foldCtrl.flat = true
+    umg.SetFill(foldCtrl, colors.sectionHeaderBg)
+end
+
+function Fold.build(ctx)
+    local umg = ctx.umg
+    local item = ctx.item
+    local collapsed = item.collapsed ~= false
+    local foldKey = ctx.ValueKey(ctx.section.id, item.id)
+    local foldMap = ctx.foldCollapsedByKey
+    if type(foldMap) == "table" then
+        if foldMap[foldKey] == nil then
+            foldMap[foldKey] = collapsed
+        end
+        collapsed = foldMap[foldKey] == true
+    end
+    local namePrefix = ctx.namePrefix
+    local foldCtrl = {
+        kind = "fold",
+        sectionId = ctx.section.id,
+        item = item,
+        collapsed = collapsed,
+        wasPressed = false,
+    }
+
+    local sec, palette = Collapse.ThemedSection(ctx.config)
+    if sec ~= nil then
+        local row, _, themedMark = Collapse.HeaderRow(ctx.contentBox, namePrefix .. "_HdrRow", {
+            config = ctx.config,
+            sec = sec,
+            title = tostring(item.label),
+            mark = Mark(collapsed),
+            -- A fold header is smaller than its section's header, so it takes the hint size.
+            themeSize = ((ctx.config.resolved or {}).hint or {}).size,
+            fontKey = "fontHint",
+            titlePad = { 10, 4, 8, 4 },
+            markPad = { 4, 4, 10, 4 },
+        })
+        local button = Paint.StateButton(ctx.contentBox, namePrefix .. "_Hdr", Collapse.HeaderStates(sec, palette), row)
+        Collapse.AdoptButton(foldCtrl, button)
+        foldCtrl.mark = themedMark
+        umg.AddToContent(ctx, button.root, { fillVertical = true })
+    else
+        BuildStockHeader(ctx, item, collapsed, foldCtrl)
+    end
+
     local body = umg.Construct("/Script/UMG.VerticalBox", ctx.contentBox, namePrefix .. "_Body")
     umg.AddToContent(ctx, body)
     pcall(function()
@@ -195,18 +242,7 @@ function Fold.build(ctx)
     ctx.layout = savedLayout
     umg.AddItemPad(ctx, namePrefix .. "_Pad", 8)
 
-    local foldCtrl = {
-        kind = "fold",
-        sectionId = ctx.section.id,
-        item = item,
-        widget = headerBtn,
-        fill = headerFill,
-        mark = mark,
-        body = body,
-        collapsed = collapsed,
-        wasPressed = false,
-    }
-    umg.SetFill(foldCtrl, colors.sectionHeaderBg)
+    foldCtrl.body = body
     table.insert(ctx.liveControls, foldCtrl)
 end
 
@@ -229,7 +265,7 @@ function Fold.onItemState(ctrl, _enabled, visible)
 end
 
 function Fold.poll(ctrl, ctx)
-    ctx.umg.TrackPointer(ctrl)
+    Paint.TrackPointer(ctrl)
     if ctx.Input.ReleaseClick(ctrl, ctrl.widget) then
         ctx.Input.DebugClick("release", ctrl, ctrl.widget)
         Toggle(ctrl, ctx)
