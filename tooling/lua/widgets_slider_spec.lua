@@ -139,3 +139,50 @@ assert_true(
     "a zero labelWidth is rejected",
     string.find(sliderError({ labelWidth = 0 }) or "", "labelWidth must be a positive number", 1, true) ~= nil
 )
+-- Themes. The variant decides whether the slider draws as today or from the theme's slider fields.
+local Style = require("ModMenu.core.style")
+local light = Style.Resolve("light")
+local dark = Style.Resolve("dark")
+local slate = Style.Resolve("slate")
+assert_eq("the light theme draws the stock slider", Slider.Variant(light, {}), "stock")
+assert_eq("the dark theme draws the stock slider", Slider.Variant(dark, {}), "stock")
+assert_eq("slate draws its own slider variant", Slider.Variant(slate, {}), slate.slider.variant)
+assert_eq("slate's slider variant is round", Slider.Variant(slate, {}), "round")
+assert_eq("no resolved style draws the stock slider", Slider.Variant(nil, {}), "stock")
+assert_eq("an item look picks its own variant", Slider.Variant(slate, { look = { variant = "bar" } }), "bar")
+
+-- Thumb shapes follow StyleLab's MakeSlider: round is a pill, square has radius 2, bar is a tall thin block.
+local sl = {
+    variant = "round", thickness = 4, size = 16,
+    track = { R = 0.1, G = 0.1, B = 0.1, A = 1 },
+    thumbFill = { R = 1, G = 1, B = 1, A = 1 },
+    thumbEdge = { R = 0, G = 0, B = 1, A = 1 },
+    thumbHover = { R = 0, G = 1, B = 0, A = 1 },
+}
+local normal, hover = Slider.ThumbSpecs(sl, false)
+assert_true("a round thumb is a pill", normal.pill == true)
+assert_eq("a round thumb is size by size", normal.size, { 16, 16 })
+assert_eq("a thumb takes the thumb fill", normal.fill, sl.thumbFill)
+assert_eq("a thumb's edge is the thumb edge colour", normal.outline, sl.thumbEdge)
+assert_eq("a thumb's edge is 2 wide without thumbWidth", normal.width, 2)
+assert_eq("the hovered thumb takes the hover fill", hover.fill, sl.thumbHover)
+assert_eq("the hovered thumb keeps the normal edge", hover.outline, sl.thumbEdge)
+assert_true("the hovered thumb is its own table", hover ~= normal)
+sl.variant = "square"
+normal = Slider.ThumbSpecs(sl, false)
+assert_true("a square thumb is not a pill", not normal.pill)
+assert_eq("a square thumb has radius 2", normal.radius, 2)
+sl.variant = "bar"
+normal = Slider.ThumbSpecs(sl, false)
+assert_eq("a bar thumb is 6 wide and 4 taller than the size", normal.size, { 6, 20 })
+sl.variant = "round"
+sl.thumbWidth = 0
+normal = Slider.ThumbSpecs(sl, false)
+assert_eq("thumbWidth 0 draws no edge", normal.width, 0)
+sl.thumbWidth = nil
+normal = Slider.ThumbSpecs(sl, true)
+assert_eq("a touch thumb is half again as large", normal.size, { 24, 24 })
+local bar = Slider.BarSpec(sl)
+assert_eq("the bar takes the track colour", bar.fill, sl.track)
+assert_eq("the bar's radius is half its thickness", bar.radius, 2)
+assert_eq("a bar fill override wins over the track", Slider.BarSpec(sl, sl.thumbHover).fill, sl.thumbHover)

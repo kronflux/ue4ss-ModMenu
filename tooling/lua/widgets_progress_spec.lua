@@ -154,3 +154,95 @@ assert_true("poll tolerates a control whose widget is gone", pcall(Progress.poll
         return false
     end,
 }))
+
+-- Segments lit for a value, rounded down, 0 at min and every segment at max.
+assert_eq("half the range lights half the segments", Progress.SegmentsLit(50, 0, 100, 12), 6)
+assert_eq("min lights no segment", Progress.SegmentsLit(0, 0, 100, 12), 0)
+assert_eq("max lights every segment", Progress.SegmentsLit(100, 0, 100, 12), 12)
+assert_eq("just under max rounds down", Progress.SegmentsLit(99.9, 0, 100, 12), 11)
+assert_eq("a value past max lights every segment", Progress.SegmentsLit(150, 0, 100, 12), 12)
+assert_eq("a value below min lights none", Progress.SegmentsLit(-5, 0, 100, 12), 0)
+assert_eq("an empty range lights none", Progress.SegmentsLit(5, 3, 3, 12), 0)
+assert_eq("a fraction that floats just under a whole step still lights it", Progress.SegmentsLit(0.3, 0, 1, 10), 3)
+assert_eq("a value that is not numeric lights none", Progress.SegmentsLit("x", 0, 1, 10), 0)
+
+-- Themes. light and dark draw today's bar; slate draws its own.
+local Style = require("ModMenu.core.style")
+local light = Style.Resolve("light")
+local slate = Style.Resolve("slate")
+assert_eq("the light theme draws the stock bar", Progress.Variant(light, {}), "stock")
+assert_eq("the dark theme draws the stock bar", Progress.Variant(Style.Resolve("dark"), {}), "stock")
+assert_eq("slate draws its own progress variant", Progress.Variant(slate, {}), slate.progress.variant)
+assert_eq("no resolved style draws the stock bar", Progress.Variant(nil, {}), "stock")
+assert_eq("an item look picks segments", Progress.Variant(slate, { look = { variant = "segments" } }), "segments")
+
+-- The themed fill is the theme's progress fill, unless the item names a button role.
+local pr = Style.ForItem(slate, "progress", nil)
+assert_eq("an unset variant fills with the progress fill", Progress.ThemedFill(pr, {}, slate), pr.fill)
+assert_eq("a default variant fills with the progress fill", Progress.ThemedFill(pr, { variant = "default" }, slate), pr.fill)
+assert_eq("a named variant fills with its role colour", Progress.ThemedFill(pr, { variant = "danger" }, slate), slate.button.roles.danger.fill)
+
+-- A ramp colours segments by their place along the bar, or in turn when cycle is set.
+local red, green, blue = { R = 1, G = 0, B = 0, A = 1 }, { R = 0, G = 1, B = 0, A = 1 }, { R = 0, G = 0, B = 1, A = 1 }
+local rampSpec = { segments = 6, ramp = { red, green, blue } }
+assert_eq("without a ramp a segment takes the fill", Progress.SegmentColor({ segments = 6 }, 3, green), green)
+assert_eq("the first segment takes the first ramp colour", Progress.SegmentColor(rampSpec, 1, green), red)
+assert_eq("segment 3 of 6 takes the second of 3 colours", Progress.SegmentColor(rampSpec, 3, green), green)
+assert_eq("the last segment takes the last ramp colour", Progress.SegmentColor(rampSpec, 6, green), blue)
+rampSpec.cycle = true
+assert_eq("a cycling ramp starts again after its last colour", Progress.SegmentColor(rampSpec, 4, green), red)
+-- The ramp spreads over the cells built, so a fractional or zero segments value never divides by zero.
+local oddSpec = { segments = 0, ramp = { red, green, blue } }
+assert_eq("a zero segments value builds one cell with the first ramp colour", Progress.SegmentColor(oddSpec, 1, green), red)
+oddSpec.segments = 3.7
+assert_eq("a fractional segments value spreads over the whole cells", Progress.SegmentColor(oddSpec, 3, green), blue)
+assert_eq("the built count passed in wins over the raw value", Progress.SegmentColor(oddSpec, 2, green, 6), red)
+
+-- A segmented bar shows a lit block by its visibility, so apply changes only the blocks whose state changed.
+local shown = {}
+local function fakeBlock(i)
+    return {
+        SetVisibility = function(_, v)
+            shown[i] = v
+        end,
+    }
+end
+local segCtrl = {
+    item = { id = "p", min = 0, max = 10 },
+    valueKey = "s.p",
+    segments = { fakeBlock(1), fakeBlock(2), fakeBlock(3), fakeBlock(4) },
+    cellShown = { false, false, false, false },
+    readout = { SetText = function() end },
+}
+local segCtx = { values = {} }
+Progress.apply(segCtrl, 5, segCtx)
+assert_eq("apply lights half the blocks", segCtrl.litCount, 2)
+assert_eq("a lit block is shown hit-test invisible", shown[2], 3)
+assert_eq("an unlit block is not touched when it was already unlit", shown[3], nil)
+Progress.apply(segCtrl, 2.5, segCtx)
+assert_eq("lowering the value hides the block above", shown[2], 2)
+assert_eq("lowering the value keeps the block below lit", shown[1], 3)
+
+-- A block whose call failed keeps no recorded state, so the next paint writes it again.
+local failing = true
+local retried = {}
+local flaky = {
+    SetVisibility = function(_, v)
+        if failing then
+            error("not ready")
+        end
+        retried[#retried + 1] = v
+    end,
+}
+local flakyCtrl = {
+    item = { id = "p", min = 0, max = 10 },
+    valueKey = "s.p",
+    segments = { flaky },
+    readout = { SetText = function() end },
+}
+Progress.apply(flakyCtrl, 10, { values = {} })
+assert_eq("a failed block records no shown state", flakyCtrl.cellShown[1], nil)
+failing = false
+Progress.apply(flakyCtrl, 10, { values = {} })
+assert_eq("the same value writes a failed block again", retried[1], 3)
+assert_eq("a written block records its shown state", flakyCtrl.cellShown[1], true)

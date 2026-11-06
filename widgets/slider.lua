@@ -10,9 +10,16 @@
   Each poll reads the engine's value, snaps it to the item's step and stores it. onChange fires once
   when the engine releases the mouse and the value changed, or on every value change when live = true.
   pollClick consumes a click on the slider, so the shell does not treat it as a miss.
+
+  The theme's slider variant decides the look. stock draws today's tinted engine slider, which light
+  and dark use. round, square and bar write the theme's track and thumb shapes into the engine
+  slider's own style brushes before the slider is first shown (field note 29). The engine draws the
+  hovered thumb from its own hovered brush, so the hover look needs no recolouring at run time.
 ]]
 
 local Theme = require("ModMenu.core.theme")
+local Style = require("ModMenu.core.style")
+local Paint = require("ModMenu.core.paint")
 
 local Slider = {}
 Slider.type = "slider"
@@ -23,6 +30,10 @@ local TRACK_HEIGHT_TOUCH = 36
 local TRACK_WIDTH_IN_ROW = 160
 local HEADER_GAP = 4
 local ITEM_PAD = 8
+-- A themed track leaves this much room around the thumb, so the SizeBox does not clip its edge.
+local THUMB_ROOM = 4
+local TOUCH_THUMB_SCALE = 1.5
+local WHITE = { R = 1, G = 1, B = 1, A = 1 }
 
 local function Prefix(sectionId, index)
     return string.format("Register(%s) items[%d]", tostring(sectionId), index)
@@ -131,6 +142,109 @@ Slider._fraction = Fraction
 Slider._valueAt = ValueAt
 Slider._format = Format
 
+--- The slider's resolved style with the item's look merged over it, or nil when no theme is resolved.
+--- A look the style module rejects falls back to the theme's own slider, so one bad look does not stop the build.
+local function LookOf(resolved, item)
+    if type(resolved) ~= "table" or type(resolved.slider) ~= "table" then
+        return nil
+    end
+    local look = item ~= nil and item.look or nil
+    local ok, merged = pcall(Style.ForItem, resolved, "slider", look)
+    if ok then
+        return merged
+    end
+    return resolved.slider
+end
+
+Slider.Look = LookOf
+
+--- The variant a slider draws with. light and dark presets say stock, so they keep today's look,
+--- and a missing theme draws stock too.
+---@param resolved table|nil
+---@param item table|nil
+---@return string
+function Slider.Variant(resolved, item)
+    local sl = LookOf(resolved, item)
+    if sl == nil or sl.variant == nil then
+        return "stock"
+    end
+    return sl.variant
+end
+
+--- The normal and hovered thumb shapes for a themed slider, as StyleLab's MakeSlider draws them.
+--- thumbWidth is the thumb's edge width. A touch thumb is larger, because a finger covers more than a pointer.
+---@param sl table resolved slider fields
+---@param touch boolean
+---@return table normal
+---@return table hover
+function Slider.ThumbSpecs(sl, touch)
+    local size = tonumber(sl.size) or 16
+    if touch then
+        size = math.floor(size * TOUCH_THUMB_SCALE + 0.5)
+    end
+    local dims, radius, pill = { size, size }, 0, false
+    if sl.variant == "round" then
+        radius, pill = 1, true
+    elseif sl.variant == "square" then
+        radius = 2
+    elseif sl.variant == "bar" then
+        dims, radius = { 6, size + 4 }, 2
+    end
+    local normal = { fill = sl.thumbFill or WHITE, radius = radius, pill = pill, size = dims,
+        outline = sl.thumbEdge, width = sl.thumbWidth or 2 }
+    local hover = {}
+    for k, v in pairs(normal) do
+        hover[k] = v
+    end
+    hover.fill = sl.thumbHover or normal.fill
+    return normal, hover
+end
+
+--- The track shape: the track colour, or a caller's fill, rounded to half the track's thickness.
+---@param sl table resolved slider fields
+---@param fill table|nil
+---@return table
+function Slider.BarSpec(sl, fill)
+    local thickness = tonumber(sl.thickness) or 4
+    return { fill = fill or sl.track or WHITE, radius = thickness / 2 }
+end
+
+--- Write a themed look into an engine Slider's own style struct, before it is first shown.
+--- The colour picker calls this for its channel sliders with the channel's hue as the bar fill.
+--- The bar and handle colours multiply over the brushes, so they are set to white.
+---@param slider any
+---@param sl table resolved slider fields
+---@param touch boolean
+---@param barFill table|nil
+function Slider.StyleEngine(slider, sl, touch, barFill)
+    local bar = Slider.BarSpec(sl, barFill)
+    local normal, hover = Slider.ThumbSpecs(sl, touch)
+    pcall(function()
+        local st = slider.WidgetStyle
+        Paint.Brush(st.NormalBarImage, bar)
+        Paint.Brush(st.HoveredBarImage, bar)
+        Paint.Brush(st.DisabledBarImage, bar)
+        Paint.Brush(st.NormalThumbImage, normal)
+        Paint.Brush(st.HoveredThumbImage, hover)
+        Paint.Brush(st.DisabledThumbImage, normal)
+        st.BarThickness = tonumber(sl.thickness) or 4
+    end)
+    pcall(function()
+        slider:SetSliderBarColor(WHITE)
+        slider:SetSliderHandleColor(WHITE)
+    end)
+end
+
+--- The track SizeBox height for a themed slider: the stock height, or taller when the thumb needs it.
+---@param sl table
+---@param touch boolean
+---@param stockHeight number
+---@return number
+function Slider.TrackHeight(sl, touch, stockHeight)
+    local normal = Slider.ThumbSpecs(sl, touch)
+    return math.max(stockHeight, normal.size[2] + THUMB_ROOM)
+end
+
 function Slider.validate(item, sectionId, index)
     local prefix = Prefix(sectionId, index)
     if item.id == nil or item.id == "" then
@@ -195,7 +309,7 @@ end
 -- This writes the value to the engine slider and rewrites the value text. Each UMG call sits in
 -- its own pcall, because the spec calls apply without the game and a failed setter must not skip
 -- the rest. The engine value is recorded so the next poll does not read the write back as a drag.
-local function Paint(ctrl, value)
+local function Repaint(ctrl, value)
     pcall(function()
         ctrl.slider:SetValue(value)
     end)
@@ -272,15 +386,30 @@ function Slider.build(ctx)
 
     local touch = IsTouch(ctx)
     local trackHeight = touch and TRACK_HEIGHT_TOUCH or TRACK_HEIGHT
+    local resolved = ctx.config.resolved
+    local themed = Slider.Variant(resolved, item) ~= "stock"
+    local sl = LookOf(resolved, item) or {}
+    if themed then
+        trackHeight = Slider.TrackHeight(sl, touch, trackHeight)
+    end
 
     local root = umg.Construct("/Script/UMG.VerticalBox", ctx.contentBox, name .. "_Slider")
 
     local header = umg.Construct("/Script/UMG.HorizontalBox", root, name .. "_Header")
     local label = umg.Construct("/Script/UMG.TextBlock", header, name .. "_Label")
-    umg.StyleText(label, ctx.config.fontItem)
-    umg.SetLabelText(label, item.label)
     local valueText = umg.Construct("/Script/UMG.TextBlock", header, name .. "_Value")
-    umg.StyleText(valueText, ctx.config.fontItem, colors.textMuted)
+    if themed then
+        -- The label reads as body text and the readout as data, as StyleLab's slider card does.
+        local config = ctx.config
+        local body, data = resolved.body or {}, resolved.data or {}
+        umg.StyleText(label, Paint.TextSize(config, body.size, "fontItem"), nil, body)
+        umg.SetLabelText(label, Paint.Caption(item.label, body))
+        umg.StyleText(valueText, Paint.TextSize(config, data.size, "fontItem"), nil, data)
+    else
+        umg.StyleText(label, ctx.config.fontItem)
+        umg.SetLabelText(label, item.label)
+        umg.StyleText(valueText, ctx.config.fontItem, colors.textMuted)
+    end
     umg.SetLabelText(valueText, Format(current, item))
     -- labelWidth fixes the label column, as the number widget's does, and the readout takes the rest of the row.
     local labelHost = label
@@ -328,9 +457,15 @@ function Slider.build(ctx)
             slider.MouseUsesStep = true
         end
         slider:SetValue(current)
-        slider:SetSliderBarColor(colors.buttonBgPrimary or colors.textAccent)
-        slider:SetSliderHandleColor(colors.textPrimary)
     end)
+    if themed then
+        Slider.StyleEngine(slider, sl, touch)
+    else
+        pcall(function()
+            slider:SetSliderBarColor(colors.buttonBgPrimary or colors.textAccent)
+            slider:SetSliderHandleColor(colors.textPrimary)
+        end)
+    end
     pcall(function()
         size:SetContent(slider)
         root:AddChildToVerticalBox(size)
@@ -406,7 +541,7 @@ function Slider.apply(ctrl, value, ctx)
     ctx.values[ctrl.valueKey] = n
     ctrl.value = n
     ctrl.lastFired = n
-    Paint(ctrl, n)
+    Repaint(ctrl, n)
 end
 
 return Slider

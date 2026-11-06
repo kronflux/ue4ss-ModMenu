@@ -12,9 +12,18 @@
   engine releases the mouse and the colour changed, as the slider widget's does without live.
 
   The group's height is several rows, so a row cannot hold a colorpicker. A fold can.
+
+  The theme's slider variant decides the look, so the picker matches the theme's sliders, and the
+  item's look is merged over the slider style. stock draws
+  today's picker, which light and dark use. Any other variant styles each channel slider as a themed
+  slider, and a field frame around the swatch when the theme's field variant is frame. The swatch
+  itself stays a flat Border, because it is recoloured on every change and only a flat shape may be
+  recoloured (field note 30).
 ]]
 
 local Theme = require("ModMenu.core.theme")
+local Paint = require("ModMenu.core.paint")
+local Slider = require("ModMenu.widgets.slider")
 
 local Colorpicker = {}
 Colorpicker.type = "colorpicker"
@@ -39,6 +48,23 @@ local CHANNEL_TINT = {
     G = { R = 0.3, G = 0.8, B = 0.3, A = 1 },
     B = { R = 0.3, G = 0.5, B = 1, A = 1 },
 }
+
+--- The bar fill of a themed channel slider. R, G and B keep their hue, and alpha has none, so it takes the slider track.
+---@param key string
+---@param sl table resolved slider fields
+---@return table
+function Colorpicker._channelBar(key, sl)
+    return CHANNEL_TINT[key] or sl.track
+end
+
+--- The slider style a picker's channels draw with: the theme's slider with the item's look merged
+--- over it, because a picker's look styles its channel sliders. Without a theme it is empty.
+---@param resolved table|nil
+---@param item table|nil
+---@return table
+function Colorpicker._sliderLook(resolved, item)
+    return Slider.Look(resolved, item) or {}
+end
 
 local function Prefix(sectionId, index)
     return string.format("Register(%s) items[%d]", tostring(sectionId), index)
@@ -191,7 +217,7 @@ end
 
 -- This writes a colour to the engine sliders, the readouts and the swatch. The engine value is
 -- recorded so the next poll does not read the write back as a drag.
-local function Paint(ctrl, color)
+local function Repaint(ctrl, color)
     for _, channel in ipairs(ctrl.channels) do
         local n = color[channel.key]
         pcall(function()
@@ -269,25 +295,63 @@ function Colorpicker.build(ctx)
     local current = Colorpicker._coerce(ctx.values[vkey], item) or Colorpicker._default(item)
     ctx.values[vkey] = current
 
-    local trackHeight = IsTouch(ctx) and TRACK_HEIGHT_TOUCH or TRACK_HEIGHT
+    local touch = IsTouch(ctx)
+    local trackHeight = touch and TRACK_HEIGHT_TOUCH or TRACK_HEIGHT
+    local resolved = ctx.config.resolved
+    local themed = Slider.Variant(resolved, item) ~= "stock"
+    local theme = type(resolved) == "table" and resolved or {}
+    local sl = Colorpicker._sliderLook(resolved, item)
+    local body = theme.body or {}
+    local hint = theme.hint or {}
+    if themed then
+        trackHeight = Slider.TrackHeight(sl, touch, trackHeight)
+    end
+    -- Channel labels and readouts are muted beside the caption; a themed picker draws them as hint text.
+    local function StyleMuted(textBlock)
+        if themed then
+            umg.StyleText(textBlock, Paint.TextSize(ctx.config, hint.size, "fontItem"), nil, hint)
+        else
+            umg.StyleText(textBlock, ctx.config.fontItem, colors.textMuted)
+        end
+    end
 
     local root = umg.Construct("/Script/UMG.VerticalBox", ctx.contentBox, name .. "_Color")
     local caption = umg.Construct("/Script/UMG.TextBlock", root, name .. "_Cap")
-    umg.StyleText(caption, ctx.config.fontItem)
-    umg.SetLabelText(caption, item.label)
+    if themed then
+        umg.StyleText(caption, Paint.TextSize(ctx.config, body.size, "fontItem"), nil, body)
+        umg.SetLabelText(caption, Paint.Caption(item.label, body))
+    else
+        umg.StyleText(caption, ctx.config.fontItem)
+        umg.SetLabelText(caption, item.label)
+    end
     pcall(function()
         local slot = root:AddChildToVerticalBox(caption)
         slot:SetPadding({ Left = 0, Top = 0, Right = 0, Bottom = ROW_GAP })
     end)
 
     local swatchSize = umg.Construct("/Script/UMG.SizeBox", root, name .. "_SwatchSize")
-    local swatch = umg.Construct("/Script/UMG.Border", swatchSize, name .. "_Swatch")
+    local field = themed and theme.field or nil
+    local swatchHost = nil
+    local swatch
+    if field ~= nil and field.variant ~= "stock" then
+        -- The frame is drawn once in its own colours and never recoloured, so it may be rounded.
+        local width = tonumber(field.width) or 0
+        swatchHost = Paint.Box(swatchSize, name .. "_SwatchFrame", { fill = field.fill, outline = field.outline,
+            width = width, radius = field.radius, pill = field.pill }, width + 2)
+        swatch = umg.Construct("/Script/UMG.Border", swatchHost, name .. "_Swatch")
+        pcall(function()
+            swatchHost:SetContent(swatch)
+        end)
+    else
+        swatch = umg.Construct("/Script/UMG.Border", swatchSize, name .. "_Swatch")
+        swatchHost = swatch
+    end
     pcall(function()
         swatch:SetBrushColor(current)
     end)
     pcall(function()
         swatchSize:SetHeightOverride(SWATCH_HEIGHT)
-        swatchSize:SetContent(swatch)
+        swatchSize:SetContent(swatchHost)
         local slot = root:AddChildToVerticalBox(swatchSize)
         slot:SetPadding({ Left = 0, Top = 0, Right = 0, Bottom = ROW_GAP })
     end)
@@ -297,7 +361,7 @@ function Colorpicker.build(ctx)
         local row = umg.Construct("/Script/UMG.HorizontalBox", root, name .. "_Row" .. key)
 
         local label = umg.Construct("/Script/UMG.TextBlock", row, name .. "_Label" .. key)
-        umg.StyleText(label, ctx.config.fontItem, colors.textMuted)
+        StyleMuted(label)
         umg.SetLabelText(label, key)
         local labelSize = umg.Construct("/Script/UMG.SizeBox", row, name .. "_LabelSize" .. key)
         pcall(function()
@@ -319,9 +383,15 @@ function Colorpicker.build(ctx)
             slider:SetStepSize(STEP)
             slider.MouseUsesStep = true
             slider:SetValue(current[key])
-            slider:SetSliderBarColor(CHANNEL_TINT[key] or colors.buttonBgPrimary or colors.textAccent)
-            slider:SetSliderHandleColor(colors.textPrimary)
         end)
+        if themed then
+            Slider.StyleEngine(slider, sl, touch, Colorpicker._channelBar(key, sl))
+        else
+            pcall(function()
+                slider:SetSliderBarColor(CHANNEL_TINT[key] or colors.buttonBgPrimary or colors.textAccent)
+                slider:SetSliderHandleColor(colors.textPrimary)
+            end)
+        end
         pcall(function()
             trackSize:SetContent(slider)
             local slot = row:AddChildToHorizontalBox(trackSize)
@@ -331,7 +401,7 @@ function Colorpicker.build(ctx)
         end)
 
         local valueText = umg.Construct("/Script/UMG.TextBlock", row, name .. "_Value" .. key)
-        umg.StyleText(valueText, ctx.config.fontItem, colors.textMuted)
+        StyleMuted(valueText)
         umg.SetLabelText(valueText, Colorpicker._format(current[key]))
         local valueSize = umg.Construct("/Script/UMG.SizeBox", row, name .. "_ValueSize" .. key)
         pcall(function()
@@ -431,7 +501,7 @@ function Colorpicker.apply(ctrl, value, ctx)
     ctx.values[ctrl.valueKey] = color
     ctrl.value = color
     ctrl.lastFired = CopyColor(color)
-    Paint(ctrl, color)
+    Repaint(ctrl, color)
 end
 
 return Colorpicker

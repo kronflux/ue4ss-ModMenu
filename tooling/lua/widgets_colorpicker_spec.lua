@@ -240,3 +240,16 @@ local goneCtx = {
     end,
 }
 assert_true("poll tolerates an invalid widget", pcall(Colorpicker.poll, dragCtrl, goneCtx))
+
+-- Themed channel bars keep each colour channel's hue so the sliders read at a glance; alpha takes the slider track.
+local track = { R = 0.2, G = 0.2, B = 0.2, A = 1 }
+local redBar = Colorpicker._channelBar("R", { track = track })
+assert_true("the red channel bar is red", redBar.R > redBar.G and redBar.R > redBar.B)
+assert_eq("the alpha channel bar takes the slider track", Colorpicker._channelBar("A", { track = track }), track)
+
+-- A picker's look styles its channel sliders, so it merges over the theme's slider style.
+local StyleForPicker = require("ModMenu.core.style")
+local slatePicker = StyleForPicker.Resolve("slate")
+assert_eq("a picker look reaches the channel slider style", Colorpicker._sliderLook(slatePicker, { look = { thickness = 8 } }).thickness, 8)
+assert_eq("a picker without a look keeps the theme's slider thickness", Colorpicker._sliderLook(slatePicker, {}).thickness, slatePicker.slider.thickness)
+assert_eq("a picker with no theme has an empty slider style", next(Colorpicker._sliderLook(nil, {})), nil)
