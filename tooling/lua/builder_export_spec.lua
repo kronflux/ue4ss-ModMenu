@@ -203,6 +203,15 @@ if themeInit ~= nil and themeConfig ~= nil then
     assert_eq("the button keeps its look", themeSections[1].items[1].look, { radius = 0, pill = false })
 end
 
+-- The stage 2 document: slate with an xp title bar, a stops list, a bevel, a status bar and a frame
+-- written by the builder.
+local stage2Init, _, stage2Config = checkExport("stage 2 document", "builder_stage2_export.lua", 1)
+if stage2Init ~= nil and stage2Config ~= nil then
+    assert_eq("Init passes the slate theme to the config", stage2Config.theme, "slate")
+    assert_eq("the exported header resolves to the xpbar variant", stage2Config.resolved.header.variant, "xpbar")
+    assert_eq("the exported bar stops resolve as a list of two colours", #stage2Config.resolved.header.barStops, 2)
+    assert_eq("the exported progress frame keeps its pad", stage2Config.resolved.progress.frame.pad, 2)
+end
 -- The library rejects a field the builder would reject, with the same words. This is the other direction:
 -- the builder's messages for these cases are in builder/src/schema/validate.test.ts.
 local function registerError(item)

@@ -53,3 +53,39 @@ test("edit, borrow and export a theme style", async ({ page, context }) => {
   // The first button's look, radius 0 with pill off, gives it square corners.
   await expect(buttons.nth(0)).toHaveCSS("border-top-left-radius", "0px");
 });
+
+// Stage 2: the window frame shows in the preview, and a variant and a compound field are edited.
+test("edit the stage 2 fields of mac-light", async ({ page }) => {
+  await gotoFresh(page);
+  await page.locator(".ed-tree-label").filter({ has: page.locator(".ed-tree-hint", { hasText: "init" }) }).click();
+
+  await page.getByLabel("Theme", { exact: true }).selectOption("mac-light");
+  await expect(preview(page).locator(".mm-lights")).toBeVisible();
+
+  await page.locator('details[data-type="button"] > summary').click();
+  await page.getByLabel("button.variant", { exact: true }).selectOption("classic");
+  await expect
+    .poll(async () => {
+      const text = await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY);
+      const doc = JSON.parse(text ?? "{}");
+      return { theme: doc.init?.theme, style: doc.init?.style };
+    }, { timeout: 3000 })
+    .toEqual({ theme: "mac-light", style: { button: { variant: "classic" } } });
+
+  // A bad compound value shows the validator's message and is not stored.
+  await page.locator('details[data-type="header"] > summary').click();
+  const stops = page.getByLabel("header.barStops", { exact: true });
+  await stops.fill('["#000080"]');
+  await expect(page.locator(".ed-style-error").filter({ hasText: "barStops" })).toBeVisible();
+  // The rejected value is not stored.
+  const stored = await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY);
+  expect(JSON.parse(stored ?? "{}").init?.style?.header).toBeUndefined();
+  await stops.fill('["#000080", "#1084D0"]');
+  await expect(page.locator(".ed-style-error")).toHaveCount(0);
+  await expect
+    .poll(async () => {
+      const text = await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY);
+      return JSON.parse(text ?? "{}").init?.style?.header;
+    }, { timeout: 3000 })
+    .toEqual({ barStops: ["#000080", "#1084D0"] });
+});

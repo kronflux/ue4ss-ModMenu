@@ -421,3 +421,40 @@ describe("printLua output for the library's own checks", () => {
     await expect(printLua(hostFixture)).toMatchFileSnapshot("../../../tooling/lua/fixtures/builder_host_export.lua");
   });
 });
+
+// Stage 2: the compound kinds are written as arrays and nested tables, which printLua already handles.
+describe("printLua for the stage 2 style kinds", () => {
+  it("writes a stops list as a Lua array", () => {
+    const doc = emptyDocument();
+    doc.init.style = { header: { barStops: ["#000080", "#1084D0"] } };
+    expect(validateDocument(doc)).toEqual([]);
+    expect(printLua(doc)).toContain('        header = { barStops = { "#000080", "#1084D0" } },');
+  });
+
+  it("writes a bevel, a frame and a status bar as nested tables with sorted keys", () => {
+    const doc = emptyDocument();
+    doc.init.style = {
+      panel: { bevel: { light: "#FFFFFF", dark: "#808080", width: 2 }, statusBar: { text: "Ready", fill: "#D4D0C8", line: "#808080" } },
+      progress: { frame: { edge: "#000000", pad: 2, radius: 3 } },
+    };
+    expect(validateDocument(doc)).toEqual([]);
+    const lua = printLua(doc);
+    expect(lua).toContain(
+      '        panel = { bevel = { dark = "#808080", light = "#FFFFFF", width = 2 }, statusBar = { fill = "#D4D0C8", line = "#808080", text = "Ready" } },',
+    );
+    expect(lua).toContain('        progress = { frame = { edge = "#000000", pad = 2, radius = 3 } },');
+  });
+
+  // The Lua suite loads this file and resolves its Init options through the library (builder_export_spec.lua).
+  it("exports a slate document with an xp title bar and stage 2 kinds to the Lua suite's fixture", async () => {
+    const doc = emptyDocument();
+    doc.init.theme = "slate";
+    doc.init.style = {
+      header: { variant: "xpbar", barStops: ["#000080", "#1084D0"] },
+      panel: { bevel: { light: "#FFFFFF", dark: "#808080", width: 2 }, statusBar: { text: "Ready", fill: "#D4D0C8", line: "#808080" } },
+      progress: { frame: { edge: "#000000", pad: 2, radius: 3 } },
+    };
+    expect(validateDocument(doc)).toEqual([]);
+    await expect(printLua(doc)).toMatchFileSnapshot("../../../tooling/lua/fixtures/builder_stage2_export.lua");
+  });
+});

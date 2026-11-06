@@ -213,6 +213,13 @@
   color: #f87171;
 }
 
+/* A rejected style value: the validator's message beside the field, in the issues list's red. */
+.ed-style-error {
+  margin-left: 6px;
+  font-size: 0.72rem;
+  color: #f87171;
+}
+
 .ed-style {
   display: flex;
   flex-direction: column;

@@ -535,6 +535,65 @@ describe("validateDocument for themes, style overrides and item looks", () => {
     ]);
   });
 
+  it("reports a bad entry inside the stage 2 kinds as <type>.<field>.<key>: expected <kind>", () => {
+    const cases: [Record<string, unknown>, string][] = [
+      [{ panel: { bevel: { light: "#12" } } }, "init.style.panel.bevel.light: expected color"],
+      [{ panel: { bevel: { width: "wide" } } }, "init.style.panel.bevel.width: expected number"],
+      [{ panel: { bevel: { glow: "#FFFFFF" } } }, "init.style.panel.bevel.glow: unknown field"],
+      [{ panel: { bevel: "flat" } }, "init.style.panel.bevel: expected bevel"],
+      [{ header: { barStops: ["#000000"] } }, "init.style.header.barStops: expected at least 2 colours"],
+      [{ header: { barStops: "#000000" } }, "init.style.header.barStops: expected stops"],
+      [{ header: { barStops: ["#000000", "#12"] } }, "init.style.header.barStops[2]: expected color"],
+      [{ button: { faces: { wobble: {} } } }, "init.style.button.faces.wobble: unknown field"],
+      [{ button: { faces: { primary: { fill: "#12" } } } }, "init.style.button.faces.primary.fill: expected color"],
+      [{ button: { xp: { face: ["#000000"] } } }, "init.style.button.xp.face: expected at least 2 colours"],
+      [{ button: { xp: { glow: 5 } } }, "init.style.button.xp.glow: expected color"],
+      [{ progress: { frame: { bevel: { light: "x" } } } }, "init.style.progress.frame.bevel.light: expected color"],
+      [{ progress: { frame: { pad: "x" } } }, "init.style.progress.frame.pad: expected number"],
+      [{ panel: { statusBar: { text: 5 } } }, "init.style.panel.statusBar.text: expected string"],
+      [{ header: { captions: "none" } }, "init.style.header.captions: must be enum:all|close"],
+      [{ motion: { open: 1 } }, "init.style.motion.open: must be boolean"],
+    ];
+    for (const [style, message] of cases) {
+      expect(withInit({ style }), message).toEqual([message]);
+    }
+  });
+
+  it("rejects a non-empty list for a fixed-key kind and accepts an empty table", () => {
+    const rejected: [Record<string, unknown>, string][] = [
+      [{ panel: { bevel: ["#000000"] } }, "init.style.panel.bevel: expected bevel"],
+      [{ panel: { statusBar: ["x"] } }, "init.style.panel.statusBar: expected statusbar"],
+      [{ button: { xp: ["x"] } }, "init.style.button.xp: expected xpface"],
+      [{ progress: { frame: [1] } }, "init.style.progress.frame: expected frame"],
+      [{ button: { faces: ["x"] } }, "init.style.button.faces: expected faces"],
+      [{ button: { faces: { primary: ["x"] } } }, "init.style.button.faces.primary: expected table"],
+    ];
+    for (const [style, message] of rejected) {
+      expect(withInit({ style }), message).toEqual([message]);
+    }
+    expect(withInit({ style: { panel: { bevel: [] }, button: { faces: [] } } })).toEqual([]);
+  });
+
+  it("accepts the new header and button variants and a full set of stage 2 kinds", () => {
+    expect(withInit({ style: { header: { variant: "mac", captions: "close" }, button: { variant: "classic" } } })).toEqual([]);
+    expect(
+      withInit({
+        style: {
+          panel: {
+            bevel: { light: "#DFDFDF", dark: "#0A0A0A", innerLight: "#FFFFFF", innerDark: "#808080", width: 2 },
+            statusBar: { text: "Ready", fill: "#ECE9D8", line: "#C5C2B2" },
+          },
+          header: { barStops: ["#000080", "#1084D0"], controlFace: "#C0C0C0" },
+          button: {
+            faces: { primary: { fill: "#F4F3EE", text: "#000000" } },
+            xp: { edge: "#003C74", glow: "#F8B33A", face: ["#FFFFFF", "#F4F3EE"], pressedFace: ["#F4F3EE", "#C0C0C0"] },
+          },
+          progress: { block: ["#A6F09C", "#5BDB50"], frame: { edge: "#686868", radius: 4, pad: 2, bevel: { light: "#808080", dark: "#FFFFFF" } } },
+        },
+      }),
+    ).toEqual([]);
+  });
+
   it("reports an unknown field in an item look against the item's object type", () => {
     const doc = widgetDoc([
       { type: "button", id: "go", label: "Go", look: { wobble: 1 } },

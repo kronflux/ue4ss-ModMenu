@@ -5,7 +5,10 @@ import type { ReactNode } from "react";
 import type { Item, MenuDocument } from "../schema";
 import { FIELDS } from "../theme/fields.generated";
 import { PRESETS, PRESET_ORDER } from "../theme/presets.generated";
-import { OBJECT_TYPES, forItem, resolve } from "../theme/resolve";
+import { OBJECT_TYPES, forItem, lookIssues, resolve, styleIssues } from "../theme/resolve";
+import { CHECKED_KINDS, parseJson } from "./jsonField";
+import type { Parsed } from "./jsonField";
+import type { StyleIssue } from "../theme/resolve";
 import type { ResolvedEntry, ResolvedStyle } from "../theme/resolve";
 import type { NodeRef } from "./model";
 import {
@@ -21,7 +24,7 @@ import {
 } from "./model";
 
 type ItemRef = Extract<NodeRef, { kind: "item" }>;
-type Parsed = { ok: true; value: unknown } | { ok: false };
+
 
 // ---------------------------------------------------------------------------------------------
 // Colours: the resolved style is linear, the editor shows sRGB hex
@@ -89,7 +92,9 @@ function DraftInput({
       onCommit(parsed.value);
     }
   };
-  const bad = draft !== null && !parse(draft).ok;
+  const parsed = draft === null ? null : parse(draft);
+  const bad = parsed !== null && !parsed.ok;
+  const message = parsed !== null && !parsed.ok ? parsed.message : undefined;
   const common = {
     "aria-label": label,
     "aria-invalid": bad || undefined,
@@ -97,10 +102,18 @@ function DraftInput({
     placeholder,
     onBlur: () => setDraft(null),
   };
-  return multiline ? (
+  const input = multiline ? (
     <textarea rows={3} {...common} onChange={(event) => change(event.target.value)} />
   ) : (
     <input type="text" {...common} onChange={(event) => change(event.target.value)} />
+  );
+  return message === undefined ? (
+    input
+  ) : (
+    <>
+      {input}
+      <span className="ed-style-error">{message}</span>
+    </>
   );
 }
 
@@ -133,22 +146,6 @@ const parseFont = (text: string): Parsed => {
   return { ok: true, value: ids.length === 1 ? ids[0] : ids };
 };
 
-function parseJson(allowFalse: boolean) {
-  return (text: string): Parsed => {
-    if (text.trim() === "") {
-      return { ok: true, value: undefined };
-    }
-    try {
-      const value: unknown = JSON.parse(text);
-      if ((allowFalse && value === false) || (typeof value === "object" && value !== null)) {
-        return { ok: true, value };
-      }
-    } catch {
-      // Not JSON yet; keep the draft.
-    }
-    return { ok: false };
-  };
-}
 
 const parseHex = (text: string): Parsed => {
   const trimmed = text.trim();
@@ -176,6 +173,7 @@ function FieldEditor({
   current,
   stored,
   onSet,
+  check,
 }: {
   name: string;
   label: string;
@@ -183,6 +181,7 @@ function FieldEditor({
   current: unknown;
   stored: unknown;
   onSet: (value: unknown) => void;
+  check?: (value: unknown) => StyleIssue[];
 }) {
   const changed = stored !== undefined;
   let control;
@@ -239,7 +238,7 @@ function FieldEditor({
         label={label}
         multiline
         value={changed ? JSON.stringify(stored) : ""}
-        parse={parseJson(kind === "shadow")}
+        parse={parseJson(kind === "shadow", CHECKED_KINDS.includes(kind) ? check : undefined)}
         onCommit={onSet}
         placeholder="Preset value. Write JSON to change it."
       />
@@ -367,6 +366,7 @@ export function StylePanel({
                 kind={kind}
                 current={resolved[type][field]}
                 stored={entry.fields[field]}
+                check={(value) => styleIssues({ [type]: { [field]: value } }, type)}
                 onSet={(value) =>
                   apply(value === undefined ? resetStyleField(document, type, field) : setStyleField(document, type, field, value))
                 }
@@ -447,6 +447,7 @@ export function LookPanel({
           kind={kind}
           current={current[field]}
           stored={look[field]}
+          check={(value) => lookIssues(type, { [field]: value }, "look")}
           onSet={(value) =>
             apply(value === undefined ? resetItemLook(document, selection, field) : setItemLook(document, selection, field, value))
           }
