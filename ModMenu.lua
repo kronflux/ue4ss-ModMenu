@@ -43,7 +43,10 @@
   Left / Right / Top / Bottom. Session only unless the host persists (OnDockChange).
   Collapsible sections: Register({ collapsible = true, collapsed = true }).
   Nested fold: { type = "fold", id, label, collapsed = true, items = { ... } }.
-  Theme (authors): Init({ theme = "light" | "dark" }) — light is the current look.
+  Theme (authors): Init({ theme = "light" }) — any id from ModMenu.Themes(), or a definition table.
+  light is the current look. Init({ style = { button = "dark", toggle = { w = 40 } } }) changes parts,
+  Init({ fonts = { kanit = "/Game/Fonts/Kanit.Kanit" } }) adds game fonts, and an item's look = { ... }
+  changes one item. A later Init that changes the look rebuilds the shell.
   Tabs: Init({ tabs = { "Cheats", "Give" } }) + Register({ tab = "Cheats", ... }).
   Confirm: button { confirm = { title, message } } or ModMenu.Confirm({ onConfirm = fn }).
   Persistence: optional ModMenu.ConfigManager (Init / Get / Set). Host-owned; not auto-wired.
@@ -55,8 +58,10 @@
 
 local Util = require("ModMenu.core.util")
 local Umg = require("ModMenu.core.umg")
+local Paint = require("ModMenu.core.paint")
 local Input = require("ModMenu.core.input")
 local Config = require("ModMenu.core.config")
+local Style = require("ModMenu.core.style")
 local Instance = require("ModMenu.core.instance")
 local InputMode = require("ModMenu.core.inputmode")
 local Session = require("ModMenu.shell.session")
@@ -133,6 +138,8 @@ S.makeWidgetCtx = function()
         nodes = S.itemNodes,
         config = S.config,
         umg = Umg,
+        -- Themed widgets draw their shapes, state looks and text styles through paint.
+        paint = Paint,
         Input = Input,
         ValueKey = Util.ValueKey,
         SafeCall = Util.SafeCall,
@@ -204,6 +211,9 @@ function ModMenu.Init(opts)
     Util.SetDebug(config.debug == true)
     Instance.Ensure(config)
     Umg.SetDefaults({ fontItem = config.fontItem, colors = config.colors })
+    -- An Init can add game fonts. Paint searches again for fonts that failed only when the font
+    -- map changed, and reports each missing font once for the whole session.
+    Paint.SetFonts(config.fonts)
     Lifecycle.InstallHooks(S)
     InstallInput()
     initialized = true
@@ -233,6 +243,23 @@ function ModMenu.Init(opts)
         tostring(Instance.GetSerial()),
         Instance.GetViewportZ()
     ))
+end
+
+--- The theme preset ids Init accepts, in the order the builder lists them.
+--- The list is a copy, so a host that edits it does not change what Init accepts.
+---@return string[]
+function ModMenu.Themes()
+    return Style.Ids()
+end
+
+--- Resolve a theme, style overrides and legacy colours into the complete style table, without building any widget.
+--- A host or a test can inspect what Init would draw, because this is the same resolution Init stores in config.resolved.
+---@param theme string|table|nil a preset id, a definition table, or nil for "light"
+---@param style table|nil
+---@param colors table|nil
+---@return table
+function ModMenu.ResolveStyle(theme, style, colors)
+    return Style.Resolve(theme, style, colors)
 end
 
 --- Process-wide instance tag used in UObject names (e.g. ModMenu_Root_TestMod_1).

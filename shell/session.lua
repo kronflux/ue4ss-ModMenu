@@ -61,7 +61,9 @@ function M.New(opts)
         cursorShowFn = nil, ---@type function|nil
         cursorShowHandle = nil,
         clientRestartFn = nil, ---@type function|nil
-        rebuildFn = nil, ---@type function|nil
+        rebuildFn = nil, ---@type function|nil the registry's content rebuild
+        styleRebuildFn = nil, ---@type function|nil the deferred shell rebuild after a look change (shell/lifecycle.lua)
+        rebuildPending = false, -- true while that shell rebuild is scheduled and has not run
         cursorHiddenWidgets = nil, ---@type { widget: any, vis: number|nil }[]|nil
         cursorScale = nil,
         cursorHotspotX = nil,

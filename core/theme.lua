@@ -2,6 +2,7 @@
   ModMenu.core.theme — author-facing color presets.
 
   Init({ theme = "light" | "dark", colors = { panelBg = { R,G,B,A }, ... } }).
+  Init accepts every preset id in core/presets.lua; this module holds the legacy colour tables of light and dark only.
   light = current ModMenu look (dark panel, light fields).
   dark  = charcoal panel, dark fields, teal/gold accents.
   Not a player setting — hosts pick a preset (and optional overrides) at Init.
@@ -185,14 +186,20 @@ local PRESETS = {
     dark = DARK,
 }
 
+--- Return the preset id for Init's theme option, "light" when it is nil.
+--- The ids come from core/presets.lua, the same list Style.Ids returns, so a preset added there is accepted here without a second edit.
+--- core/style.lua requires this module, so the list is read from core/presets.lua directly rather than through Style.
+---@param name string|nil
+---@return string
 function M.Normalize(name)
-    if name == nil or name == "light" then
+    if name == nil then
         return "light"
     end
-    if name == "dark" then
-        return "dark"
+    local Presets = require("ModMenu.core.presets")
+    if type(name) == "string" and Presets.presets[name] ~= nil then
+        return name
     end
-    error('ModMenu.Init: theme must be "light" or "dark"')
+    error("ModMenu.Init: theme must be one of: " .. table.concat(Presets.order, ", ") .. " (got " .. tostring(name) .. ")")
 end
 
 function M.Preset(name)
@@ -219,8 +226,9 @@ function M.Merge(base, overrides)
     return out
 end
 
+--- Only light and dark have legacy colour tables here; the other presets' legacy colours come from Style.LegacyColors, so they start from light.
 function M.Resolve(name, overrides)
-    return M.Merge(PRESETS[M.Normalize(name)], overrides)
+    return M.Merge(PRESETS[M.Normalize(name)] or PRESETS.light, overrides)
 end
 
 local function Clamp01(n)

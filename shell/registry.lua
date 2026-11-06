@@ -9,6 +9,7 @@ local Options = require("ModMenu.core.options")
 local Tooltip = require("ModMenu.core.tooltip")
 local Persist = require("ModMenu.core.persist")
 local ItemState = require("ModMenu.core.itemstate")
+local Style = require("ModMenu.core.style")
 local Widgets = require("ModMenu.widgets.init")
 local Session = require("ModMenu.shell.session")
 local Build = require("ModMenu.shell.build")
@@ -42,6 +43,49 @@ local function ValidateTooltips(item, prefix)
     end
 end
 
+--- The style object type each widget type reads, so an item's look is checked against the fields that type draws with.
+--- Row, fold and separator have no entry, because they draw no styled part of their own.
+local LOOK_TYPE = {
+    button = "button",
+    checkbox = "toggle",
+    slider = "slider",
+    colorpicker = "slider",
+    progress = "progress",
+    radio = "choice",
+    multiselect = "choice",
+    textinput = "field",
+    number = "field",
+    keybind = "field",
+    dropdown = "field",
+    label = "body",
+    stepper = "stepper",
+}
+M.LOOK_TYPE = LOOK_TYPE
+
+--- Check an item's look, and the looks of a row's or fold's children at any depth, against the field list.
+--- An item whose type takes no look raises an error when it has one, so a look that would be ignored is reported.
+---@param item table
+---@param prefix string the item's place, such as "Register(Main) items[2]"
+function M.ValidateLook(item, prefix)
+    if item.look ~= nil then
+        local objectType = LOOK_TYPE[item.type]
+        if objectType == nil then
+            error(prefix .. ".look is not supported on a " .. tostring(item.type) .. " item")
+        end
+        if type(item.look) ~= "table" then
+            error(prefix .. ".look must be a table of " .. objectType .. " fields")
+        end
+        Style.Validate({ [objectType] = item.look }, prefix .. ".look", { noFrom = true })
+    end
+    if (item.type == "row" or item.type == "fold") and type(item.items) == "table" then
+        for i, child in ipairs(item.items) do
+            if type(child) == "table" then
+                M.ValidateLook(child, string.format("%s.items[%d]", prefix, i))
+            end
+        end
+    end
+end
+
 local function ValidateItem(item, sectionId, index)
     local prefix = string.format("Register(%s) items[%d]", tostring(sectionId), index)
     if type(item) ~= "table" then
@@ -53,6 +97,8 @@ local function ValidateItem(item, sectionId, index)
     if not widget then
         error(prefix .. " unsupported type '" .. tostring(t) .. "' (" .. Widgets.typeList() .. ")")
     end
+    -- The look is checked after the type, so an unknown type is reported as that rather than as an unsupported look.
+    M.ValidateLook(item, prefix)
     if widget.validate then
         widget.validate(item, sectionId, index)
     end
@@ -375,7 +421,8 @@ function M.SetButtonLabel(S, sectionId, itemId, text)
             and ctrl.item.id == itemId
         then
             -- Do not gate on IsValid(labelWidget) — Button child TextBlocks often report invalid.
-            SetLabelText(ctrl.labelWidget, item.label)
+            -- A themed button shows the caption in its theme's case, as it did when built.
+            SetLabelText(ctrl.labelWidget, Button.CaptionText(ctrl, item.label))
             return true
         end
     end

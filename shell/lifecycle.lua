@@ -251,8 +251,149 @@ function M.Toggle(S)
     end
 end
 
+-- Write a value as text with table keys sorted, so two equal configs always give the same key.
+local function Serialize(v, out)
+    local t = type(v)
+    if t == "table" then
+        local keys = {}
+        for k in pairs(v) do
+            keys[#keys + 1] = k
+        end
+        table.sort(keys, function(a, b)
+            return tostring(a) < tostring(b)
+        end)
+        out[#out + 1] = "{"
+        for _, k in ipairs(keys) do
+            out[#out + 1] = tostring(k)
+            out[#out + 1] = "="
+            Serialize(v[k], out)
+            out[#out + 1] = ","
+        end
+        out[#out + 1] = "}"
+    elseif t == "string" then
+        out[#out + 1] = string.format("%q", v)
+    else
+        out[#out + 1] = tostring(v)
+    end
+end
+
+--- Return a string that changes when the theme, the theme definition, the style overrides, the colours or the fonts change.
+--- Other options leave it equal, so an Init that changes only a title or a key keeps today's in-place update.
+---@param config table
+---@return string
+function M.StyleKey(config)
+    local out = {}
+    Serialize({
+        theme = config.theme,
+        themeDef = config.themeDef,
+        style = config.style,
+        colors = config.colors,
+        fonts = config.fonts,
+    }, out)
+    return table.concat(out)
+end
+
+--- Tear the shell down and build it again from the current config, reopening it when it was open.
+--- Styles are written into widgets before they are first shown (field note 28), so a new look needs new widgets rather than a repaint.
+--- This follows the ClientRestart path: Destroy releases the input mode this shell held, and Open takes it again.
+local function RebuildShell(S)
+    local wasOpen = S.menuOpen == true
+    if wasOpen then
+        -- A keybind capture belongs to the widgets being destroyed, so it ends here as it does on Close.
+        Widgets.get("keybind")._stopCapture(S.makeWidgetCtx())
+    end
+    if S.cursorShowHandle ~= nil then
+        pcall(function()
+            CancelDelayedAction(S.cursorShowHandle)
+        end)
+        S.cursorShowHandle = nil
+    end
+    Build.Destroy(S, S.stopPoll or function()
+        M.StopPoll(S)
+    end)
+    -- The cursor records its new config while the menu counts as closed, so it does not build an overlay this
+    -- rebuild would throw away; Open shows the overlay again from that record.
+    Cursor.OnConfigChanged(S)
+    Debug("style changed: shell rebuilt")
+    if wasOpen then
+        -- The menu was already open, so it is restored without asking the host gate again.
+        M.Open(S, { skipCanOpen = true })
+        -- A click still latched from before the rebuild must not land on the new widgets, as after a content rebuild.
+        Input.ClearClickState()
+    end
+end
+
+-- The wait before a deferred rebuild, about one frame. It is never 0, because a zero delay has
+-- left a game stuck before (field notes), and any positive delay runs after the current poll.
+local REBUILD_DELAY_MS = 16
+
+--- True when an Init's look needs the shell torn down and built again: a shell exists and its
+--- style key differs from the key it was built with. The first Init has no built key, and an
+--- Init that leaves the look alone keeps the in-place update.
+---@param builtKey string|nil the key the current shell was built with
+---@param key string the key of the current config
+---@param hasShell boolean
+---@return boolean
+function M.NeedsRebuild(builtKey, key, hasShell)
+    return builtKey ~= nil and builtKey ~= key and hasShell == true
+end
+
+-- Run the rebuild a changed look scheduled. The key is read now, so several Inits in one tick
+-- give one rebuild from the latest config, and an Init that put the look back gives none.
+local function RunPendingRebuild(S)
+    S.rebuildPending = false
+    local key = M.StyleKey(S.config)
+    if key == S.styleKey then
+        return
+    end
+    S.styleKey = key
+    Tabs.Ensure(S)
+    if not IsValid(S.menuRoot) then
+        -- The shell went away meanwhile, as on ClientRestart, so the next build uses this config already.
+        Cursor.OnConfigChanged(S)
+        return
+    end
+    RebuildShell(S)
+end
+
+-- A host's onClick can call Init while PollControls walks S.liveControls, so destroying the shell
+-- then would pull the list from under that loop. The rebuild waits for a later game-thread tick.
+local function ScheduleRebuild(S)
+    if S.rebuildPending then
+        return
+    end
+    if S.styleRebuildFn == nil then
+        -- Pinned for the session, as the poll function is, so a queued call never meets a dropped function.
+        -- It has its own field, because S.rebuildFn holds the registry's content rebuild.
+        S.styleRebuildFn = Util.PinFn(function()
+            RunPendingRebuild(S)
+        end)
+    end
+    S.rebuildPending = true
+    local ok, err = pcall(function()
+        ExecuteInGameThreadWithDelay(REBUILD_DELAY_MS, S.styleRebuildFn)
+    end)
+    if not ok then
+        -- Without the delayed call the new look would never show, so the rebuild runs now as it used to.
+        Log("style change: could not defer the rebuild (" .. tostring(err) .. "); rebuilding now")
+        RunPendingRebuild(S)
+    end
+end
+
 --- Re-apply panel fill/outline after Init. Rebuild content if the shell exists.
+--- When the look changed, the whole shell is rebuilt instead, on a later tick, because panel shapes and widget
+--- styles are fixed at build time.
 function M.OnConfigChanged(S)
+    -- S.styleKey is the key the current shell was built with: it is stored here when no rebuild is needed, and
+    -- by the deferred rebuild when that runs, never when one is only scheduled.
+    local key = M.StyleKey(S.config)
+    local builtKey = S.styleKey
+    if M.NeedsRebuild(builtKey, key, IsValid(S.menuRoot)) then
+        Tabs.Ensure(S)
+        ScheduleRebuild(S)
+        return
+    end
+    S.styleKey = key
     Tabs.Ensure(S)
     local colors = Theme.Of(S.config)
     if IsValid(S.panelBorder) then
@@ -406,6 +547,9 @@ function M.InstallHooks(S)
     S.clientRestartFn = Util.PinFn(function()
         local wasOpen = S.menuOpen
         Build.Destroy(S, S.stopPoll)
+        -- The next shell is built from the current config, here or at the next Open, so its key is stored now and a
+        -- style rebuild still pending finds nothing to do.
+        S.styleKey = M.StyleKey(S.config)
         Debug("ClientRestart — shell reset")
         if wasOpen then
             -- Already-open session: restore without re-checking the host gate.

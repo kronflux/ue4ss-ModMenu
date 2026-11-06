@@ -3,8 +3,89 @@
 ]]
 
 local Theme = require("ModMenu.core.theme")
+local Style = require("ModMenu.core.style")
 
 local M = {}
+
+local function DeepCopy(v)
+    if type(v) ~= "table" then
+        return v
+    end
+    local out = {}
+    for k, inner in pairs(v) do
+        out[k] = DeepCopy(inner)
+    end
+    return out
+end
+
+--- Returns a new style override table with the host's overrides merged over a base, per object type.
+--- The base is the current config.style, so a later Init keeps earlier overrides.
+--- A preset id string replaces the type's earlier entry, because it names a whole borrowed part.
+--- A table merges field by field over an earlier table for that type.
+--- A table over an earlier preset id keeps the borrow as `from`, so the new fields refine that part instead of dropping it.
+--- The value is checked against the field list first, so an unknown type or field raises an error that names it.
+---@param value table|nil
+---@param base table|nil
+---@return table
+function M.NormalizeStyle(value, base)
+    local out = DeepCopy(type(base) == "table" and base or {})
+    if value == nil then
+        return out
+    end
+    if type(value) ~= "table" then
+        error("ModMenu.Init: style must be a table of object type to preset id or fields")
+    end
+    Style.Validate(value, "ModMenu.Init: style")
+    for typeName, entry in pairs(value) do
+        if type(entry) == "string" then
+            out[typeName] = entry
+        else
+            local merged = {}
+            local earlier = out[typeName]
+            if type(earlier) == "string" then
+                merged.from = earlier
+            elseif type(earlier) == "table" then
+                for f, v in pairs(earlier) do
+                    merged[f] = v
+                end
+            end
+            for f, v in pairs(entry) do
+                merged[f] = DeepCopy(v)
+            end
+            out[typeName] = merged
+        end
+    end
+    return out
+end
+
+--- Returns a new font table, font id to UFont object path, with the host's entries merged over a base.
+--- The base is the current config.fonts, so a later Init keeps fonts an earlier one added.
+--- Every path must be a non-empty string, because a font is loaded by its object path; an error names the entry as fonts.<id>.
+---@param value table|nil
+---@param base table|nil
+---@return table
+function M.NormalizeFonts(value, base)
+    local out = {}
+    for id, path in pairs(type(base) == "table" and base or {}) do
+        out[id] = path
+    end
+    if value == nil then
+        return out
+    end
+    if type(value) ~= "table" then
+        error("ModMenu.Init: fonts must be a table of font id to object path")
+    end
+    for id, path in pairs(value) do
+        if type(id) ~= "string" or id == "" then
+            error("ModMenu.Init: fonts keys must be non-empty font id strings")
+        end
+        if type(path) ~= "string" or path == "" then
+            error("ModMenu.Init: fonts." .. id .. " must be an object path string, such as /Game/Fonts/Kanit.Kanit")
+        end
+        out[id] = path
+    end
+    return out
+end
 
 --- These are the default layout gaps and paddings, in pixels, that the shell reads from config.spacing.
 --- A host tunes them through Init's spacing table without editing the shell.
@@ -97,8 +178,14 @@ function M.New()
         topFrac = 0.05,
         bottomFrac = 0.05,
         rightFrac = 0.01, -- thickness-edge gap (all four docks)
-        theme = "light", -- "light" (current look) | "dark" (charcoal panel)
-        colors = Theme.Preset("light"),
+        theme = "light", -- a preset id from Style.Ids(), or "custom" when Init passed a definition table
+        themeDef = nil, -- the definition table Init passed as theme, or nil for a preset id
+        style = {}, -- per-type overrides, merged across Init calls by NormalizeStyle
+        fonts = {}, -- font id to UFont object path, merged across Init calls by NormalizeFonts
+        -- The legacy colour tokens Init passed, kept so a later Init without theme merges over them as Theme.Merge did.
+        _colorOverrides = {},
+        resolved = Style.Resolve("light"), -- the complete style table every shell part and widget reads
+        colors = Theme.Preset("light"), -- legacy tokens, filled from resolved for code that still reads them
         fontScale = 1, -- multiplies the default font sizes (per-game; 1 = stock)
         fontTitle = 22,
         fontHint = 14,
@@ -358,6 +445,65 @@ function M.ResolveEngineKeyName(config)
     return nil
 end
 
+--- Resolve this Init's theme, style, colors and fonts over the current ones, without changing config.
+--- Every check runs on copies, so the caller assigns the result only when nothing raised.
+---@param config table
+---@param opts table
+---@return table look { theme, themeDef, style, fonts, colorOverrides, resolved, colors }
+local function ResolveLook(config, opts)
+    local theme = config.theme
+    local themeDef = config.themeDef
+    if type(opts.theme) == "table" then
+        theme = "custom"
+        -- The definition is copied, so a host that edits its table after Init does not change the menu behind the rebuild check.
+        themeDef = DeepCopy(opts.theme)
+    elseif opts.theme ~= nil then
+        theme = Theme.Normalize(opts.theme)
+        themeDef = nil
+    end
+
+    -- colors alone must be a table, as before. Beside a theme a non-table colors is ignored, because Theme.Resolve
+    -- passed it to Theme.Merge, which skipped it, and a mod written against that still loads.
+    if opts.theme == nil and opts.colors ~= nil and type(opts.colors) ~= "table" then
+        error("ModMenu.Init: colors must be a table of { R, G, B, A } tokens")
+    end
+    -- A new theme starts its colour overrides afresh and colors alone merges over the earlier ones, as Theme.Resolve and Theme.Merge did.
+    -- Theme.Merge keeps only the tokens it knows that hold a table, so a stray value is still ignored as before.
+    local colorOverrides
+    if opts.theme ~= nil then
+        colorOverrides = Theme.Merge({}, opts.colors)
+    else
+        colorOverrides = Theme.Merge(config._colorOverrides or {}, opts.colors)
+    end
+
+    local style = M.NormalizeStyle(opts.style, config.style)
+    local fonts = M.NormalizeFonts(opts.fonts, config.fonts)
+
+    -- Style.Resolve also checks a definition table; its message is prefixed so the host sees which call failed.
+    -- Level 0 adds no position, and a position some runtimes put before the inner message is removed, so the host
+    -- reads one prefix and the message.
+    local ok, resolved = pcall(Style.Resolve, themeDef or theme, style, colorOverrides)
+    if not ok then
+        local msg = tostring(resolved)
+        msg = msg:gsub("^%S-:%d+: ", "", 1)
+        msg = msg:gsub("^%S-:%(%d[^%)]*%): ", "", 1)
+        error("ModMenu.Init: " .. msg, 0)
+    end
+
+    -- Legacy readers expect every token, so the resolved tokens are merged over the nearest legacy preset.
+    -- For light and dark the resolved tokens equal that preset's, so config.colors is exactly what Theme.Resolve returned before.
+    local legacyBase = Theme.Preset(theme == "dark" and "dark" or "light")
+    return {
+        theme = theme,
+        themeDef = themeDef,
+        style = style,
+        fonts = fonts,
+        colorOverrides = colorOverrides,
+        resolved = resolved,
+        colors = Theme.Merge(legacyBase, Style.LegacyColors(resolved)),
+    }
+end
+
 --- Merge Init(opts) into config. ctx.instanceUnlocked: instanceId may still be set.
 ---@param config table
 ---@param opts table|nil
@@ -365,6 +511,10 @@ end
 function M.ApplyInit(config, opts, ctx)
     opts = opts or {}
     ctx = ctx or {}
+
+    -- Theme, style, colors and fonts are resolved into a local before any config field is written, and assigned at
+    -- the end, so a look error leaves the whole config as it was and any later error leaves these five fields as they were.
+    local look = ResolveLook(config, opts)
 
     if opts.title ~= nil then config.title = opts.title end
     if opts.key ~= nil then config.key = opts.key end
@@ -376,15 +526,6 @@ function M.ApplyInit(config, opts, ctx)
     if opts.bottomFrac ~= nil then config.bottomFrac = opts.bottomFrac end
     if opts.rightFrac ~= nil then config.rightFrac = opts.rightFrac end
     if opts.dock ~= nil then config.dock = M.NormalizeDock(opts.dock) end
-    if opts.theme ~= nil then
-        config.theme = Theme.Normalize(opts.theme)
-        config.colors = Theme.Resolve(config.theme, opts.colors)
-    elseif opts.colors ~= nil then
-        if type(opts.colors) ~= "table" then
-            error("ModMenu.Init: colors must be a table of { R, G, B, A } tokens")
-        end
-        config.colors = Theme.Merge(config.colors, opts.colors)
-    end
     ApplyFonts(config, opts)
     if opts.canOpen ~= nil then
         if opts.canOpen ~= false and type(opts.canOpen) ~= "function" then
@@ -452,6 +593,15 @@ function M.ApplyInit(config, opts, ctx)
     if opts.debug ~= nil then
         config.debug = opts.debug == true
     end
+
+    -- Every option above has been checked, so the resolved look can replace the old one.
+    config.theme = look.theme
+    config.themeDef = look.themeDef
+    config.style = look.style
+    config.fonts = look.fonts
+    config._colorOverrides = look.colorOverrides
+    config.resolved = look.resolved
+    config.colors = look.colors
 
     if config.key == nil then
         config.key = Key.F6
