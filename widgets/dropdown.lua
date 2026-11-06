@@ -1,5 +1,9 @@
 --[[
   ModMenu widget: dropdown (plain + searchable).
+
+  A stock field, as light and dark have, draws the library's own header and option rows. A frame
+  field draws the header from the field style (headerFill, headerText, outline, width, radius) and
+  the option rows from the list style (fill, text, hover, more, radius), each look its own shape.
 ]]
 
 local Util = require("ModMenu.core.util")
@@ -7,6 +11,8 @@ local Umg = require("ModMenu.core.umg")
 local Theme = require("ModMenu.core.theme")
 local Options = require("ModMenu.core.options")
 local Input = require("ModMenu.core.input")
+local Paint = require("ModMenu.core.paint")
+local Style = require("ModMenu.core.style")
 
 local Dropdown = {}
 Dropdown.type = "dropdown"
@@ -16,8 +22,62 @@ local VIS_COLLAPSED = 1
 
 local DROPDOWN_LIST_MAX_HEIGHT = 320
 local DROPDOWN_SEARCHABLE_MAX_ROWS = 400
+local THEMED_ROW_CAP = 40
 
 local dropdownRowSerial = 0
+
+--- Show a pointer state on a header or row paint table. A themed one is a Paint state button; a
+--- stock one is recoloured as the library always has.
+local function Track(paint)
+    if paint == nil then
+        return
+    end
+    if paint.flat ~= nil then
+        Paint.TrackPointer(paint)
+    else
+        Umg.TrackPointer(paint)
+    end
+end
+
+--- The row looks of a themed option list: the list fill with its hover colour, or the active
+--- button role for the selected row. Every look shares the list radius.
+---@param themed table { list, active }
+---@param selected boolean
+---@return table states, table textColor
+function Dropdown._rowStates(themed, selected)
+    local list = themed.list
+    if selected then
+        return { normal = { fill = themed.active.fill, radius = list.radius } }, themed.active.text
+    end
+    return {
+        normal = { fill = list.fill, radius = list.radius },
+        hover = { fill = list.hover, radius = list.radius },
+    }, list.text
+end
+
+--- The themed looks of a dropdown, or nil for the library's own look. The item's look merges into
+--- the field style, which decides stock or frame; the option rows read the list style and the
+--- active button role for the selected row.
+---@param config table|nil
+---@param look table|nil
+---@return table|nil { field, list, active, textSpec, hintSpec }
+function Dropdown._themed(config, look)
+    local resolved = config and config.resolved
+    if resolved == nil then
+        return nil
+    end
+    local field = Style.ForItem(resolved, "field", look)
+    if Umg.IsStockField(field) then
+        return nil
+    end
+    return {
+        field = field,
+        list = Style.ForItem(resolved, "list", nil),
+        active = resolved.button.roles.active,
+        textSpec = resolved.body,
+        hintSpec = resolved.hint,
+    }
+end
 
 local function SyncHeader(ctrl)
     local label = ctrl.selectedLabel
@@ -38,6 +98,12 @@ local function RebuildRows(ctrl)
     ctrl.optionRows = {}
 
     local maxVisible = ctrl.maxVisible or 12
+    -- A themed row is a shaped button of several widgets, rebuilt on every expand and search
+    -- change, so a searchable list builds at most THEMED_ROW_CAP at once and search reaches the
+    -- rest. A list without search keeps every row, because a capped row could never be chosen.
+    if ctrl.themed ~= nil and ctrl.searchable and maxVisible > THEMED_ROW_CAP then
+        maxVisible = THEMED_ROW_CAP
+    end
     local filter = ctrl.searchFilter or ""
     local matched = 0
     local shown = 0
@@ -56,25 +122,49 @@ local function RebuildRows(ctrl)
                 dropdownRowSerial = dropdownRowSerial + 1
                 local optValue = Util.ToPlainString(opt.value) or opt.value
                 local isSelected = selectedValue ~= nil and optValue == selectedValue
-                local fill, btn, lbl = Umg.CreateFilledButton(
-                    ctrl.listBox,
-                    ctrl.namePrefix .. "_Opt" .. tostring(dropdownRowSerial),
-                    opt.label,
-                    isSelected and selectedText or optionText,
-                    fontDropdown
-                )
-                ctrl.listBox:AddChildToVerticalBox(fill)
-                local row = {
-                    button = btn,
-                    widget = btn,
-                    fill = fill,
-                    label = lbl,
-                    optLabel = opt.label,
-                    optValue = opt.value,
-                    wasPressed = false,
-                }
-                Umg.SetFill(row, isSelected and selectedBg or optionBg)
-                table.insert(ctrl.optionRows, row)
+                local themed = ctrl.themed
+                if themed ~= nil then
+                    -- Each row is built with its look written in place and only then added, so the
+                    -- list shows it from the first frame even though it is built on expand.
+                    local states, textColor = Dropdown._rowStates(themed, isSelected)
+                    local paint = Paint.StateButton(
+                        ctrl.listBox,
+                        ctrl.namePrefix .. "_Opt" .. tostring(dropdownRowSerial),
+                        states,
+                        opt.label,
+                        { color = textColor, size = fontDropdown, textSpec = themed.textSpec, pad = { 8, 4, 8, 4 } }
+                    )
+                    ctrl.listBox:AddChildToVerticalBox(paint.root)
+                    table.insert(ctrl.optionRows, {
+                        button = paint.widget,
+                        widget = paint.widget,
+                        paint = paint,
+                        label = paint.label,
+                        optLabel = opt.label,
+                        optValue = opt.value,
+                        wasPressed = false,
+                    })
+                else
+                    local fill, btn, lbl = Umg.CreateFilledButton(
+                        ctrl.listBox,
+                        ctrl.namePrefix .. "_Opt" .. tostring(dropdownRowSerial),
+                        opt.label,
+                        isSelected and selectedText or optionText,
+                        fontDropdown
+                    )
+                    ctrl.listBox:AddChildToVerticalBox(fill)
+                    local row = {
+                        button = btn,
+                        widget = btn,
+                        fill = fill,
+                        label = lbl,
+                        optLabel = opt.label,
+                        optValue = opt.value,
+                        wasPressed = false,
+                    }
+                    Umg.SetFill(row, isSelected and selectedBg or optionBg)
+                    table.insert(ctrl.optionRows, row)
+                end
             end
         end
     end
@@ -146,6 +236,11 @@ local function CreatePicker(outer, namePrefix, options, selectedValue, dropOpts,
     local fontDropdown = config.fontDropdown or 15
     local fontHint = config.fontHint or 14
     local colors = Theme.Of(config)
+    local themed = Dropdown._themed(config, dropOpts.look)
+    if themed ~= nil then
+        fontDropdown = Paint.TextSize(config, themed.textSpec and themed.textSpec.size, "fontDropdown")
+        fontHint = Paint.TextSize(config, themed.hintSpec and themed.hintSpec.size, "fontHint")
+    end
 
     local list, labelToValue, valueToLabel = Options.NormalizeOptions(options)
     selectedValue = Util.ToPlainString(selectedValue) or selectedValue
@@ -161,23 +256,31 @@ local function CreatePicker(outer, namePrefix, options, selectedValue, dropOpts,
 
     local root = Umg.Construct("/Script/UMG.VerticalBox", outer, namePrefix .. "_Root")
 
-    -- The Border is the visible fill, and the Button inside it is transparent (see Umg.SetFillColors).
-    local headerFill = Umg.Construct("/Script/UMG.Border", root, namePrefix .. "_Header_Fill")
-    local headerBtn = Umg.Construct("/Script/UMG.Button", headerFill, namePrefix .. "_Header_Btn")
-    pcall(function()
-        headerFill:SetPadding({ Left = 0, Top = 0, Right = 0, Bottom = 0 })
-        headerFill:SetContent(headerBtn)
-        if headerBtn.SetClickMethod then
-            headerBtn:SetClickMethod(1)
-        end
-        if headerBtn.SetTouchMethod then
-            headerBtn:SetTouchMethod(1)
-        end
-    end)
-    local headerRow = Umg.Construct("/Script/UMG.HorizontalBox", headerBtn, namePrefix .. "_HeaderRow")
+    local headerFill, headerBtn, headerRow
+    if themed == nil then
+        -- The Border is the visible fill, and the Button inside it is transparent (see Umg.SetFillColors).
+        headerFill = Umg.Construct("/Script/UMG.Border", root, namePrefix .. "_Header_Fill")
+        headerBtn = Umg.Construct("/Script/UMG.Button", headerFill, namePrefix .. "_Header_Btn")
+        pcall(function()
+            headerFill:SetPadding({ Left = 0, Top = 0, Right = 0, Bottom = 0 })
+            headerFill:SetContent(headerBtn)
+            if headerBtn.SetClickMethod then
+                headerBtn:SetClickMethod(1)
+            end
+            if headerBtn.SetTouchMethod then
+                headerBtn:SetTouchMethod(1)
+            end
+        end)
+        headerRow = Umg.Construct("/Script/UMG.HorizontalBox", headerBtn, namePrefix .. "_HeaderRow")
+    else
+        -- The themed header is a Paint state button built around this row once the row is filled.
+        headerRow = Umg.Construct("/Script/UMG.HorizontalBox", root, namePrefix .. "_HeaderRow")
+    end
+    local headerText = themed ~= nil and themed.field.headerText or colors.dropdownHeaderText
+    local headerSpec = themed ~= nil and themed.textSpec or nil
 
     local valueLabel = Umg.Construct("/Script/UMG.TextBlock", headerRow, namePrefix .. "_Value")
-    Umg.StyleText(valueLabel, fontDropdown, colors.dropdownHeaderText)
+    Umg.StyleText(valueLabel, fontDropdown, headerText, headerSpec)
     Umg.SetLabelText(valueLabel, tostring(selectedLabel))
     local valueSlot = headerRow:AddChildToHorizontalBox(valueLabel)
     pcall(function()
@@ -187,7 +290,7 @@ local function CreatePicker(outer, namePrefix, options, selectedValue, dropOpts,
     end)
 
     local arrowLabel = Umg.Construct("/Script/UMG.TextBlock", headerRow, namePrefix .. "_Arrow")
-    Umg.StyleText(arrowLabel, fontDropdown, colors.dropdownHeaderText)
+    Umg.StyleText(arrowLabel, fontDropdown, headerText, headerSpec)
     Umg.SetLabelText(arrowLabel, "▼")
     local arrowSlot = headerRow:AddChildToHorizontalBox(arrowLabel)
     pcall(function()
@@ -196,12 +299,25 @@ local function CreatePicker(outer, namePrefix, options, selectedValue, dropOpts,
         arrowSlot:SetVerticalAlignment(2)
     end)
 
-    pcall(function()
-        headerBtn:SetContent(headerRow)
-    end)
-    root:AddChildToVerticalBox(headerFill)
-    local headerPaint = { widget = headerBtn, fill = headerFill }
-    Umg.SetFill(headerPaint, colors.dropdownHeaderBg)
+    local headerPaint
+    if themed == nil then
+        pcall(function()
+            headerBtn:SetContent(headerRow)
+        end)
+        root:AddChildToVerticalBox(headerFill)
+        headerPaint = { widget = headerBtn, fill = headerFill }
+        Umg.SetFill(headerPaint, colors.dropdownHeaderBg)
+    else
+        local f = themed.field
+        -- The edge is its own Border, because a Button's state brush did not draw an outline
+        -- (field note 31); hover and pressed shapes are derived from the header fill.
+        headerPaint = Paint.StateButton(root, namePrefix .. "_Header", {
+            normal = { fill = f.headerFill, radius = f.radius, pill = f.pill },
+            edge = { outline = f.outline, width = f.width },
+        }, headerRow)
+        headerBtn, headerFill = headerPaint.widget, headerPaint.fill
+        root:AddChildToVerticalBox(headerPaint.root)
+    end
 
     local optionsBox = Umg.Construct("/Script/UMG.VerticalBox", root, namePrefix .. "_Opts")
     pcall(function()
@@ -210,17 +326,29 @@ local function CreatePicker(outer, namePrefix, options, selectedValue, dropOpts,
 
     local searchBox = nil
     if searchable then
-        local searchBorder = Umg.Construct("/Script/UMG.Border", optionsBox, namePrefix .. "_SearchBorder")
-        pcall(function()
-            searchBorder:SetBrushColor(colors.fieldBg)
-            searchBorder:SetPadding({ Left = 8, Top = 6, Right = 8, Bottom = 6 })
-        end)
+        local searchBorder
+        if themed == nil then
+            searchBorder = Umg.Construct("/Script/UMG.Border", optionsBox, namePrefix .. "_SearchBorder")
+            pcall(function()
+                searchBorder:SetBrushColor(colors.fieldBg)
+                searchBorder:SetPadding({ Left = 8, Top = 6, Right = 8, Bottom = 6 })
+            end)
+        else
+            local f = themed.field
+            searchBorder = Paint.Box(optionsBox, namePrefix .. "_SearchBorder", {
+                fill = f.fill,
+                outline = f.outline,
+                width = f.width,
+                radius = f.radius,
+                pill = f.pill,
+            }, { 8, 6, 8, 6 })
+        end
         searchBox = Umg.Construct("/Script/UMG.EditableTextBox", searchBorder, namePrefix .. "_Search")
         pcall(function()
             searchBox:SetHintText(FText("Type to filter..."))
             searchBox:SetText(FText(""))
         end)
-        Umg.StyleEditableTextBox(searchBox, fontDropdown)
+        Umg.StyleEditableTextBox(searchBox, fontDropdown, themed and themed.field, themed and themed.textSpec)
         pcall(function()
             searchBorder:SetContent(searchBox)
         end)
@@ -247,7 +375,8 @@ local function CreatePicker(outer, namePrefix, options, selectedValue, dropOpts,
     local moreLabel = nil
     if searchable then
         moreLabel = Umg.Construct("/Script/UMG.TextBlock", optionsBox, namePrefix .. "_More")
-        Umg.StyleText(moreLabel, fontHint, colors.dropdownMore)
+        Umg.StyleText(moreLabel, fontHint, themed ~= nil and themed.list.more or colors.dropdownMore,
+            themed ~= nil and themed.hintSpec or nil)
         Umg.SetLabelText(moreLabel, "")
         pcall(function()
             moreLabel:SetVisibility(VIS_COLLAPSED)
@@ -284,6 +413,7 @@ local function CreatePicker(outer, namePrefix, options, selectedValue, dropOpts,
         optionText = colors.dropdownOptionText,
         optionSelectedBg = colors.buttonBgActive,
         optionSelectedText = colors.buttonTextActive,
+        themed = themed,
         expanded = false,
         headerWasPressed = false,
     }
@@ -337,8 +467,15 @@ function Dropdown.build(ctx)
     end
 
     local caption = umg.Construct("/Script/UMG.TextBlock", ctx.contentBox, ctx.namePrefix .. "_Cap")
-    umg.StyleText(caption, ctx.config.fontHint)
-    umg.SetLabelText(caption, item.label)
+    local themed = Dropdown._themed(ctx.config, item.look)
+    if themed ~= nil then
+        local spec = themed.textSpec
+        umg.StyleText(caption, Paint.TextSize(ctx.config, spec and spec.size, "fontHint"), nil, spec)
+        umg.SetLabelText(caption, Paint.Caption(item.label, spec))
+    else
+        umg.StyleText(caption, ctx.config.fontHint)
+        umg.SetLabelText(caption, item.label)
+    end
     ctx.contentBox:AddChildToVerticalBox(caption)
     umg.RecordNode(ctx, caption)
 
@@ -348,6 +485,7 @@ function Dropdown.build(ctx)
         maxVisible = item.maxVisible,
         listMaxHeight = item.listMaxHeight,
         allowEmpty = item.allowEmpty,
+        look = item.look,
     }, ctx.config)
 
     ctx.values[vkey] = picker.selectedValue
@@ -393,6 +531,7 @@ function Dropdown.liveControl(picker, extra)
         optionText = picker.optionText,
         optionSelectedBg = picker.optionSelectedBg,
         optionSelectedText = picker.optionSelectedText,
+        themed = picker.themed,
         expanded = false,
         headerWasPressed = false,
     }
@@ -451,16 +590,14 @@ function Dropdown.poll(ctrl, ctx)
 
     if ctrl.expanded and ctrl.optionRows then
         for _, row in ipairs(ctrl.optionRows) do
-            Umg.TrackPointer(row)
+            Track(row.paint or row)
             if Input.ReleaseClick(row, row.button) then
                 SelectOption(ctrl, ctx, row, "release")
                 return
             end
         end
     end
-    if ctrl.headerPaint ~= nil then
-        Umg.TrackPointer(ctrl.headerPaint)
-    end
+    Track(ctrl.headerPaint)
     if Input.ReleaseClick(ctrl, ctrl.headerBtn) then
         ToggleHeader(ctrl, ctx, "release")
     end

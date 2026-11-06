@@ -68,3 +68,57 @@ assert_true(
     "apply errors on a value not in the options",
     mentions(errorOf(Radio.apply, ctrl, "z", {}), "radio mode: value must be one of a, b, c")
 )
+
+-- The choice variant: stock for light and dark, the resolved choice variant otherwise.
+local Style = require("ModMenu.core.style")
+local slate = Style.Resolve("slate")
+assert_eq("light's radio variant is stock", Radio.Variant(Style.Resolve("light")), "stock")
+assert_eq("dark's radio variant is stock", Radio.Variant(Style.Resolve("dark")), "stock")
+assert_eq("slate's radio variant is its resolved choice variant", Radio.Variant(slate), slate.choice.variant)
+assert_eq("no resolved theme is stock", Radio.Variant(nil), "stock")
+assert_eq("an item look overrides the variant", Radio.Variant(slate, { variant = "chips" }), "chips")
+assert_eq("the theme stays as resolved after an item look", Radio.Variant(slate), slate.choice.variant)
+
+-- Caption colours per variant and state.
+local cs, p = slate.choice, slate.palette
+assert_eq("a chosen joined option uses the mark text", Radio._choiceTextColor(cs, p, "joined", true), cs.markText)
+assert_eq("an unchosen joined option uses the text colour", Radio._choiceTextColor(cs, p, "joined", false), p.text)
+assert_eq("an unchosen tab is muted", Radio._choiceTextColor(cs, p, "tabs", false), p.muted)
+assert_eq("a chosen tab uses the mark fill when no tab text is set", Radio._choiceTextColor(cs, p, "tabs", true), cs.tabText or cs.markFill)
+assert_eq("a radio option keeps the text colour when chosen", Radio._choiceTextColor(cs, p, "radio", true), p.text)
+assert_eq("chips stand apart", Radio._choiceGap("chips"), 6)
+assert_eq("joined options nearly touch", Radio._choiceGap("joined"), 2)
+
+-- A themed group shows exactly one mark: the chosen option's.
+local function fakeWidget()
+    local w = { vis = nil }
+    function w:SetVisibility(v)
+        self.vis = v
+    end
+    function w:SetColorAndOpacity(c)
+        self.color = c.SpecifiedColor
+    end
+    return w
+end
+local theme = { cs = cs, p = p, variant = "joined" }
+local themedCtrl = { kind = "radio", item = item(), optionCtrls = {}, valueKey = "s.mode" }
+for _, value in ipairs({ "a", "b", "c" }) do
+    themedCtrl.optionCtrls[#themedCtrl.optionCtrls + 1] = {
+        value = value,
+        paint = {},
+        marksOn = { fakeWidget() },
+        marksOff = {},
+        text = fakeWidget(),
+        theme = theme,
+        item = {},
+    }
+end
+Radio.apply(themedCtrl, "b", {})
+local opts = themedCtrl.optionCtrls
+assert_eq("the chosen option's mark is shown", opts[2].marksOn[1].vis, 3)
+assert_eq("an unchosen option's mark is hidden, keeping its layout", opts[1].marksOn[1].vis, 2)
+assert_eq("the other unchosen mark is hidden", opts[3].marksOn[1].vis, 2)
+assert_eq("the chosen caption takes the mark text", opts[2].text.color, cs.markText)
+Radio.apply(themedCtrl, "c", {})
+assert_eq("choosing another option hides the old mark", opts[2].marksOn[1].vis, 2)
+assert_eq("and shows the new one", opts[3].marksOn[1].vis, 3)

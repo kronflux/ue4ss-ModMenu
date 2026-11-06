@@ -6,7 +6,11 @@
   the checked option values, in option order. Options use the dropdown's shape: plain strings or
   { label, value } tables.
 
-  Each option is a button control that the button widget paints and polls, as the radio does.
+  The theme's choice variant picks the look, as for the radio, and the radio's functions draw it.
+  stock, as light and dark draw, makes each option a button control that the button widget paints
+  and polls. joined, chips, tabs and radio show a mark on every checked option, so several marks
+  are on at once, and the caption carries no check text because the mark says it.
+
   The option's onClick only records which option was pressed; the multiselect then toggles it,
   stores the array and fires onChange with a copy of the array.
 
@@ -15,6 +19,8 @@
 
 local Options = require("ModMenu.core.options")
 local Button = require("ModMenu.widgets.button")
+local Radio = require("ModMenu.widgets.radio")
+local Paint = require("ModMenu.core.paint")
 
 local Multiselect = {}
 Multiselect.type = "multiselect"
@@ -170,12 +176,16 @@ local function PaintOptions(ctrl, ctx)
     for _, opt in ipairs(ctrl.optionCtrls) do
         local checked = on[opt.value] == true
         opt.item.active = checked
-        pcall(function()
-            if opt.labelWidget ~= nil and ctx.umg ~= nil then
-                ctx.umg.SetLabelText(opt.labelWidget, Multiselect._caption(opt.label, checked))
-            end
-        end)
-        Button.applyChrome(opt, ctx)
+        if opt.paint ~= nil then
+            Radio._paintOption(opt, checked)
+        else
+            pcall(function()
+                if opt.labelWidget ~= nil and ctx.umg ~= nil then
+                    ctx.umg.SetLabelText(opt.labelWidget, Multiselect._caption(opt.label, checked))
+                end
+            end)
+            Button.applyChrome(opt, ctx)
+        end
     end
 end
 
@@ -200,16 +210,24 @@ function Multiselect.build(ctx)
     local selected = Multiselect._normalize(ctx.values[vkey], item)
     ctx.values[vkey] = selected
 
+    local theme = Radio._choiceTheme(ctx, item)
     local root = umg.Construct("/Script/UMG.VerticalBox", ctx.contentBox, ctx.namePrefix .. "_Root")
     local caption = umg.Construct("/Script/UMG.TextBlock", root, ctx.namePrefix .. "_Cap")
-    umg.StyleText(caption, ctx.config.fontHint)
-    umg.SetLabelText(caption, item.label)
+    if theme ~= nil then
+        umg.StyleText(caption, theme.hintSize, nil, theme.textSpec)
+        umg.SetLabelText(caption, Paint.Caption(item.label, theme.textSpec))
+    else
+        umg.StyleText(caption, ctx.config.fontHint)
+        umg.SetLabelText(caption, item.label)
+    end
     root:AddChildToVerticalBox(caption)
 
     local columns = item.columns or MIN_COLUMNS
     local grid = umg.Construct("/Script/UMG.UniformGridPanel", root, ctx.namePrefix .. "_Grid")
+    -- Each slot pads all four sides, so half the radio's gap between options gives the same spacing.
+    local gap = theme ~= nil and Radio._choiceGap(theme.variant) / 2 or OPTION_GAP
     pcall(function()
-        grid:SetSlotPadding({ Left = OPTION_GAP, Top = OPTION_GAP, Right = OPTION_GAP, Bottom = OPTION_GAP })
+        grid:SetSlotPadding({ Left = gap, Top = gap, Right = gap, Bottom = gap })
     end)
 
     local ctrl = {
@@ -230,27 +248,43 @@ function Multiselect.build(ctx)
 
     local list = Options.NormalizeOptions(item.options)
     for i, opt in ipairs(list) do
-        local fill, button, label = umg.CreateFilledButton(grid, ctx.namePrefix .. "_Opt" .. tostring(i), opt.label)
+        local name = ctx.namePrefix .. "_Opt" .. tostring(i)
+        local optCtrl
+        if theme ~= nil then
+            local optItem = Multiselect._optionItem(ctrl, opt.value)
+            optCtrl = Radio._buildOption(umg, grid, name, opt.label, theme, optItem.onClick)
+            optCtrl.value = opt.value
+            optCtrl.label = opt.label
+            optCtrl.item = optItem
+        else
+            local fill, button, label = umg.CreateFilledButton(grid, name, opt.label)
+            optCtrl = {
+                kind = "button",
+                value = opt.value,
+                label = opt.label,
+                root = fill,
+                widget = button,
+                fill = fill,
+                labelWidget = label,
+                enabled = true,
+                wasPressed = false,
+                item = Multiselect._optionItem(ctrl, opt.value),
+            }
+        end
         local row = math.floor((i - 1) / columns)
         local col = (i - 1) % columns
         pcall(function()
-            local slot = grid:AddChildToUniformGrid(fill, row, col)
+            local slot = grid:AddChildToUniformGrid(optCtrl.root, row, col)
             slot:SetHorizontalAlignment(ALIGN_FILL)
             slot:SetVerticalAlignment(ALIGN_FILL)
         end)
-        table.insert(ctrl.optionCtrls, {
-            kind = "button",
-            value = opt.value,
-            label = opt.label,
-            widget = button,
-            fill = fill,
-            labelWidget = label,
-            enabled = true,
-            wasPressed = false,
-            item = Multiselect._optionItem(ctrl, opt.value),
-        })
+        table.insert(ctrl.optionCtrls, optCtrl)
     end
-    root:AddChildToVerticalBox(grid)
+    if theme ~= nil then
+        root:AddChildToVerticalBox(Radio._choiceFrame(umg, root, ctx.namePrefix .. "_Track", grid, theme))
+    else
+        root:AddChildToVerticalBox(grid)
+    end
 
     umg.AddToContent(ctx, root)
     umg.AddItemPad(ctx, ctx.namePrefix .. "_Pad", 8)
@@ -278,7 +312,7 @@ function Multiselect.poll(ctrl, ctx)
         return
     end
     for _, opt in ipairs(ctrl.optionCtrls) do
-        Button.poll(opt, ctx)
+        Radio._pollOption(opt, ctx)
         if TakePending(ctrl, ctx) then
             return
         end
@@ -292,7 +326,7 @@ function Multiselect.pollClick(ctrl, ctx)
         return false
     end
     for _, opt in ipairs(ctrl.optionCtrls) do
-        if Button.pollClick(opt, ctx) then
+        if Radio._pollOptionClick(opt, ctx) then
             TakePending(ctrl, ctx)
             return true
         end

@@ -239,3 +239,8 @@ assert_true(
     inList.A and inList.Z and inList.Zero and inList.Nine and inList.F1 and inList.F12
         and inList.Up and inList.Left and inList.LeftControl and inList.RightAlt and inList.RightShift
 )
+
+-- A themed keybind shows capture by its text colour: the accent while it listens.
+local themed = { field = { text = { R = 1, G = 1, B = 1, A = 1 } }, accent = { R = 0, G = 0.5, B = 1, A = 1 } }
+assert_eq("a capturing themed keybind uses the accent", Keybind._textColor(themed, true), themed.accent)
+assert_eq("an idle themed keybind uses the field text", Keybind._textColor(themed, false), themed.field.text)

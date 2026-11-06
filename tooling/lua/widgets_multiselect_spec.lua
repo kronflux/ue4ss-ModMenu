@@ -189,3 +189,73 @@ assert_true("a checked option is painted active", clickCtrl.optionCtrls[2].item.
 assert_true("an unchecked option is painted normal", clickCtrl.optionCtrls[1].item.active == false)
 Multiselect.poll(clickCtrl, clickCtx)
 assert_eq("an idle poll fires nothing", #fired, 2)
+
+-- A themed multiselect shows a mark on every checked option, so several marks are on at once.
+local Style = require("ModMenu.core.style")
+local slate = Style.Resolve("slate")
+local function fakeWidget()
+    local w = {}
+    function w:SetVisibility(v)
+        self.vis = v
+    end
+    function w:SetColorAndOpacity(c)
+        self.color = c.SpecifiedColor
+    end
+    return w
+end
+local themedFired = {}
+local themedItem = { id = "t", label = "T", options = { "a", "b", "c" }, onChange = function(v)
+    themedFired[#themedFired + 1] = v
+end }
+local themedValues = { ["s.t"] = {} }
+local themedCtrl = { kind = "multiselect", item = themedItem, valueKey = "s.t", selected = {}, optionCtrls = {} }
+local theme = { cs = slate.choice, p = slate.palette, variant = "radio" }
+for _, value in ipairs({ "a", "b", "c" }) do
+    themedCtrl.optionCtrls[#themedCtrl.optionCtrls + 1] = {
+        kind = "button",
+        value = value,
+        widget = "t" .. value,
+        paint = {},
+        marksOn = { fakeWidget(), fakeWidget() },
+        marksOff = { fakeWidget() },
+        text = fakeWidget(),
+        theme = theme,
+        item = Multiselect._optionItem(themedCtrl, value),
+    }
+end
+local themedReleased = {}
+local themedCtx = {
+    values = themedValues,
+    config = {},
+    IsValid = function()
+        return true
+    end,
+    SafeCall = function(fn, ...)
+        fn(...)
+    end,
+    ReclaimMenuInput = function() end,
+    Input = {
+        ReleaseClick = function(_, w)
+            return themedReleased[w] == true
+        end,
+        ArmClick = function()
+            return false, false
+        end,
+        SuppressPressEdge = function() end,
+        IgnoreClicks = function() end,
+    },
+}
+Multiselect.apply(themedCtrl, { "a", "c" }, themedCtx)
+local t = themedCtrl.optionCtrls
+assert_eq("a checked themed option shows its ring", t[1].marksOn[1].vis, 3)
+assert_eq("a checked themed option shows its dot", t[1].marksOn[2].vis, 3)
+assert_eq("a checked themed option hides its empty ring", t[1].marksOff[1].vis, 2)
+assert_eq("a second checked option is marked too", t[3].marksOn[1].vis, 3)
+assert_eq("an unchecked themed option hides its mark", t[2].marksOn[1].vis, 2)
+assert_eq("an unchecked themed option shows its empty ring", t[2].marksOff[1].vis, 3)
+themedReleased.tb = true
+Multiselect.poll(themedCtrl, themedCtx)
+themedReleased.tb = nil
+assert_eq("a release over a themed option checks it", themedValues["s.t"], { "a", "b", "c" })
+assert_eq("the themed click fires onChange with the array", themedFired[1], { "a", "b", "c" })
+assert_eq("the newly checked option shows its mark", t[2].marksOn[1].vis, 3)

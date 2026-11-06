@@ -5,6 +5,9 @@
 local Options = require("ModMenu.core.options")
 local Util = require("ModMenu.core.util")
 local Theme = require("ModMenu.core.theme")
+local Paint = require("ModMenu.core.paint")
+local Button = require("ModMenu.widgets.button")
+local Stepper = require("ModMenu.widgets.stepper")
 
 local Number = {}
 Number.type = "number"
@@ -181,18 +184,35 @@ function Number.build(ctx)
     local fillField = ctx.layout ~= "horizontal" and item.fill ~= false
     -- The minus and plus buttons show only when the item sets step, so a number that does not keeps its look.
     local stepButtons = {}
+    -- A stock field gives nil styles and fontItem, so light and dark build today's field.
+    local field, textSpec, fontSize = umg.FieldLook(ctx.config, item.look)
+    -- On a themed preset the step buttons take the stepper's look, as the stepper widget's own
+    -- buttons do; light and dark keep the flat recoloured buttons.
+    local stepStates, stepCaption = nil, nil
+    if field ~= nil then
+        stepStates = Stepper._states(ctx.config.resolved, {})
+        stepCaption = Button.CaptionStyle(ctx, stepStates)
+    end
     local function AddStepButtons(row)
         local colors = Theme.Of(ctx.config)
         for _, spec in ipairs({ { key = "minus", text = "-" }, { key = "plus", text = "+" } }) do
-            local fill, button, text = umg.CreateFilledButton(row, ctx.namePrefix .. "_" .. spec.key, spec.text, nil, ctx.config.fontItem)
-            local slot = row:AddChildToHorizontalBox(fill)
+            local stepName = ctx.namePrefix .. "_" .. spec.key
+            local stepCtrl
+            if stepStates ~= nil then
+                stepCtrl = Paint.StateButton(row, stepName, stepStates, spec.text, stepCaption)
+                stepCtrl.labelWidget = stepCtrl.label
+            else
+                local fill, button, text = umg.CreateFilledButton(row, stepName, spec.text, nil, ctx.config.fontItem)
+                stepCtrl = { root = fill, widget = button, fill = fill, labelWidget = text }
+                umg.SetFill(stepCtrl, colors.buttonBg)
+            end
+            stepCtrl.dir = spec.key == "plus" and 1 or -1
+            local slot = row:AddChildToHorizontalBox(stepCtrl.root)
             pcall(function()
                 slot:SetSize({ SizeRule = 0, Value = 0.0 })
                 slot:SetPadding({ Left = 6, Top = 0, Right = 0, Bottom = 0 })
                 slot:SetVerticalAlignment(2)
             end)
-            local stepCtrl = { widget = button, fill = fill, labelWidget = text, dir = spec.key == "plus" and 1 or -1 }
-            umg.SetFill(stepCtrl, colors.buttonBg)
             table.insert(stepButtons, stepCtrl)
         end
     end
@@ -202,7 +222,9 @@ function Number.build(ctx)
         item.label,
         FormatValue(current, item.integer == true),
         {
-            fontSize = ctx.config.fontItem,
+            fontSize = fontSize,
+            field = field,
+            textSpec = textSpec,
             fieldWidth = item.fieldWidth or (ctx.layout == "horizontal" and 72 or 96),
             labelWidth = item.labelWidth,
             hint = item.placeholder,
@@ -253,7 +275,12 @@ function Number.poll(ctrl, ctx)
         return
     end
     for _, stepCtrl in ipairs(ctrl.stepButtons or {}) do
-        ctx.umg.TrackPointer(stepCtrl)
+        -- A shaped step button swaps shapes; a flat one is recoloured as before.
+        if stepCtrl.flat == false then
+            Paint.TrackPointer(stepCtrl)
+        else
+            ctx.umg.TrackPointer(stepCtrl)
+        end
         if ctx.Input.ReleaseClick(stepCtrl, stepCtrl.widget) then
             FireStep(ctrl, ctx, stepCtrl)
         end

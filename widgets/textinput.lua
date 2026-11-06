@@ -58,13 +58,17 @@ function TextInput.build(ctx)
     end
 
     local fillField = ctx.layout ~= "horizontal" and item.fill ~= false
+    -- A stock field gives nil styles and fontItem, so light and dark build today's field.
+    local field, textSpec, fontSize = umg.FieldLook(ctx.config, item.look)
     local root, edit, label = umg.CreateLabeledEditable(
         ctx.contentBox,
         ctx.namePrefix,
         item.label,
         current,
         {
-            fontSize = ctx.config.fontItem,
+            fontSize = fontSize,
+            field = field,
+            textSpec = textSpec,
             fieldWidth = item.fieldWidth or (ctx.layout == "horizontal" and 140 or 200),
             labelWidth = item.labelWidth,
             hint = item.placeholder,

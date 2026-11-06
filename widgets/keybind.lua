@@ -18,6 +18,8 @@
 ]]
 
 local Util = require("ModMenu.core.util")
+local Umg = require("ModMenu.core.umg")
+local PaintLib = require("ModMenu.core.paint")
 local Button = require("ModMenu.widgets.button")
 
 local Keybind = {}
@@ -212,9 +214,32 @@ local function Caption(item, value, capturing)
     return string.format("%s: %s", tostring(item.label), shown)
 end
 
+--- The text colour of a themed keybind: the accent while it captures, the field text otherwise.
+---@param themed table { field, accent }
+---@param capturing boolean
+---@return table
+function Keybind._textColor(themed, capturing)
+    if capturing then
+        return themed.accent
+    end
+    return themed.field.text
+end
+
 --- Paint the button as active while it captures, so the player sees which item is listening.
 local function Paint(ctrl, ctx)
-    ctx.umg.SetLabelText(ctrl.labelWidget, Caption(ctrl.item, ctx.values[ctrl.valueKey], ctrl.capturing))
+    local caption = Caption(ctrl.item, ctx.values[ctrl.valueKey], ctrl.capturing)
+    local themed = ctrl.themed
+    if themed ~= nil then
+        -- A themed keybind shows capture by its caption and text colour alone, so no shape is
+        -- recoloured at run time (field note 30).
+        ctx.umg.SetLabelText(ctrl.labelWidget, PaintLib.Caption(caption, themed.textSpec))
+        local color = Keybind._textColor(themed, ctrl.capturing == true)
+        pcall(function()
+            ctrl.labelWidget:SetColorAndOpacity({ SpecifiedColor = color, ColorUseRule = 0 })
+        end)
+        return
+    end
+    ctx.umg.SetLabelText(ctrl.labelWidget, caption)
     -- The paint table is kept, because it holds the fill colours the pointer poll repaints from.
     ctrl.paint = ctrl.paint or {
         kind = "keybind",
@@ -233,12 +258,32 @@ function Keybind.build(ctx)
     if ctx.values[vkey] == nil then
         ctx.values[vkey] = DefaultValue(item)
     end
-    local fill, button, label = umg.CreateFilledButton(
-        ctx.contentBox,
-        ctx.namePrefix,
-        Caption(item, ctx.values[vkey], false)
-    )
-    umg.AddToContent(ctx, fill)
+    local field, textSpec, fontSize = Umg.FieldLook(ctx.config, item.look)
+    local fill, button, label, root
+    local themed = nil
+    if field ~= nil then
+        -- The binding sits in a field frame; the edge is its own Border because a Button's state
+        -- brush did not draw an outline (field note 31).
+        local paint = PaintLib.StateButton(ctx.contentBox, ctx.namePrefix, {
+            normal = { fill = field.fill, radius = field.radius, pill = field.pill },
+            edge = { outline = field.outline, width = field.width },
+        }, Caption(item, ctx.values[vkey], false), {
+            color = field.text,
+            size = fontSize,
+            textSpec = textSpec,
+            pad = { 10, 4, 10, 4 },
+        })
+        root, button, label = paint.root, paint.widget, paint.label
+        themed = { paint = paint, field = field, textSpec = textSpec, accent = ctx.config.resolved.palette.accent }
+    else
+        fill, button, label = umg.CreateFilledButton(
+            ctx.contentBox,
+            ctx.namePrefix,
+            Caption(item, ctx.values[vkey], false)
+        )
+        root = fill
+    end
+    umg.AddToContent(ctx, root)
     umg.AddItemPad(ctx, ctx.namePrefix .. "_Pad", 8)
     local ctrl = {
         kind = "keybind",
@@ -250,6 +295,7 @@ function Keybind.build(ctx)
         valueKey = vkey,
         wasPressed = false,
         capturing = false,
+        themed = themed,
         -- Keyboard and gamepad focus is not built yet; the stubs keep the control contract.
         focus = {
             enter = function() end,
@@ -442,7 +488,9 @@ function Keybind.poll(ctrl, ctx)
     if not ctx.IsValid(ctrl.widget) then
         return
     end
-    if ctrl.paint ~= nil then
+    if ctrl.themed ~= nil then
+        PaintLib.TrackPointer(ctrl.themed.paint)
+    elseif ctrl.paint ~= nil then
         ctx.umg.TrackPointer(ctrl.paint)
     end
     if ctx.Input.ReleaseClick(ctrl, ctrl.widget) then
