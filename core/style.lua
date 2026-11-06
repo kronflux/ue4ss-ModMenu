@@ -29,6 +29,20 @@ local ROLE_KINDS = {
 }
 local SHADOW_KINDS = { x = "number", y = "number", color = "color" }
 
+-- The stage 2 kinds that are a fixed set of keys. A key may itself hold another stage 2 kind: an xp
+-- face holds two stops lists and a frame holds a bevel. Every key is optional, so a borrowed value
+-- that kept only a width is still valid.
+local FIXED_KINDS = {
+    bevel = { light = "color", dark = "color", innerLight = "color", innerDark = "color", width = "number" },
+    xpface = { edge = "color", glow = "color", defaultRing = "color", face = "stops", pressedFace = "stops" },
+    frame = { edge = "color", fill = "color", radius = "radius", pad = "number", bevel = "bevel" },
+    statusbar = { text = "string", fill = "color", line = "color" },
+}
+-- A faces entry is a map from button role to one of these.
+local FACE_KINDS = { fill = "color", text = "color" }
+-- Every stage 2 kind. Their validation messages read `<path>: expected <kind>`.
+local STAGE2_KINDS = { stops = true, bevel = true, faces = true, xpface = true, frame = true, statusbar = true }
+
 -- Types resolve in this order because some defaults read an earlier type: choice reads button,
 -- tabs reads choice, and field, list, stepper and tooltip read button or field.
 local TYPE_ORDER = {
@@ -204,6 +218,23 @@ CopyByKind = function(kind, v)
         end
         return out
     end
+    if kind == "stops" and type(v) == "table" then
+        local out = {}
+        for i = 1, #v do
+            out[i] = Color(v[i])
+        end
+        return out
+    end
+    if FIXED_KINDS[kind] ~= nil and type(v) == "table" then
+        return CopyTable(FIXED_KINDS[kind], v)
+    end
+    if kind == "faces" and type(v) == "table" then
+        local out = {}
+        for role, entry in pairs(v) do
+            out[role] = type(entry) == "table" and CopyTable(FACE_KINDS, entry) or entry
+        end
+        return out
+    end
     if kind == "table" then
         return ConvertDeep(v)
     end
@@ -220,8 +251,40 @@ local function Normalize(typeName, entry)
     return out
 end
 
--- Merge two entries of one type. Roles merge per role and per colour, and text tables per key,
--- because an override names only the parts it changes.
+-- A shallow merge of two tables: the keys of base, then the keys of over. Defined here because
+-- MergeType and the resolvers below both use it.
+local function Merge(base, over)
+    local out = {}
+    for k, v in pairs(base or {}) do
+        out[k] = v
+    end
+    for k, v in pairs(over or {}) do
+        out[k] = v
+    end
+    return out
+end
+
+-- Merge two tables of one fixed-key kind key by key, and a nested fixed-key kind the same way. A
+-- stops list replaces whole, because half a gradient has no meaning.
+local function MergeFixed(kind, base, over)
+    local kinds = FIXED_KINDS[kind]
+    local out = {}
+    for k, v in pairs(base) do
+        out[k] = v
+    end
+    for k, v in pairs(over) do
+        local sub = kinds[k]
+        if FIXED_KINDS[sub] ~= nil and type(v) == "table" and type(out[k]) == "table" then
+            out[k] = MergeFixed(sub, out[k], v)
+        else
+            out[k] = v
+        end
+    end
+    return out
+end
+
+-- Merge two entries of one type. Roles merge per role and per colour, text tables per key, and the
+-- stage 2 kinds per key, because an override names only the parts it changes.
 local function MergeType(typeName, base, over)
     local kinds = TYPES[typeName] or {}
     local out = {}
@@ -250,6 +313,21 @@ local function MergeType(typeName, base, over)
                 end
             end
             out[f] = roles
+        elseif FIXED_KINDS[kind] ~= nil and type(v) == "table" and type(out[f]) == "table" then
+            out[f] = MergeFixed(kind, out[f], v)
+        elseif kind == "faces" and type(v) == "table" and type(out[f]) == "table" then
+            local faces = {}
+            for role, entry in pairs(out[f]) do
+                faces[role] = entry
+            end
+            for role, entry in pairs(v) do
+                if type(entry) == "table" and type(faces[role]) == "table" then
+                    faces[role] = Merge(faces[role], entry)
+                else
+                    faces[role] = entry
+                end
+            end
+            out[f] = faces
         elseif kind == "text" and type(v) == "table" and type(out[f]) == "table" then
             local text = {}
             for k, inner in pairs(out[f]) do
@@ -274,6 +352,37 @@ local function WithoutKeys(t, colorKinds)
         end
     end
     return out
+end
+
+-- The part of a stage 2 value that a borrow keeps, which is only what is not a colour: a bevel keeps
+-- its width, a frame its radius, pad and bevel width, and a status bar its text. Stops, faces and
+-- xp faces hold nothing else, so nothing is kept. An empty result means the field is dropped.
+local function StripKind(kind, v)
+    if kind == "bevel" then
+        if v.width ~= nil then
+            return { width = v.width }
+        end
+    elseif kind == "statusbar" then
+        if v.text ~= nil then
+            return { text = v.text }
+        end
+    elseif kind == "frame" then
+        local out = {}
+        if v.radius ~= nil then
+            out.radius = DeepCopy(v.radius)
+        end
+        if v.pad ~= nil then
+            out.pad = v.pad
+        end
+        if type(v.bevel) == "table" then
+            local bevel = StripKind("bevel", v.bevel)
+            if next(bevel) ~= nil then
+                out.bevel = bevel
+            end
+        end
+        return out
+    end
+    return {}
 end
 
 --- An entry without its colours, so a borrowed type takes its shape from one preset and its
@@ -301,6 +410,11 @@ local function StripColors(typeName, entry)
             end
         elseif kind == "shadow" and type(v) == "table" then
             out[f] = WithoutKeys(v, SHADOW_KINDS)
+        elseif STAGE2_KINDS[kind] and type(v) == "table" then
+            local kept = StripKind(kind, v)
+            if next(kept) ~= nil then
+                out[f] = kept
+            end
         else
             out[f] = v
         end
@@ -360,18 +474,22 @@ end
 
 local CheckValue
 
-local function CheckTable(where, path, kinds, t)
+-- `inside` marks a table that is part of a stage 2 value, whose entries report `expected <kind>`.
+local function CheckTable(where, path, kinds, t, inside)
     for k, v in pairs(t) do
         local kind = kinds[k]
         if kind == nil then
             Fail(where .. ": " .. path .. "." .. tostring(k) .. " is not a known field")
         end
-        CheckValue(where, path .. "." .. tostring(k), kind, v)
+        CheckValue(where, path .. "." .. tostring(k), kind, v, inside)
     end
 end
 
-CheckValue = function(where, path, kind, v)
+CheckValue = function(where, path, kind, v, inside)
     local function Bad()
+        if inside or STAGE2_KINDS[kind] then
+            Fail(where .. ": " .. path .. ": expected " .. kind)
+        end
         Fail(where .. ": " .. path .. " must be " .. kind)
     end
     if kind == "color" then
@@ -429,6 +547,38 @@ CheckValue = function(where, path, kind, v)
                 Fail(where .. ": " .. rolePath .. " must be a table of " .. kind)
             end
             CheckTable(where, rolePath, ROLE_KINDS, entry)
+        end
+    elseif kind == "stops" then
+        if type(v) ~= "table" then
+            Bad()
+        end
+        if #v < 2 then
+            Fail(where .. ": " .. path .. ": expected at least 2 colours")
+        end
+        for i = 1, #v do
+            if not IsColorValue(v[i]) then
+                Fail(where .. ": " .. path .. "[" .. i .. "]: expected color")
+            end
+        end
+    elseif FIXED_KINDS[kind] ~= nil then
+        -- A table of keys. An empty list is an empty table, but a list with entries is not.
+        if type(v) ~= "table" or #v > 0 then
+            Bad()
+        end
+        CheckTable(where, path, FIXED_KINDS[kind], v, true)
+    elseif kind == "faces" then
+        if type(v) ~= "table" or #v > 0 then
+            Bad()
+        end
+        for role, entry in pairs(v) do
+            local rolePath = path .. "." .. tostring(role)
+            if not IsRole[role] then
+                Fail(where .. ": " .. rolePath .. " is not a known field")
+            end
+            if type(entry) ~= "table" or #entry > 0 then
+                Fail(where .. ": " .. rolePath .. ": expected table")
+            end
+            CheckTable(where, rolePath, FACE_KINDS, entry, true)
         end
     elseif kind == "table" then
         if type(v) ~= "table" then
@@ -615,17 +765,6 @@ local function ResolvePalette(raw)
     return p
 end
 
-local function Merge(base, over)
-    local out = {}
-    for k, v in pairs(base or {}) do
-        out[k] = v
-    end
-    for k, v in pairs(over or {}) do
-        out[k] = v
-    end
-    return out
-end
-
 local function LargestRadius(radius)
     if type(radius) == "table" then
         local largest = 0
@@ -637,6 +776,36 @@ local function LargestRadius(radius)
         return largest
     end
     return radius or 0
+end
+
+-- A bevel with no width is one unit wide, as the field list says. Only a bevel that exists gets one,
+-- so a borrow that dropped its bevel does not bring it back.
+local function WithBevelWidth(bevel)
+    if type(bevel) ~= "table" then
+        return bevel
+    end
+    return Merge({ width = 1 }, bevel)
+end
+
+-- The bevel and status bar defaults of each object type, filled for a resolved entry and for an item
+-- look merged over it.
+local function FillDefaults(typeName, s)
+    if typeName == "panel" then
+        s.bevel = WithBevelWidth(s.bevel)
+        -- The status bar says "Ready" unless the theme gives it other text.
+        if type(s.statusBar) == "table" then
+            s.statusBar = Merge({ text = "Ready" }, s.statusBar)
+        end
+    elseif typeName == "button" or typeName == "field" then
+        s.bevel = WithBevelWidth(s.bevel)
+    elseif typeName == "toggle" then
+        s.checkBevel = WithBevelWidth(s.checkBevel)
+    elseif typeName == "progress" then
+        if type(s.frame) == "table" and s.frame.bevel ~= nil then
+            s.frame = Merge(s.frame, { bevel = WithBevelWidth(s.frame.bevel) })
+        end
+    end
+    return s
 end
 
 local function ResolveText(t, color)
@@ -672,12 +841,12 @@ function RESOLVERS.panel(t, p)
     -- The blur sits at half the panel's radius (field note 32), so it follows a changed radius.
     s.blurRadius = s.blurRadius or LargestRadius(s.radius) * 0.5
     s.blurInset = s.blurInset or 2
-    return s
+    return FillDefaults("panel", s)
 end
 
 function RESOLVERS.header(t, p)
     return Merge({ variant = "badge", fill = Alpha(p.bg, 0), text = p.text, line = p.line,
-        badgeFill = Mix(p.bg, p.accent, 0.16), controlGlyph = p.text }, t)
+        badgeFill = Mix(p.bg, p.accent, 0.16), controlGlyph = p.text, captions = "all" }, t)
 end
 
 function RESOLVERS.title(t, p)
@@ -706,15 +875,14 @@ function RESOLVERS.section(t, p)
 end
 
 function RESOLVERS.button(t, p)
-    local s = Merge({ variant = "fill", radius = 8, width = 1, height = 36, hoverToward = WHITE,
-        hoverAmount = 0.14 }, t)
+    local s = Merge({ variant = "fill", radius = 8, width = 1, hoverToward = WHITE, hoverAmount = 0.14 }, t)
     -- Every role is filled, so a widget never meets a nil fill or text colour.
     local roles = DefaultRoles(p)
     for role, entry in pairs(s.roles or {}) do
         roles[role] = Merge(roles[role], entry)
     end
     s.roles = roles
-    return s
+    return FillDefaults("button", s)
 end
 
 function RESOLVERS.toggle(t, p)
@@ -722,7 +890,7 @@ function RESOLVERS.toggle(t, p)
         knobOff = WHITE, w = 36, h = 20, checkOff = Alpha(p.text, 0), checkOn = p.accent, checkEdge = p.text,
         checkEdgeOn = p.accent, checkMark = p.accentText, checkEdgeWidth = 1 }, t)
     s.radius = s.radius or s.h / 2
-    return s
+    return FillDefaults("toggle", s)
 end
 
 function RESOLVERS.slider(t, p)
@@ -731,8 +899,9 @@ function RESOLVERS.slider(t, p)
 end
 
 function RESOLVERS.progress(t, p)
-    return Merge({ variant = "bar", height = 8, radius = 4, segments = 12, gap = 3, track = p.track,
+    local s = Merge({ variant = "bar", height = 8, radius = 4, segments = 12, gap = 3, track = p.track,
         fill = p.accent }, t)
+    return FillDefaults("progress", s)
 end
 
 function RESOLVERS.choice(t, p, s)
@@ -754,7 +923,7 @@ function RESOLVERS.field(t, p, s)
         radius = s.button.radius, pill = s.button.pill, text = p.text, hint = p.muted }, t)
     f.headerFill = f.headerFill or Mix(p.bg, p.text, 0.12)
     f.headerText = f.headerText or f.text
-    return f
+    return FillDefaults("field", f)
 end
 
 function RESOLVERS.list(t, p, s)
@@ -777,7 +946,8 @@ function RESOLVERS.confirm(t, p, s)
 end
 
 function RESOLVERS.motion(t)
-    return Merge({ pulse = false, cursor = false, glitch = false, sparkle = false }, t)
+    return Merge({ pulse = false, cursor = false, glitch = false, sparkle = false, open = true, pop = true,
+        shake = true }, t)
 end
 
 --- Resolve one type from its raw entry. The result is normalized, so no table in it is shared
@@ -984,7 +1154,7 @@ function M.ForItem(resolved, objectType, look)
     if look == nil then
         return base
     end
-    return MergeType(objectType, base, Normalize(objectType, look))
+    return FillDefaults(objectType, MergeType(objectType, base, Normalize(objectType, look)))
 end
 
 return M

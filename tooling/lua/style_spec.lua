@@ -8,6 +8,7 @@ end
 local Theme = require("ModMenu.core.theme")
 local Json = require("ModMenu.store.json")
 local Fields = require("ModMenu.core.stylefields")
+local Presets = require("ModMenu.core.presets")
 
 local FIXTURES = {
     "slate-plain",
@@ -21,6 +22,9 @@ local FIXTURES = {
     "light",
     "dark",
     "custom-definition",
+    "stage2-kinds",
+    "stage2-borrow",
+    "stage2-merge",
 }
 
 local function ReadFixture(name)
@@ -73,7 +77,17 @@ for _, name in ipairs(FIXTURES) do
         assert_true("style fixture " .. name .. " is readable", false)
     else
         local input = fixture.input
+        -- A fixture may name temporary presets, because no shipped preset holds every stage 2 kind.
+        -- They are registered for this resolve only and removed straight after it.
+        local temporary = {}
+        for id, definition in pairs(input.presets or {}) do
+            Presets.presets[id] = definition
+            temporary[#temporary + 1] = id
+        end
         local ok, resolved = pcall(Style.Resolve, input.theme, input.style, input.colors)
+        for _, id in ipairs(temporary) do
+            Presets.presets[id] = nil
+        end
         if not ok then
             assert_eq("style fixture " .. name, tostring(resolved), "no error")
         else
@@ -90,6 +104,12 @@ for _, name in ipairs(FIXTURES) do
                 local got = GetPath(resolved, path)
                 if not Near(got, fixture.expect[path]) then
                     mismatches[#mismatches + 1] = path .. " = " .. _RUNNER.encode(got)
+                end
+            end
+            -- A path listed under `absent` must resolve to nothing, as a borrowed field with no keys left does.
+            for _, path in ipairs(fixture.absent or {}) do
+                if GetPath(resolved, path) ~= nil then
+                    mismatches[#mismatches + 1] = path .. " should be absent"
                 end
             end
             assert_eq("style fixture " .. name, mismatches, {})
@@ -159,9 +179,25 @@ for _, id in ipairs(Style.Ids()) do
     assert_true("preset " .. id .. " ok", valid)
 end
 
--- Stage 1 ships light, dark and the 27 StyleLab presets; the loop above resolves each of them.
+-- Stages 1 and 2 ship light, dark and 32 StyleLab presets; the loop above resolves each of them.
+-- The five Windows presets are drafts outside themes/presets until they are polished.
 local ids = Style.Ids()
-assert_eq("Ids holds the 29 stage 1 presets", #ids, 29)
+assert_eq("Ids holds the 34 presets of stages 1 and 2", #ids, 34)
+assert_eq(
+    "Ids ends with the five stage 2 presets in the spec's order",
+    { table.unpack(ids, 30, 34) },
+    { "terminal", "hologram", "frost", "mac-light", "mac-dark" }
+)
+assert_eq("Ids puts nord before terminal", ids[29], "nord")
+do
+    assert_eq("mac-light uses the mac header", Style.Resolve("mac-light").header.variant, "mac")
+    local xp = Style.Resolve("slate", { header = { variant = "xpbar" }, button = { variant = "xp" }, panel = { radius = { 8, 8, 0, 0 } } })
+    assert_eq("an xp override sets the xp button variant", xp.button.variant, "xp")
+    assert_eq("an xp override sets the xpbar header", xp.header.variant, "xpbar")
+    assert_eq("an xp override keeps the panel corners 8, 8, 0, 0", xp.panel.radius, { 8, 8, 0, 0 })
+    assert_eq("a classic override sets the classic button variant", Style.Resolve("slate", { button = { variant = "classic" } }).button.variant, "classic")
+    assert_eq("neon pulses", Style.Resolve("neon").motion.pulse, true)
+end
 assert_eq("Ids starts with light, dark and slate", { ids[1], ids[2], ids[3] }, { "light", "dark", "slate" })
 assert_eq("Ids matches the generated order", ids, require("ModMenu.core.presets").order)
 
@@ -236,3 +272,56 @@ assert_true("ForItem returns a new table", item ~= slate.button)
 -- presets carry StyleLab's text defaults: title 20, body 14, readout 22.
 assert_eq("light sets no title size", Style.Resolve("light").title.size, nil)
 assert_eq("slate carries StyleLab's body size", slate.body.size, 14)
+
+-- Stage 2 kinds: a bad entry inside stops, bevel, faces, xpface, frame or statusbar is reported as
+-- `<type>.<field>.<key>: expected <kind>`, and an unknown key as an unknown field.
+local function Bad(style)
+    return ErrorOf(Style.Validate, style, "here")
+end
+assert_eq("a bevel colour must be a colour", Bad({ panel = { bevel = { light = "#12" } } }), "here: panel.bevel.light: expected color")
+assert_eq("a bevel width must be a number", Bad({ panel = { bevel = { width = "wide" } } }), "here: panel.bevel.width: expected number")
+assert_eq("a bevel names an unknown key", Bad({ panel = { bevel = { glow = "#FFFFFF" } } }), "here: panel.bevel.glow is not a known field")
+assert_eq("a bevel must be a table", Bad({ panel = { bevel = "flat" } }), "here: panel.bevel: expected bevel")
+assert_eq("stops need two colours", Bad({ header = { barStops = { "#000000" } } }), "here: header.barStops: expected at least 2 colours")
+assert_eq("stops must be a list", Bad({ header = { barStops = "#000000" } }), "here: header.barStops: expected stops")
+assert_eq("a stop must be a colour", Bad({ header = { barStops = { "#000000", "#12" } } }), "here: header.barStops[2]: expected color")
+assert_eq("faces names an unknown role", Bad({ button = { faces = { wobble = {} } } }), "here: button.faces.wobble is not a known field")
+assert_eq("a face colour must be a colour", Bad({ button = { faces = { primary = { fill = "#12" } } } }), "here: button.faces.primary.fill: expected color")
+assert_eq("an xp face needs two stops", Bad({ button = { xp = { face = { "#000000" } } } }), "here: button.xp.face: expected at least 2 colours")
+assert_eq("an xp colour must be a colour", Bad({ button = { xp = { glow = 5 } } }), "here: button.xp.glow: expected color")
+assert_eq("a frame bevel is checked", Bad({ progress = { frame = { bevel = { light = "x" } } } }), "here: progress.frame.bevel.light: expected color")
+assert_eq("a frame pad must be a number", Bad({ progress = { frame = { pad = "x" } } }), "here: progress.frame.pad: expected number")
+assert_eq("a status bar text must be a string", Bad({ panel = { statusBar = { text = 5 } } }), "here: panel.statusBar.text: expected string")
+assert_eq("a header caption mode is an enum", Bad({ header = { captions = "none" } }), "here: header.captions must be enum:all|close")
+assert_eq("a header variant gains mac", Bad({ header = { variant = "mac", captions = "close" } }), "no error")
+assert_eq("a button variant gains classic", Bad({ button = { variant = "classic" } }), "no error")
+assert_eq("a motion field takes a boolean", Bad({ motion = { open = 1 } }), "here: motion.open must be boolean")
+
+-- Defaults: the open, pop and shake motions are on unless a theme turns them off; light and dark do.
+assert_eq("light turns open off", Style.Resolve("light").motion.open, false)
+assert_eq("dark turns pop off", Style.Resolve("dark").motion.pop, false)
+assert_eq("dark turns shake off", Style.Resolve("dark").motion.shake, false)
+assert_eq("slate keeps open on", slate.motion.open, true)
+assert_eq("slate keeps pop on", slate.motion.pop, true)
+assert_eq("slate keeps shake on", slate.motion.shake, true)
+assert_eq("slate sets no button height", slate.button.height, nil)
+assert_eq("a bevel override fills the default width", Style.Resolve("slate", { panel = { bevel = { light = "#FFFFFF", dark = "#000000" } } }).panel.bevel.width, 1)
+assert_eq("every new kind is in the field list", { Fields.types.panel.bevel, Fields.types.panel.statusBar, Fields.types.header.barStops, Fields.types.button.faces, Fields.types.button.xp, Fields.types.progress.frame }, { "bevel", "statusbar", "stops", "faces", "xpface", "frame" })
+
+-- A header shows every caption control unless a theme says only the close control.
+assert_eq("slate shows all captions", slate.header.captions, "all")
+assert_eq("light shows all captions", Style.Resolve("light").header.captions, "all")
+
+-- A fixed-key kind is a table of keys, so a non-empty array is rejected and an empty table is not.
+assert_eq("a bevel list is rejected", Bad({ panel = { bevel = { "#000000" } } }), "here: panel.bevel: expected bevel")
+assert_eq("a status bar list is rejected", Bad({ panel = { statusBar = { "x" } } }), "here: panel.statusBar: expected statusbar")
+assert_eq("an xp face list is rejected", Bad({ button = { xp = { "x" } } }), "here: button.xp: expected xpface")
+assert_eq("a frame list is rejected", Bad({ progress = { frame = { 1 } } }), "here: progress.frame: expected frame")
+assert_eq("a faces list is rejected", Bad({ button = { faces = { "x" } } }), "here: button.faces: expected faces")
+assert_eq("a face entry list is rejected", Bad({ button = { faces = { primary = { "x" } } } }), "here: button.faces.primary: expected table")
+assert_eq("an empty bevel table is accepted", Bad({ panel = { bevel = {} } }), "no error")
+assert_eq("an empty faces table is accepted", Bad({ button = { faces = {} } }), "no error")
+
+-- An override of a fixed-key kind is merged key by key, and a look fills the same defaults as Resolve.
+local lookBevel = Style.ForItem(slate, "field", { bevel = { light = "#FFFFFF", dark = "#000000" } })
+assert_eq("a look bevel gets the default width", lookBevel.bevel.width, 1)

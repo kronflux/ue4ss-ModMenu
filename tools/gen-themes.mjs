@@ -73,7 +73,10 @@ const PRESET_ORDER = [
   "windows-classic",
 ];
 
-const KINDS = new Set(["color", "number", "boolean", "string", "radius", "font", "text", "roles", "shadow", "table"]);
+const KINDS = new Set([
+  "color", "number", "boolean", "string", "radius", "font", "text", "roles", "shadow", "table",
+  "stops", "bevel", "faces", "xpface", "frame", "statusbar",
+]);
 
 // The roles a button style may colour, and the keys each role takes. A role may also name its own
 // button variant, because StyleLab themes such as Carbon draw one role as a fill and another as an
@@ -82,6 +85,17 @@ const ROLE_NAMES = ["default", "primary", "secondary", "success", "danger", "war
 const ROLE_KEYS = { fill: "color", text: "color", hover: "color", pressed: "color", edge: "color", variant: null };
 
 const SHADOW_KEYS = { x: "number", y: "number", color: "color" };
+
+// The keys of the stage 2 kinds that are a fixed set of fields. A key may itself hold one of these
+// kinds, such as an xp face holding two `stops` lists. Every key is optional, so a borrowed value
+// that kept only a width is still valid.
+const FIXED_KINDS = {
+  bevel: { light: "color", dark: "color", innerLight: "color", innerDark: "color", width: "number" },
+  xpface: { edge: "color", glow: "color", defaultRing: "color", face: "stops", pressedFace: "stops" },
+  frame: { edge: "color", fill: "color", radius: "radius", pad: "number", bevel: "bevel" },
+  statusbar: { text: "string", fill: "color", line: "color" },
+};
+const FACE_KEYS = { fill: "color", text: "color" };
 
 // Keys a preset file may hold beside its object types.
 const META_KEYS = new Set(["id", "stage", "name", "subtitle", "footer", "palette", "base", "parts"]);
@@ -113,6 +127,12 @@ function readJson(abs, label) {
 
 function isObject(v) {
   return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
+// A table of keys. An empty list counts as an empty table, because Lua cannot tell the two apart,
+// but a list with entries is not one.
+function isKeyTable(v) {
+  return isObject(v) || (Array.isArray(v) && v.length === 0);
 }
 
 /** Check the field list itself, so a typo in a kind fails here and not in every preset. */
@@ -171,6 +191,18 @@ function describeKind(kind) {
       return "a table of button roles";
     case "shadow":
       return "a shadow table { x, y, color }";
+    case "stops":
+      return "a list of at least 2 colours";
+    case "bevel":
+      return "a bevel table { light, dark, innerLight, innerDark, width }";
+    case "faces":
+      return "a table of button roles, each { fill, text }";
+    case "xpface":
+      return "an xp face table { edge, glow, defaultRing, face, pressedFace }";
+    case "frame":
+      return "a frame table { edge, fill, radius, pad, bevel }";
+    case "statusbar":
+      return "a status bar table { text, fill, line }";
     case "table":
       return "a table or a list";
     default:
@@ -225,6 +257,39 @@ function validateValue(kind, value, where, name, ctx) {
           throw new Error(`${where}: ${name}.${key} is not a known field`);
         }
         validateValue(SHADOW_KEYS[key], sub, where, `${name}.${key}`, ctx);
+      }
+      return;
+    case "stops":
+      if (!Array.isArray(value) || value.length < 2) fail();
+      value.forEach((stop, i) => validateValue("color", stop, where, `${name}[${i + 1}]`, ctx));
+      return;
+    case "bevel":
+    case "xpface":
+    case "frame":
+    case "statusbar":
+      if (!isKeyTable(value)) fail();
+      for (const [key, sub] of Object.entries(value)) {
+        if (!Object.hasOwn(FIXED_KINDS[kind], key)) {
+          throw new Error(`${where}: ${name}.${key} is not a known field`);
+        }
+        validateValue(FIXED_KINDS[kind][key], sub, where, `${name}.${key}`, ctx);
+      }
+      return;
+    case "faces":
+      if (!isKeyTable(value)) fail();
+      for (const [role, entry] of Object.entries(value)) {
+        if (!ROLE_NAMES.includes(role)) {
+          throw new Error(`${where}: ${name}.${role} is not a known role (${ROLE_NAMES.join(", ")})`);
+        }
+        if (!isKeyTable(entry)) {
+          throw new Error(`${where}: ${name}.${role} must be a table of face colours`);
+        }
+        for (const [key, sub] of Object.entries(entry)) {
+          if (!Object.hasOwn(FACE_KEYS, key)) {
+            throw new Error(`${where}: ${name}.${role}.${key} is not a known field`);
+          }
+          validateValue(FACE_KEYS[key], sub, where, `${name}.${role}.${key}`, ctx);
+        }
       }
       return;
     case "text":
@@ -339,8 +404,8 @@ function validatePreset(preset, file, fields, ids) {
   assertPrintable(preset, where, "");
 }
 
-// Element checks for `table` fields whose shape stage 1 already reads. A table field without an
-// entry here is a stage 2 field, and is only checked for being a table.
+// Element checks for the free-form `table` fields, ramp and shadowLayers. The stage 2 fields have
+// their own kinds and are checked by validateValue.
 const TABLE_ELEMENTS = {
   "progress.ramp": (value, where, name) => {
     if (!Array.isArray(value) || value.length === 0) {

@@ -117,6 +117,76 @@ test("bad elements in progress.ramp and panel.shadowLayers fail with the file an
   }
 });
 
+test("a stage 2 kind rejects a bad entry with the file and field named", () => {
+  const cases = [
+    [(s) => (s.header = { barStops: ["#zz", "#000000"] }), "header.barStops[1]"],
+    [(s) => (s.header = { barStops: ["#000000"] }), "header.barStops"],
+    [(s) => (s.panel = { ...s.panel, bevel: { light: "#12", dark: "#000000" } }), "panel.bevel.light"],
+    [(s) => (s.panel = { ...s.panel, bevel: { glow: "#000000" } }), "panel.bevel.glow"],
+    [(s) => (s.panel = { ...s.panel, statusBar: { text: 5, fill: "#000000", line: "#000000" } }), "panel.statusBar.text"],
+    [(s) => (s.button = { ...s.button, faces: { wobble: {} } }), "button.faces.wobble"],
+    [(s) => (s.button = { ...s.button, faces: { primary: { fill: "#12" } } }), "button.faces.primary.fill"],
+    [(s) => (s.button = { ...s.button, xp: { face: ["#000000"] } }), "button.xp.face"],
+    [(s) => (s.progress = { frame: { pad: "x" } }), "progress.frame.pad"],
+    [(s) => (s.panel = { ...s.panel, bevel: ["#000000"] }), "panel.bevel"],
+    [(s) => (s.button = { ...s.button, faces: { primary: ["x"] } }), "button.faces.primary"],
+    [(s) => (s.progress = { frame: { bevel: { light: "#12" } } }), "progress.frame.bevel.light"],
+  ];
+  for (const [change, field] of cases) {
+    const dir = tempRoot();
+    const file = path.join(dir, "themes", "presets", "slate.json");
+    const slate = JSON.parse(fs.readFileSync(file, "utf8"));
+    change(slate);
+    fs.writeFileSync(file, JSON.stringify(slate, null, 2) + "\n");
+    assert.throws(
+      () => generate(dir),
+      (err) => err instanceof Error && err.message.includes("slate.json") && err.message.includes(field),
+      `expected an error naming slate.json and ${field}`,
+    );
+  }
+});
+
+test("a stage 2 kind accepts a valid value and writes it to both outputs", () => {
+  const dir = tempRoot();
+  const file = path.join(dir, "themes", "presets", "slate.json");
+  const slate = JSON.parse(fs.readFileSync(file, "utf8"));
+  slate.header = { variant: "xpbar", barStops: ["#000080", "#1084D0"], captions: "close", controlFace: "#C0C0C0" };
+  slate.button = {
+    ...slate.button,
+    variant: "classic",
+    faces: { primary: { fill: "#C0C0C0", text: "#000000" } },
+    bevel: { light: "#DFDFDF", dark: "#0A0A0A", width: 2 },
+    xp: { edge: "#003C74", glow: "#F8B33A", face: ["#FFFFFF", "#F4F3EE"], pressedFace: ["#F4F3EE", "#C0C0C0"] },
+  };
+  slate.motion = { open: false, pop: false, shake: false };
+  fs.writeFileSync(file, JSON.stringify(slate, null, 2) + "\n");
+  const files = generate(dir);
+  assert.match(files.get("core/presets.lua"), /barStops = \{ "#000080", "#1084D0" \}/);
+  assert.match(files.get("builder/src/theme/presets.generated.ts"), /barStops: \[ "#000080", "#1084D0" \]/);
+});
+
+test("an empty list is accepted for a fixed-key kind, as an empty table", () => {
+  const dir = tempRoot();
+  const file = path.join(dir, "themes", "presets", "slate.json");
+  const slate = JSON.parse(fs.readFileSync(file, "utf8"));
+  slate.panel = { ...slate.panel, bevel: [] };
+  slate.button = { ...slate.button, faces: [] };
+  fs.writeFileSync(file, JSON.stringify(slate, null, 2) + "\n");
+  assert.doesNotThrow(() => generate(dir));
+});
+
+test("the field list declares each stage 2 kind", () => {
+  const fields = JSON.parse(fs.readFileSync(path.join(ROOT, "themes", "fields.json"), "utf8"));
+  assert.equal(fields.types.panel.bevel, "bevel");
+  assert.equal(fields.types.panel.statusBar, "statusbar");
+  assert.equal(fields.types.header.barStops, "stops");
+  assert.equal(fields.types.button.faces, "faces");
+  assert.equal(fields.types.button.xp, "xpface");
+  assert.equal(fields.types.progress.frame, "frame");
+  assert.equal(fields.types.progress.block, "stops");
+  assert.equal(fields.types.progress.ramp, "table");
+});
+
 test("an unknown field fails with the file and the field named", () => {
   const dir = tempRoot();
   const file = path.join(dir, "themes", "presets", "slate.json");

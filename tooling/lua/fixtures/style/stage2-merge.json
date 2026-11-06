@@ -1,0 +1,57 @@
+{
+  "input": {
+    "presets": {
+      "stage2-merge-source": {
+        "id": "stage2-merge-source",
+        "stage": 2,
+        "panel": { "statusBar": { "text": "Done", "fill": "#ECE9D8", "line": "#C5C2B2" } },
+        "button": {
+          "faces": { "primary": { "fill": "#F4F3EE", "text": "#000000" } },
+          "xp": {
+            "edge": "#003C74",
+            "glow": "#F8B33A",
+            "face": ["#FFFFFF", "#F4F3EE"],
+            "pressedFace": ["#F4F3EE", "#C0C0C0"]
+          }
+        }
+      }
+    },
+    "theme": "stage2-merge-source",
+    "style": {
+      "panel": { "statusBar": { "text": "Hi" } },
+      "button": { "xp": { "glow": "#FFFFFF" }, "faces": { "primary": { "text": "#FFFFFF" } } }
+    },
+    "lookType": "button",
+    "look": { "bevel": { "light": "#FFFFFF", "dark": "#000000" } }
+  },
+  "expect": {
+    "panel.statusBar": {
+      "text": "Hi",
+      "fill": { "R": 0.8388, "G": 0.8148, "B": 0.6867, "A": 1 },
+      "line": { "R": 0.5583, "G": 0.5395, "B": 0.4452, "A": 1 }
+    },
+    "button.xp": {
+      "edge": { "R": 0, "G": 0.0452, "B": 0.1746, "A": 1 },
+      "glow": { "R": 1, "G": 1, "B": 1, "A": 1 },
+      "face": [
+        { "R": 1, "G": 1, "B": 1, "A": 1 },
+        { "R": 0.9047, "G": 0.8963, "B": 0.855, "A": 1 }
+      ],
+      "pressedFace": [
+        { "R": 0.9047, "G": 0.8963, "B": 0.855, "A": 1 },
+        { "R": 0.5271, "G": 0.5271, "B": 0.5271, "A": 1 }
+      ]
+    },
+    "button.faces": {
+      "primary": {
+        "fill": { "R": 0.9047, "G": 0.8963, "B": 0.855, "A": 1 },
+        "text": { "R": 1, "G": 1, "B": 1, "A": 1 }
+      }
+    },
+    "button.bevel": {
+      "light": { "R": 1, "G": 1, "B": 1, "A": 1 },
+      "dark": { "R": 0, "G": 0, "B": 0, "A": 1 },
+      "width": 1
+    }
+  }
+}
