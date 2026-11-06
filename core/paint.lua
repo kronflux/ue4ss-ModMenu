@@ -19,8 +19,8 @@ local M = {}
 local VIS_HIDDEN, VIS_HIT_TEST_INVISIBLE = 2, 3
 local DRAW_NONE, DRAW_BOX, DRAW_ROUNDED = 0, 1, 4
 local ROUND_FIXED, ROUND_HALF_HEIGHT = 0, 1
-local H_FILL, H_CENTER = 0, 2
-local V_FILL, V_CENTER = 0, 2
+local H_FILL, H_LEFT, H_CENTER, H_RIGHT = 0, 1, 2, 3
+local V_FILL, V_TOP, V_CENTER, V_BOTTOM = 0, 1, 2, 3
 
 local WHITE = { R = 1, G = 1, B = 1, A = 1 }
 local BLACK = { R = 0, G = 0, B = 0, A = 1 }
@@ -125,6 +125,11 @@ end
 function M.IsFlat(spec)
     if spec == nil then
         return true
+    end
+    -- A gradient, a bevel or a stack of layers is drawn from several widgets, so it is never
+    -- the single recoloured Border that a flat look is.
+    if spec.gradient ~= nil or spec.bevel ~= nil or spec.layers ~= nil then
+        return false
     end
     if spec.pill then
         return false
@@ -439,11 +444,15 @@ function M.Box(outer, name, spec, pad)
     return border
 end
 
-local function SetShown(widget, on)
+--- Show a widget hit-test invisible (3), so clicks pass through it, or hide it (2).
+---@param widget any
+---@param on boolean
+function M.SetShown(widget, on)
     pcall(function()
         widget:SetVisibility(on and VIS_HIT_TEST_INVISIBLE or VIS_HIDDEN)
     end)
 end
+local SetShown = M.SetShown
 
 local function AddToOverlay(overlay, widget, pad, halign, valign)
     local slot = overlay:AddChildToOverlay(widget)
@@ -453,6 +462,252 @@ local function AddToOverlay(overlay, widget, pad, halign, valign)
         slot:SetVerticalAlignment(valign or V_FILL)
     end)
     return slot
+end
+
+-- A SizeBox that fixes only the dimensions given, so a bevel line is 1 unit thick and still fills
+-- the length of its edge.
+local function Sized(outer, name, content, w, h)
+    local box = Umg.Construct("/Script/UMG.SizeBox", outer, name)
+    pcall(function()
+        if w ~= nil then
+            box:SetWidthOverride(w)
+        end
+        if h ~= nil then
+            box:SetHeightOverride(h)
+        end
+        box:SetContent(content)
+    end)
+    return box
+end
+
+------------------------------------------------------------------------------------------
+-- Gradients, bevels, layered shapes and the cross
+------------------------------------------------------------------------------------------
+
+local function Mix(a, b, t)
+    return {
+        R = a.R + (b.R - a.R) * t,
+        G = a.G + (b.G - a.G) * t,
+        B = a.B + (b.B - a.B) * t,
+        A = (a.A or 1) + ((b.A or 1) - (a.A or 1)) * t,
+    }
+end
+
+--- A colour ramp of n steps through the stops, for faking a gradient from strips (StyleLab Ramp).
+---@param stops table[]
+---@param n number
+---@return table[]
+function M.Ramp(stops, n)
+    local out = {}
+    for i = 1, n do
+        local t = (n == 1) and 0 or (i - 1) / (n - 1) * (#stops - 1)
+        local k = math.min(#stops - 1, math.floor(t))
+        out[i] = Mix(stops[k + 1], stops[math.min(#stops, k + 2)], t - k)
+    end
+    return out
+end
+
+--- The strips of a gradient: a colour, the corner radii and whether the strip is a rounded end cap.
+--- With a radius, the first strip is rounded on its outer corners and so is the last, unless
+--- roundEnds is "first", as on a title bar that is rounded only at the top.
+---@param stops table[]
+---@param steps number|nil
+---@param radius number|nil
+---@param horizontal boolean|nil
+---@param roundEnds string|nil
+---@return table[] strips { color, radii, cap }
+function M.GradientPlan(stops, steps, radius, horizontal, roundEnds)
+    local colors = M.Ramp(stops, steps or 12)
+    local r = tonumber(radius) or 0
+    local plan = {}
+    for i, color in ipairs(colors) do
+        local radii = { 0, 0, 0, 0 }
+        local cap = false
+        if r > 0 then
+            if i == 1 then
+                radii = horizontal and { r, 0, 0, r } or { r, r, 0, 0 }
+                cap = true
+            elseif i == #colors and roundEnds ~= "first" then
+                radii = horizontal and { 0, r, r, 0 } or { 0, 0, r, r }
+                cap = true
+            end
+        end
+        plan[i] = { color = color, radii = radii, cap = cap }
+    end
+    return plan
+end
+
+--- A gradient drawn as flat strips that share the space evenly, so it stretches to any size. Each
+--- strip is its own Border and is never recoloured. A rounded end strip gets a fixed size of the
+--- radius, so its rounding has room.
+--- spec: stops, steps?, radius?, horizontal?, roundEnds?
+---@param outer any
+---@param name string
+---@param spec table
+---@return any
+function M.Gradient(outer, name, spec)
+    local horizontal = spec.horizontal == true
+    local box = Umg.Construct(horizontal and "/Script/UMG.HorizontalBox" or "/Script/UMG.VerticalBox", outer, name)
+    local r = tonumber(spec.radius) or 0
+    for i, strip in ipairs(M.GradientPlan(spec.stops, spec.steps, spec.radius, horizontal, spec.roundEnds)) do
+        local square = strip.radii[1] == 0 and strip.radii[2] == 0 and strip.radii[3] == 0 and strip.radii[4] == 0
+        local border = M.Box(box, name .. "_Strip" .. i, { fill = strip.color, radius = square and 0 or strip.radii }, 0)
+        local child = border
+        if strip.cap then
+            child = horizontal and Sized(box, name .. "_Cap" .. i, border, r, nil)
+                or Sized(box, name .. "_Cap" .. i, border, nil, r)
+        end
+        local slot = horizontal and box:AddChildToHorizontalBox(child) or box:AddChildToVerticalBox(child)
+        pcall(function()
+            slot:SetSize({ SizeRule = strip.cap and 0 or 1, Value = strip.cap and 0 or 1 })
+            if horizontal then
+                slot:SetVerticalAlignment(V_FILL)
+            else
+                slot:SetHorizontalAlignment(H_FILL)
+            end
+        end)
+    end
+    return box
+end
+
+--- The lines of a bevel: light along the top and left edges and dark along the bottom and right,
+--- or the reverse when sunken, then a second ring one width in when the bevel has an inner pair
+--- (Windows Classic). A bevel without light or dark draws nothing.
+---@param bevel table|nil
+---@param sunken boolean|nil
+---@return table[] lines { color, edge, inset }
+function M.BevelPlan(bevel, sunken)
+    local lines = {}
+    if bevel == nil or bevel.light == nil or bevel.dark == nil then
+        return lines
+    end
+    local w = tonumber(bevel.width) or 1
+    local function Ring(light, dark, inset)
+        if sunken then
+            light, dark = dark, light
+        end
+        lines[#lines + 1] = { color = light, edge = "top", inset = inset }
+        lines[#lines + 1] = { color = light, edge = "left", inset = inset }
+        lines[#lines + 1] = { color = dark, edge = "bottom", inset = inset }
+        lines[#lines + 1] = { color = dark, edge = "right", inset = inset }
+    end
+    Ring(bevel.light, bevel.dark, 0)
+    if bevel.innerLight ~= nil and bevel.innerDark ~= nil then
+        Ring(bevel.innerLight, bevel.innerDark, w)
+    end
+    return lines
+end
+
+--- Draw the lines of a bevel into an overlay, each a 1-width Border along an edge.
+---@param overlay any
+---@param name string
+---@param bevel table
+---@param sunken boolean|nil
+---@return any[] widgets
+function M.BevelLines(overlay, name, bevel, sunken)
+    local widgets = {}
+    local w = tonumber(bevel.width) or 1
+    for i, line in ipairs(M.BevelPlan(bevel, sunken)) do
+        local inset = line.inset
+        local border = M.Box(overlay, name .. "_Line" .. i, { fill = line.color }, 0)
+        local widget, pad, halign, valign
+        if line.edge == "top" then
+            widget = Sized(overlay, name .. "_LineSize" .. i, border, nil, w)
+            pad, halign, valign = { inset, inset, inset, 0 }, H_FILL, V_TOP
+        elseif line.edge == "left" then
+            widget = Sized(overlay, name .. "_LineSize" .. i, border, w, nil)
+            pad, halign, valign = { inset, inset, 0, inset }, H_LEFT, V_FILL
+        elseif line.edge == "bottom" then
+            widget = Sized(overlay, name .. "_LineSize" .. i, border, nil, w)
+            pad, halign, valign = { inset, 0, inset, inset }, H_FILL, V_BOTTOM
+        else
+            widget = Sized(overlay, name .. "_LineSize" .. i, border, w, nil)
+            pad, halign, valign = { 0, inset, inset, inset }, H_RIGHT, V_FILL
+        end
+        AddToOverlay(overlay, widget, pad, halign, valign)
+        -- A line is shown hit-test invisible, as a shown state shape is, so a bevel drawn over a
+        -- control never takes the pointer from the control under it.
+        SetShown(widget, true)
+        widgets[#widgets + 1] = widget
+    end
+    return widgets
+end
+
+--- Wrap a widget in a bevel: an Overlay holding the widget with the bevel's lines drawn over it. A
+--- bevel with no light or dark colour draws nothing, so the widget comes back unchanged and the
+--- widget tree stays as it was.
+---@param outer any
+---@param name string
+---@param content any
+---@param bevel table|nil
+---@param sunken boolean|nil
+---@return any
+function M.Bevelled(outer, name, content, bevel, sunken)
+    if type(bevel) ~= "table" or #M.BevelPlan(bevel, sunken) == 0 then
+        return content
+    end
+    local stack = Umg.Construct("/Script/UMG.Overlay", outer, name)
+    pcall(function()
+        AddToOverlay(stack, content, 0)
+    end)
+    M.BevelLines(stack, name .. "_Bevel", bevel, sunken)
+    return stack
+end
+
+--- Draw one look. A look is a Box spec, or { gradient = spec, inset? }, or { fill?, bevel, sunken? },
+--- or { layers = { look, ... } } stacked in an Overlay. Every part is its own shape, shown or hidden
+--- as a whole by the caller and never recoloured (field note 30).
+---@param outer any
+---@param name string
+---@param look table
+---@return any
+function M.Shape(outer, name, look)
+    if look.layers ~= nil then
+        local stack = Umg.Construct("/Script/UMG.Overlay", outer, name)
+        for i, layer in ipairs(look.layers) do
+            AddToOverlay(stack, M.Shape(stack, name .. "_L" .. i, layer), 0)
+        end
+        return stack
+    end
+    if look.gradient ~= nil then
+        local gradient = M.Gradient(outer, name, look.gradient)
+        if look.inset == nil then
+            return gradient
+        end
+        local stack = Umg.Construct("/Script/UMG.Overlay", outer, name .. "_Inset")
+        AddToOverlay(stack, gradient, look.inset)
+        return stack
+    end
+    if look.bevel ~= nil then
+        local stack = Umg.Construct("/Script/UMG.Overlay", outer, name)
+        if look.fill ~= nil then
+            AddToOverlay(stack, M.Box(stack, name .. "_Fill", { fill = look.fill }, 0), 0)
+        end
+        M.BevelLines(stack, name, look.bevel, look.sunken)
+        return stack
+    end
+    return M.Box(outer, name, look, 0)
+end
+
+--- A cross: two Borders of thickness by size, centred, turned 45 and -45 degrees by a render
+--- transform, as the check box draws its tick. It is drawn, so no game texture is needed.
+---@param outer any
+---@param name string
+---@param color table
+---@param size number the length of each bar
+---@param thickness number
+---@return any
+function M.Cross(outer, name, color, size, thickness)
+    local stack = Umg.Construct("/Script/UMG.Overlay", outer, name)
+    for i, angle in ipairs({ 45, -45 }) do
+        local bar = Sized(stack, name .. "_BarSize" .. i,
+            M.Box(stack, name .. "_Bar" .. i, { fill = color }, 0), thickness, size)
+        AddToOverlay(stack, bar, 0, H_CENTER, V_CENTER)
+        pcall(function()
+            bar:SetRenderTransformAngle(angle)
+        end)
+    end
+    return stack
 end
 
 ------------------------------------------------------------------------------------------
@@ -614,24 +869,30 @@ local function ShapeButton(outer, name, states, content, labelStyle)
 
     local overlay = Umg.Construct("/Script/UMG.Overlay", button, name .. "_Shapes")
     local normal = states.normal
-    -- A missing hover or pressed look is derived from the normal fill and shape, as the flat
-    -- button derives its colours, so every button answers the pointer.
-    local derivedHover, derivedPressed = Theme.FillStates(normal.fill or WHITE)
     local looks = {
         normal = normal,
-        hover = states.hover or { fill = derivedHover, radius = normal.radius, pill = normal.pill,
-            outline = normal.outline, width = normal.width },
-        pressed = states.pressed or { fill = derivedPressed, radius = normal.radius, pill = normal.pill,
-            outline = normal.outline, width = normal.width },
+        hover = states.hover,
+        pressed = states.pressed,
         disabled = states.disabled,
     }
+    -- A missing hover or pressed look is derived from the normal fill and shape, as the flat
+    -- button derives its colours, so every button answers the pointer. That works only for a
+    -- plain Box look: a layered, gradient or bevel normal has no single fill to derive from, so
+    -- a state without a look keeps showing the shape it falls back to (ShapeKey).
+    if normal.gradient == nil and normal.bevel == nil and normal.layers == nil then
+        local derivedHover, derivedPressed = Theme.FillStates(normal.fill or WHITE)
+        looks.hover = states.hover or { fill = derivedHover, radius = normal.radius, pill = normal.pill,
+            outline = normal.outline, width = normal.width }
+        looks.pressed = states.pressed or { fill = derivedPressed, radius = normal.radius, pill = normal.pill,
+            outline = normal.outline, width = normal.width }
+    end
     local shapes = {}
     -- Each look is its own shape in its exact colours, shown and hidden by visibility, because a
     -- rounded or outlined brush recoloured with SetBrushColor shows a rim (field note 30).
     for _, key in ipairs({ "normal", "hover", "pressed", "disabled" }) do
         local look = looks[key]
         if look ~= nil then
-            local shape = M.Box(overlay, name .. "_" .. key, look, 0)
+            local shape = M.Shape(overlay, name .. "_" .. key, look)
             SetShown(shape, key == "normal")
             AddToOverlay(overlay, shape, 0)
             shapes[key] = shape
@@ -675,8 +936,10 @@ local function ShapeButton(outer, name, states, content, labelStyle)
         root = button,
         widget = button,
         shapes = shapes,
+        looks = looks,
         edge = edgeWidget,
         label = label,
+        content = label == nil and content or nil,
         flat = false,
         lastState = "normal",
         shownKey = "normal",
@@ -708,6 +971,26 @@ function M.StateButton(outer, name, states, content, labelStyle)
     return FlatButton(outer, name, states, content, labelStyle)
 end
 
+-- Move the caption, or the content widget when there is no caption, by the shown look's shift, as
+-- Windows Classic moves its text down and right while pressed. A look without a shift puts it
+-- back, and nothing is written while the offset is unchanged or has never moved.
+local function ApplyShift(ctrl, key)
+    local look = ctrl.looks and ctrl.looks[key]
+    local shift = look and look.shift
+    local x, y = shift and shift.x or 0, shift and shift.y or 0
+    local lastX, lastY = ctrl.shiftX or 0, ctrl.shiftY or 0
+    if x == lastX and y == lastY then
+        return
+    end
+    ctrl.shiftX, ctrl.shiftY = x, y
+    local target = ctrl.label or ctrl.content
+    if target ~= nil then
+        pcall(function()
+            target:SetRenderTranslation({ X = x, Y = y })
+        end)
+    end
+end
+
 --- Show a state on a state button. The flat button is recoloured; the shape button shows exactly
 --- one shape and hides the one it showed before. Nothing is called when the state has not changed.
 ---@param ctrl table
@@ -731,16 +1014,16 @@ function M.ShowState(ctrl, state)
         return
     end
     local key = M.ShapeKey(shapes, state)
-    if key == ctrl.shownKey then
-        return
+    if key ~= ctrl.shownKey then
+        -- A shape is never recoloured, only shown or hidden (field note 30).
+        local before = ctrl.shownKey and shapes[ctrl.shownKey]
+        if before ~= nil then
+            SetShown(before, false)
+        end
+        SetShown(shapes[key], true)
+        ctrl.shownKey = key
     end
-    -- A shape is never recoloured, only shown or hidden (field note 30).
-    local before = ctrl.shownKey and shapes[ctrl.shownKey]
-    if before ~= nil then
-        SetShown(before, false)
-    end
-    SetShown(shapes[key], true)
-    ctrl.shownKey = key
+    ApplyShift(ctrl, key)
 end
 
 --- Enable or disable a state button and show its disabled look.

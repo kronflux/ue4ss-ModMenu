@@ -460,8 +460,9 @@ end
 --- Field chrome follows the active theme (light fields on light, dark on dark).
 --- opts.field (optional) is the item's resolved field style and opts.textSpec its text style. A
 --- frame field draws its Border from the field's fill, outline, width and radius; a stock or
---- missing field keeps the library's own look.
---- @return root, editBox, label
+--- missing field keeps the library's own look. opts.bevel (optional) is a bevel drawn sunken around
+--- the field's Border.
+---@return any root, any editBox, any label
 function M.CreateLabeledEditable(outer, namePrefix, caption, initialText, opts)
     opts = opts or {}
     local fontSize = opts.fontSize or defaults.fontItem
@@ -565,9 +566,11 @@ function M.CreateLabeledEditable(outer, namePrefix, caption, initialText, opts)
             AddNote("_Suffix", opts.suffix, 2, 0)
         end
     end
+    -- A field bevel goes around the Border, inside the size box. Without one the Border goes in alone.
+    local framed = Paint.Bevelled(sizeBox, namePrefix .. "_FieldBevel", border, opts.bevel, true)
     pcall(function()
         border:SetContent(content)
-        sizeBox:SetContent(border)
+        sizeBox:SetContent(framed)
     end)
 
     local fieldSlot = root:AddChildToHorizontalBox(sizeBox)
