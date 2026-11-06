@@ -227,3 +227,19 @@ assert_eq("disabling mid-hold reclaims the menu input once", heldReclaims, 1)
 Stepper.onItemState(heldCtrl, true, true, heldCtx)
 assert_eq("enabling the stepper reclaims nothing", heldReclaims, 1)
 Stepper._clock = os.clock
+
+-- The stepper's minus and plus buttons take the stepper fields over the button style.
+local Style = require("ModMenu.core.style")
+local Paint = require("ModMenu.core.paint")
+local slateSteps = Stepper._states(Style.Resolve("slate"), {})
+assert_eq("slate stepper buttons follow the button radius", slateSteps.normal.radius, 8)
+local squareSteps = Stepper._states(Style.Resolve({ base = "slate", stepper = { radius = 0, role = "primary" } }), {})
+assert_eq("a stepper radius wins over the button radius", squareSteps.normal.radius, 0)
+local slatePrimary = Style.Resolve("slate").button.roles.primary.fill
+assert_eq("the stepper role picks the button role", squareSteps.normal.fill, slatePrimary)
+local lookSteps = Stepper._states(Style.Resolve("slate"), { look = { pill = true } })
+assert_eq("an item look on the stepper reaches its buttons", lookSteps.normal.pill, true)
+local lightSteps = Stepper._states(Style.Resolve("light"), {})
+assert_true("light stepper buttons keep the legacy recoloured button", Paint.NeedsShapes(lightSteps) == false)
+assert_eq("light stepper buttons rest on the legacy buttonBg", lightSteps.normal.fill,
+    require("ModMenu.core.theme").Preset("light").buttonBg)

@@ -8,6 +8,9 @@
 ]]
 
 local Theme = require("ModMenu.core.theme")
+local Style = require("ModMenu.core.style")
+local Paint = require("ModMenu.core.paint")
+local Button = require("ModMenu.widgets.button")
 
 local Stepper = {}
 Stepper.type = "stepper"
@@ -123,7 +126,16 @@ local function Repeat(heldMs, lastMs)
     return heldMs - lastMs >= REPEAT_INTERVAL_MS
 end
 
+-- The looks of the minus and plus buttons: the button style in the stepper's role, with the
+-- stepper's radius and pill over it. The item's look is a stepper look, so it merges over the
+-- stepper fields first.
+local function States(resolved, item)
+    local s = Style.ForItem(resolved, "stepper", item.look)
+    return Button.States(resolved, { variant = s.role }, { radius = s.radius, pill = s.pill })
+end
+
 -- The spec runs without the game and cannot build a widget, so the module exposes these helpers.
+Stepper._states = States
 Stepper._coerce = Coerce
 Stepper._next = Next
 Stepper._format = Format
@@ -179,7 +191,8 @@ function Stepper.seed(sectionId, item, values)
     values[vkey] = n
 end
 
-local function Paint(ctrl, value)
+-- Named ShowValue rather than Paint, because Paint is the drawing module.
+local function ShowValue(ctrl, value)
     pcall(function()
         ctrl.readout:SetText(FText(Format(value, ctrl.item)))
     end)
@@ -209,16 +222,31 @@ function Stepper.build(ctx)
 
     local buttons = {}
     local readout
+    local resolved = ctx.config.resolved
+    local states, caption = nil, nil
+    if resolved ~= nil then
+        states = States(resolved, item)
+        caption = Button.CaptionStyle(ctx, states)
+    end
     local function AddButton(key, text, dir)
-        local fill, button, caption = umg.CreateFilledButton(root, name .. "_" .. key, text, nil, ctx.config.fontItem)
+        local button_ctrl
+        if states ~= nil then
+            -- A flat look gives CreateFilledButton's tree in the same colours, so light and dark
+            -- keep today's stepper buttons.
+            button_ctrl = Paint.StateButton(root, name .. "_" .. key, states, text, caption)
+            button_ctrl.labelWidget = button_ctrl.label
+        else
+            local fill, button, label = umg.CreateFilledButton(root, name .. "_" .. key, text, nil, ctx.config.fontItem)
+            button_ctrl = { root = fill, widget = button, fill = fill, labelWidget = label }
+            umg.SetFill(button_ctrl, colors.buttonBg)
+        end
+        button_ctrl.dir = dir
         pcall(function()
-            local slot = root:AddChildToHorizontalBox(fill)
+            local slot = root:AddChildToHorizontalBox(button_ctrl.root)
             slot:SetSize({ SizeRule = 0, Value = 0.0 })
             slot:SetPadding({ Left = BUTTON_GAP, Top = 0, Right = 0, Bottom = 0 })
             slot:SetVerticalAlignment(2)
         end)
-        local button_ctrl = { widget = button, fill = fill, labelWidget = caption, dir = dir }
-        umg.SetFill(button_ctrl, colors.buttonBg)
         table.insert(buttons, button_ctrl)
     end
     AddButton("minus", "-", -1)
@@ -226,8 +254,12 @@ function Stepper.build(ctx)
     readout = umg.Construct("/Script/UMG.TextBlock", size, name .. "_Readout")
     umg.StyleText(readout, ctx.config.fontItem, colors.textMuted)
     umg.SetLabelText(readout, Format(current, item))
+    local readoutWidth = READOUT_WIDTH
+    if resolved ~= nil then
+        readoutWidth = Style.ForItem(resolved, "stepper", item.look).valueWidth or READOUT_WIDTH
+    end
     pcall(function()
-        size:SetWidthOverride(READOUT_WIDTH)
+        size:SetWidthOverride(readoutWidth)
         size:SetContent(readout)
         readout:SetJustification(1)
         local slot = root:AddChildToHorizontalBox(size)
@@ -281,7 +313,11 @@ end
 -- This watches one button: it repeats while the button is held and fires the click on release.
 -- A release that ends a run of repeats is dropped, because the repeats already moved the value.
 local function PollButton(ctrl, ctx, button)
-    ctx.umg.TrackPointer(button)
+    if button.flat == false then
+        Paint.TrackPointer(button)
+    else
+        ctx.umg.TrackPointer(button)
+    end
     local down = ctx.Input.WidgetIsDown(button.widget)
     if down then
         local now = Stepper._clock() * 1000
@@ -316,6 +352,12 @@ end
 --- stepper, so a hold in progress is dropped here: it would otherwise repeat or click once the
 --- stepper is enabled again, and the input a run of repeats left alone is reclaimed now.
 function Stepper.onItemState(ctrl, enabled, _visible, ctx)
+    -- A shaped button shows its disabled shape; a flat one keeps today's look.
+    for _, button in ipairs(ctrl.buttons or {}) do
+        if button.flat == false then
+            Paint.SetEnabled(button, enabled)
+        end
+    end
     if enabled then
         return
     end
@@ -369,7 +411,7 @@ function Stepper.apply(ctrl, value, ctx)
     end
     ctx.values[ctrl.valueKey] = n
     ctrl.value = n
-    Paint(ctrl, n)
+    ShowValue(ctrl, n)
 end
 
 return Stepper

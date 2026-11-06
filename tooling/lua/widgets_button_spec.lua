@@ -191,3 +191,124 @@ if okUmg then
     Umg.TrackPointer(derived)
     assert_true("SetFill derives a lighter hover colour", derived.fill.color.R > normal.R)
 end
+
+-- Button.States decides a button's look from the resolved theme with no engine, so each theme's
+-- choice of variant, role, shape and outline is checked here.
+local okStyle, Style = pcall(require, "ModMenu.core.style")
+local okPaint, Paint = pcall(require, "ModMenu.core.paint")
+local okTheme, Theme = pcall(require, "ModMenu.core.theme")
+assert_true("core.style, core.paint and core.theme load for Button.States", okStyle and okPaint and okTheme)
+assert_true("Button.States exists", type(Button.States) == "function")
+if okStyle and okPaint and okTheme and type(Button.States) == "function" then
+    local light = Style.Resolve("light")
+    local slate = Style.Resolve("slate")
+    local legacyLight = Theme.Preset("light")
+
+    local primary = Button.States(light, { variant = "primary" })
+    assert_eq("light primary rests on the legacy buttonBgPrimary", primary.normal.fill, legacyLight.buttonBgPrimary)
+    assert_eq("light primary captions use the legacy buttonTextPrimary", primary.text, legacyLight.buttonTextPrimary)
+    assert_true("light primary is flat in every state", Paint.IsFlat(primary.normal) and Paint.IsFlat(primary.hover)
+        and Paint.IsFlat(primary.pressed) and Paint.IsFlat(primary.disabled))
+    assert_eq("light primary draws no outline", primary.edge, nil)
+    assert_true("light primary keeps the legacy recoloured button", Paint.NeedsShapes(primary) == false)
+    local legacyStates = Theme.ButtonStates(legacyLight, "primary")
+    assert_eq("light primary hover is today's hover", primary.hover.fill, legacyStates.hover)
+    assert_eq("light primary pressed is today's pressed", primary.pressed.fill, legacyStates.pressed)
+
+    local dark = Style.Resolve("dark")
+    local darkDefault = Button.States(dark, {})
+    local legacyDark = Theme.Preset("dark")
+    assert_eq("dark default rests on the legacy buttonBg", darkDefault.normal.fill, legacyDark.buttonBg)
+    assert_true("dark default keeps the legacy recoloured button", Paint.NeedsShapes(darkDefault) == false)
+
+    local slateDefault = Button.States(slate, {})
+    assert_eq("slate buttons have radius 8", slateDefault.normal.radius, 8)
+    assert_true("slate buttons draw their own shapes", Paint.NeedsShapes(slateDefault) == true)
+
+    local ghostTheme = Style.Resolve({ button = { variant = "ghost", pill = true, width = 2 } })
+    local ghost = Button.States(ghostTheme, { variant = "primary" })
+    assert_eq("a pill ghost theme gives pill shapes", ghost.normal.pill, true)
+    assert_eq("a ghost outline takes the button width", ghost.edge and ghost.edge.width, 2)
+    assert_eq("a ghost rests clear", ghost.normal.fill.A, 0)
+    assert_eq("a ghost caption takes the role colour", ghost.text, ghostTheme.button.roles.primary.fill)
+
+    local disabled = Button.States(slate, { variant = "primary", enabled = false })
+    assert_eq("a disabled button does not change on hover", disabled.hover, disabled.normal)
+    assert_eq("a disabled button does not change on press", disabled.pressed, disabled.normal)
+    assert_eq("a disabled button uses the disabled role", disabled.normal.fill, slate.button.roles.disabled.fill)
+
+    local active = Button.States(slate, { variant = "danger", active = true })
+    assert_eq("an active button uses the active role", active.normal.fill, slate.button.roles.active.fill)
+    assert_eq("an active button keeps one fill on hover", active.hover, active.normal)
+
+    local looked = Button.States(slate, { look = { radius = 0 } })
+    assert_eq("an item look radius 0 overrides slate's radius", looked.normal.radius, 0)
+
+    local soft = Button.States(Style.Resolve({ button = { variant = "soft" } }), { variant = "primary" })
+    assert_true("a soft button rests on a faint tint", soft.normal.fill.A > 0 and soft.normal.fill.A < 0.5)
+
+    local underline = Button.States(Style.Resolve({ button = { variant = "underline" } }), {})
+    assert_true("an underline button names its bar colour", underline.underline ~= nil)
+    assert_eq("an underline button draws no outline", underline.edge, nil)
+
+    local stepperish = Button.States(slate, {}, { radius = 0, pill = false })
+    assert_eq("an override table wins over the button radius", stepperish.normal.radius, 0)
+
+    local ghostDisabled = Button.States(ghostTheme, { variant = "primary", enabled = false })
+    assert_eq("a disabled ghost outlines in the disabled tone", ghostDisabled.edge and ghostDisabled.edge.outline,
+        ghostTheme.button.roles.disabled.text)
+
+    local neonLike = Style.Resolve({ base = "neon" })
+    local neonDefault = Button.States(neonLike, {})
+    assert_true("a neon-based theme has a clear default fill", neonLike.button.roles.default.fill.A < 0.05)
+    assert_eq("a clear default tone gives way to the role text for the ghost edge",
+        neonDefault.edge and neonDefault.edge.outline, neonLike.button.roles.default.text)
+    assert_eq("a clear default tone gives way to the role text for the caption", neonDefault.text,
+        neonLike.button.roles.default.text)
+
+    assert_eq("a themed button relabels in its theme's upper case",
+        Button.CaptionText({ themed = true, captionSpec = { upper = true } }, "Go now"), "GO NOW")
+    assert_eq("a themed button with no text style relabels as given",
+        Button.CaptionText({ themed = true }, "Go now"), "Go now")
+    assert_eq("a legacy button relabels as given", Button.CaptionText({ captionSpec = { upper = true } }, "Go now"), "Go now")
+end
+
+-- Confirm buttons take their looks from Button.States, so a ghost theme outlines them as it
+-- outlines button items, and light keeps today's flat dialog buttons.
+local confirmStub = package.loaded["UEHelpers.UEHelpers"] == nil
+if confirmStub then
+    package.loaded["UEHelpers.UEHelpers"] = {}
+end
+local okConfirm, Confirm = pcall(require, "ModMenu.shell.confirm")
+if confirmStub then
+    package.loaded["UEHelpers.UEHelpers"] = nil
+end
+assert_true("shell.confirm loads under MoonSharp", okConfirm)
+if okConfirm and okStyle and okPaint and okTheme then
+    assert_true("Confirm.ButtonLook exists", type(Confirm.ButtonLook) == "function")
+    local neonConfig = { resolved = Style.Resolve({ base = "neon" }), colors = Theme.Preset("dark") }
+    local neonStates, neonCaption = Confirm.ButtonLook(neonConfig, "danger")
+    assert_true("a neon confirm button is outlined", neonStates.edge ~= nil and (neonStates.edge.width or 0) > 0)
+    assert_eq("a neon confirm button rests clear", neonStates.normal.fill.A, 0)
+    assert_eq("a neon confirm caption is the outline colour", neonCaption.color, neonStates.edge and neonStates.edge.outline)
+    local neonCancel = Confirm.ButtonLook(neonConfig, "secondary")
+    assert_true("a neon cancel button is outlined", neonCancel.edge ~= nil)
+
+    local lightColors = Theme.Preset("light")
+    local lightConfig = { resolved = Style.Resolve("light"), colors = lightColors, fontItem = 16 }
+    local lightStates, lightCaption = Confirm.ButtonLook(lightConfig, "danger")
+    local legacy = Theme.ButtonStates(lightColors, "danger")
+    assert_true("a light confirm button stays flat", Paint.NeedsShapes(lightStates) == false)
+    assert_eq("a light confirm button rests on the legacy danger fill", lightStates.normal.fill, lightColors.buttonBgDanger)
+    assert_eq("a light confirm hover is the legacy hover", lightStates.hover.fill, legacy.hover)
+    assert_eq("a light confirm pressed is the legacy pressed", lightStates.pressed.fill, legacy.pressed)
+    assert_eq("a light confirm caption is the legacy danger text", lightCaption.color, lightColors.buttonTextDanger)
+    assert_eq("a light confirm caption keeps the item font size", lightCaption.size, 16)
+    assert_eq("a light confirm caption has no text style", lightCaption.textSpec, nil)
+    assert_eq("a light confirm caption keeps its padding", lightCaption.pad, { 12, 4, 12, 4 })
+
+    local underConfig = { resolved = Style.Resolve({ base = "slate", button = { variant = "underline" } }), colors = lightColors }
+    local underStates = Confirm.ButtonLook(underConfig, "default")
+    assert_eq("an underline confirm button draws no bar", underStates.underline, nil)
+    assert_true("an underline confirm button is outlined as ghost", underStates.edge ~= nil)
+end
