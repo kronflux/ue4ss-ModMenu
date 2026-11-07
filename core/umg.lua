@@ -38,9 +38,18 @@ function M.StyleScrollBox(scroll, config)
         return
     end
     local touch = config ~= nil and config.pointerMode == "touch"
+    local themed = nil
+    if config ~= nil and type(config.resolved) == "table" and type(config.resolved.scroll) == "table" then
+        themed = config.resolved.scroll
+    end
     local thick = 8
     if touch then
         thick = 28
+    elseif themed ~= nil then
+        local width = tonumber(themed.width)
+        if width ~= nil and width >= 1 then
+            thick = width
+        end
     end
     pcall(function()
         scroll:SetAnimateWheelScrolling(true)
@@ -100,6 +109,35 @@ function M.StyleScrollBox(scroll, config)
         end
         scroll.WidgetBarStyle = style
     end)
+
+    -- Theme brushes. Each write has its own pcall, so one failed brush leaves the others written.
+    -- Paint requires this module, so it is required here, when first needed.
+    if themed ~= nil then
+        local function Write(key, fill)
+            if fill == nil then
+                return
+            end
+            pcall(function()
+                local Paint = require("ModMenu.core.paint")
+                local edge = themed.thumbEdge
+                Paint.Brush(scroll.WidgetBarStyle[key], {
+                    fill = fill,
+                    radius = themed.thumbRadius or 0,
+                    outline = edge,
+                    width = (edge ~= nil and key ~= "VerticalBackgroundImage") and 1 or 0,
+                    drawAs = 4,
+                })
+            end)
+        end
+        local hover = themed.thumbHover or themed.thumb
+        Write("NormalThumbImage", themed.thumb)
+        Write("HoveredThumbImage", hover)
+        Write("DraggedThumbImage", hover)
+        Write("VerticalBackgroundImage", themed.track)
+        pcall(function()
+            scroll.WidgetBarStyle = scroll.WidgetBarStyle
+        end)
+    end
 
     pcall(function()
         scroll:SynchronizeProperties()
