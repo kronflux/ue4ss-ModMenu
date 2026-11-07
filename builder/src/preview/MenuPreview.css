@@ -603,12 +603,24 @@
   padding: 10px 12px;
 }
 
+/* The scroll bar takes the theme's scroll style through --mm-scroll-* (core/umg.lua StyleScrollBox); with none
+   set every fallback is today's bar. */
 .mm-scroll::-webkit-scrollbar {
-  width: 8px;
+  width: var(--mm-scroll-width, 8px);
+}
+
+.mm-scroll::-webkit-scrollbar-track {
+  background: var(--mm-scroll-track, transparent);
 }
 
 .mm-scroll::-webkit-scrollbar-thumb {
-  background: var(--mm-button-bg);
+  background: var(--mm-scroll-thumb, var(--mm-button-bg));
+  border: var(--mm-scroll-thumb-border, 0);
+  border-radius: var(--mm-scroll-thumb-radius, 0);
+}
+
+.mm-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--mm-scroll-thumb-hover, var(--mm-scroll-thumb, var(--mm-button-bg)));
 }
 
 /* Label styles. Heading is the section size in the accent colour, and warning is the status colour. */
@@ -924,6 +936,7 @@
 }
 
 .mm-tg-check {
+  position: relative;
   flex: 0 0 20px;
   height: 20px;
   box-sizing: border-box;
@@ -1168,6 +1181,205 @@
   margin-top: 8px;
 }
 
+/* XP tabs (shell/tabs.lua XpTab, BuildPane): rounded top corners on a face gradient, the selected tab in the
+   mark fill with a top line and joined to the pane under the strip. Hover shows the line, as the strip's poll does. */
+/* Tabs fit their caption, left-aligned with no gap and about 6 units of padding each side. */
+.mm-choice-xp {
+  align-items: flex-end;
+  gap: 0;
+  border-bottom: 1px solid var(--mm-tab-edge);
+}
+
+.mm-choice-xp .mm-choice-opt {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  padding: 0 6px 4px;
+  border-radius: var(--mm-tab-radius);
+  background: var(--mm-tab-face);
+  box-shadow: inset 0 0 0 1px var(--mm-tab-edge);
+}
+
+.mm-choice-xp .mm-choice-opt:hover {
+  background: var(--mm-tab-face);
+}
+
+.mm-choice-xp .mm-choice-opt.is-on,
+.mm-choice-xp .mm-choice-opt.is-on:hover {
+  margin-bottom: -1px;
+  padding-top: 2px;
+  background: var(--mm-tab-mark);
+  box-shadow: inset 1px 1px 0 0 var(--mm-tab-edge), inset -1px 0 0 0 var(--mm-tab-edge);
+}
+
+.mm-tab-line {
+  display: block;
+  flex: 0 0 3px;
+  height: 3px;
+  margin: 1px var(--mm-tab-pad, 3px) 0;
+  background: var(--mm-tab-line);
+  visibility: hidden;
+}
+
+.mm-tab-line.is-on,
+.mm-choice-xp .mm-choice-opt:hover .mm-tab-line {
+  visibility: visible;
+}
+
+.mm-tab-pane {
+  padding: 8px 0 0;
+  border: 1px solid var(--mm-tab-edge);
+  border-top: 0;
+}
+
+/* A check box face gradient under both looks, and the hover ring just inside the edge (widgets/checkbox.lua). */
+.mm-tg-check.mm-tg-check-face,
+.mm-tg-check.mm-tg-check-face.is-on {
+  background: var(--mm-toggle-check-face);
+}
+
+.mm-check-ring {
+  display: none;
+  position: absolute;
+  inset: var(--mm-toggle-check-edge-width);
+  /* The box radius less the edge width, never below 0 (widgets/checkbox.lua). */
+  border-radius: max(0px, calc(var(--mm-toggle-box-radius) - var(--mm-toggle-check-edge-width)));
+  box-shadow: inset 0 0 0 2px var(--mm-toggle-check-hover-ring);
+  pointer-events: none;
+}
+
+.mm-toggle:hover .mm-check-ring {
+  display: block;
+}
+
+/* A drawn radio (widgets/radio.lua): concentric circles and an optional bevel are always shown and the choice
+   only shows the dot; the hover ring is a 2 unit outline just inside the edge. */
+.mm-choice-ring.mm-radio-custom {
+  background: transparent;
+  box-shadow: none;
+}
+
+.mm-radio-ring,
+.mm-radio-bevel {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.mm-radio-bevel-dark {
+  inset: 0;
+}
+
+.mm-radio-bevel-light {
+  left: 1px;
+  top: 1px;
+  right: 0;
+  bottom: 0;
+}
+
+.mm-radio-hover {
+  display: none;
+  position: absolute;
+  inset: 1px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px var(--mm-ch-hover-ring);
+  pointer-events: none;
+}
+
+.mm-choice-opt:hover .mm-radio-hover {
+  display: block;
+}
+
+.mm-choice-opt.is-on .mm-choice-ring.mm-radio-custom::after {
+  left: calc(4px + var(--mm-ch-ring-shift, 0px));
+  top: calc(4px + var(--mm-ch-ring-shift, 0px));
+  background: var(--mm-ch-dot);
+}
+
+/* The pointer thumb (widgets/slider.lua): a box thumbWidth wide and size tall whose bottom corners are half
+   its width, the sunken two-line track, and a row of ticks inset like the rail. */
+.mm-sl-thumb.mm-thumb-pointer {
+  width: var(--mm-slider-pointer-width);
+  height: var(--mm-slider-size);
+  border-radius: var(--mm-slider-thumb-radius) var(--mm-slider-thumb-radius) calc(var(--mm-slider-pointer-width) / 2)
+    calc(var(--mm-slider-pointer-width) / 2);
+}
+
+/* The two lines run nearly the full track, inset by 4 (THUMB_ROOM in widgets/slider.lua). */
+.mm-sl-track.mm-track-light {
+  margin: 0 4px;
+  border-radius: 0;
+  background: linear-gradient(180deg, var(--mm-slider-track) calc(100% - 1px), var(--mm-slider-track-light) 0);
+}
+
+.mm-ticks {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 var(--mm-slider-tick-inset, 0);
+}
+
+.mm-tick {
+  flex: 0 0 1px;
+  height: 4px;
+  background: var(--mm-slider-tick, #fff);
+}
+
+/* Arrow buttons (core/paint.lua ArrowButton): a gradient face, an optional edge and bevel, and a triangle of
+   7, 5, 3 and 1 unit bars, each cell one box-shadow of the .mm-arrow-tri unit. The glyph steps 1 down and
+   right while a bevelled button is pressed. */
+.mm-arrow {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 0;
+  border: 0;
+  background: var(--mm-arrow-face);
+  box-shadow: var(--mm-arrow-shadow);
+  cursor: pointer;
+}
+
+.mm-arrow:hover {
+  background: var(--mm-arrow-hover);
+}
+
+.mm-arrow:active {
+  background: var(--mm-arrow-pressed);
+  box-shadow: var(--mm-arrow-shadow-pressed);
+}
+
+.mm-arrow-bevel:active .mm-arrow-glyph {
+  transform: translate(1px, 1px);
+}
+
+.mm-arrow > .mm-arrow-glyph:first-child {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+}
+
+.mm-arrow-tri {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+}
+
+.mm-drop-header .mm-arrow {
+  margin-left: 4px;
+}
+
+.mm-drop-header:has(.mm-arrow) {
+  padding: 2px 2px 2px 10px;
+}
+
+.mm-step-stack {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+}
+
 /* Framed fields (the field style): text and number boxes, the dropdown header and its list, and the
    keybind chip take the field's fill, outline and radius; list options wash in the list hover. */
 .mm-variant-field-frame .mm-field-box {
@@ -1372,8 +1584,9 @@
 
 /* A progress trough inside its frame (Progress.FrameSpec): the frame's own style carries the pad, fill,
    radius and shadows, and the bar keeps its width inside it. */
+/* A flex box, so the trough inside it keeps its 200 px basis; as a block it collapsed to its padding. */
 .mm-pr-frame {
-  display: block;
+  display: flex;
   flex: 0 0 auto;
   box-sizing: content-box;
 }

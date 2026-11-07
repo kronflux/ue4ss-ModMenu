@@ -415,6 +415,10 @@ export function typeVars(type: string, e: ResolvedEntry, css: (c: Color) => stri
     // A sunken bevel goes over the whole check box, as Windows Classic draws it.
     const checkBevel = asBevel(e.checkBevel);
     if (checkBevel) v["--mm-toggle-check-bevel"] = bevelToCss(checkBevel, true, css);
+    // A face gradient shows under both looks of the box, and a ring shows while the pointer is over it.
+    const checkFace = colorStops(e.checkFace);
+    if (checkFace) v["--mm-toggle-check-face"] = stopsToCss(checkFace, false, css);
+    put(v, "--mm-toggle-check-hover-ring", e.checkHoverRing, css);
   } else if (type === "slider") {
     v["--mm-slider-thickness"] = `${num(e.thickness, 4)}px`;
     v["--mm-slider-size"] = `${num(e.size, 16)}px`;
@@ -423,6 +427,20 @@ export function typeVars(type: string, e: ResolvedEntry, css: (c: Color) => stri
     put(v, "--mm-slider-thumb-fill", e.thumbFill, css);
     put(v, "--mm-slider-thumb-edge", e.thumbEdge, css);
     put(v, "--mm-slider-thumb-hover", e.thumbHover ?? e.thumbFill, css);
+    if (e.variant === "pointer") {
+      // The pointer thumb is a box: thumbWidth is its width and its edge is 1 wide (Slider.ThumbSpecs).
+      v["--mm-slider-size"] = `${num(e.size, 21)}px`;
+      v["--mm-slider-thumb-width"] = "1px";
+      v["--mm-slider-pointer-width"] = `${num(e.thumbWidth, 11)}px`;
+      v["--mm-slider-thumb-radius"] = `${num(e.thumbRadius, 0)}px`;
+    }
+    put(v, "--mm-slider-track-light", e.trackLight, css);
+    put(v, "--mm-slider-tick", e.tickColor, css);
+    if (typeof e.ticks === "number" && e.ticks >= 1) {
+      // The tick row is inset by half the thumb's width, rounded down (BuildTicks); the bar thumb is 6 wide.
+      const thumbWidth = e.variant === "pointer" ? num(e.thumbWidth, 11) : e.variant === "bar" ? 6 : num(e.size, 16);
+      v["--mm-slider-tick-inset"] = `${Math.floor(thumbWidth / 2)}px`;
+    }
   } else if (type === "progress") {
     v["--mm-progress-height"] = `${num(e.height, 8)}px`;
     v["--mm-progress-radius"] = radiusCss(e.radius);
@@ -524,6 +542,9 @@ function frameVars(resolved: ResolvedStyle, css: (c: Color) => string): Record<s
     const controls = colorStops(header.controlStops) ?? barStops;
     const close = colorStops(header.closeStops) ?? barStops;
     const shade = (stops: Color[], toward: Color, amount: number) => stops.map((c) => mixColor(c, toward, amount));
+    if (isColor(header.captionGlyph)) {
+      vars["--mm-cap-xp-ink"] = css(header.captionGlyph);
+    }
     for (const [name, stops] of [["xp", controls], ["xp-close", close]] as const) {
       if (stops !== undefined) {
         vars[`--mm-cap-${name}`] = stopsToCss(stops, false, css);
@@ -549,6 +570,25 @@ function frameVars(resolved: ResolvedStyle, css: (c: Color) => string): Record<s
     vars["--mm-status-line"] = css(isColor(status.line) ? status.line : p.line);
   }
   return vars;
+}
+
+/**
+ * The scroll bar's colours and size as variables for the preview scroller (core/umg.lua StyleScrollBox).
+ * A style with no scroll table gives none, so the preview keeps today's bar. The hover colour is also
+ * the drag colour, and the edge is 1 wide around the thumb and not around the track.
+ */
+export function scrollVars(scroll: ResolvedEntry | undefined, css: (c: Color) => string): Record<string, string> {
+  const v: Record<string, string> = {};
+  if (scroll === undefined) {
+    return v;
+  }
+  put(v, "--mm-scroll-track", scroll.track, css);
+  put(v, "--mm-scroll-thumb", scroll.thumb, css);
+  put(v, "--mm-scroll-thumb-hover", scroll.thumbHover ?? scroll.thumb, css);
+  if (isColor(scroll.thumbEdge)) v["--mm-scroll-thumb-border"] = `1px solid ${css(scroll.thumbEdge)}`;
+  if (scroll.thumbRadius !== undefined) v["--mm-scroll-thumb-radius"] = radiusCss(scroll.thumbRadius);
+  if (typeof scroll.width === "number" && scroll.width >= 1) v["--mm-scroll-width"] = `${scroll.width}px`;
+  return v;
 }
 
 /**
@@ -609,6 +649,7 @@ export function styleVars(resolved: ResolvedStyle): Record<string, string> {
   for (const type of ["title", "body", "hint", "data", "section", "button", "toggle", "slider", "progress", "field", "list", "confirm"]) {
     Object.assign(vars, typeVars(type, (resolved as Record<string, ResolvedEntry>)[type], css));
   }
+  Object.assign(vars, scrollVars(resolved.scroll, css));
   if (resolved.motion?.glitch === true) {
     // The title's two ghost copies, one red and one in the accent, three units to either side (Effects.Title).
     const ghosts = `3px 0 0 ${css(alpha(p.danger, 0.8))}, -3px 0 0 ${css(alpha(p.accent, 0.8))}`;

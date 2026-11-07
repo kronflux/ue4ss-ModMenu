@@ -1,17 +1,21 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { ButtonItem, DockSide, MenuDocument, ThemeName } from "../schema";
 import { barColors, headerVariant, styleVars } from "../theme/css";
-import { EffectsLayer, MacHeader, StatusBar, WindowBand } from "./frames";
+import { Arrow, EffectsLayer, MacHeader, StatusBar, WindowBand } from "./frames";
 import { ChoiceStrip, PreviewItem, type PreviewActions } from "./Items";
 import {
+  arrowLook,
   buttonLook,
   choiceLook,
   closeLook,
+  fieldVariant,
   labelVars,
   panelClasses,
   previewFor,
   StyleContext,
   usePreviewStyle,
+  variantClass,
+  type VarStyle,
 } from "./look";
 import "./MenuPreview.css";
 
@@ -104,6 +108,18 @@ export function ConfirmCard({ item, onDismiss }: { item: ButtonItem; onDismiss: 
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** The XP tab pane: the content under the strip, outlined on 3 sides; without XP tabs it adds no element. */
+function PaneWrap({ xp, style, children }: { xp: boolean; style: VarStyle; children: ReactNode }) {
+  if (!xp) {
+    return <>{children}</>;
+  }
+  return (
+    <div className="mm-tab-pane" style={style}>
+      {children}
     </div>
   );
 }
@@ -223,6 +239,10 @@ export function MenuPreview({
   const variant = headerVariant(ps.resolved);
   const tabsLook = choiceLook(ps, "tabs", undefined);
   const tabs = document.init.tabs;
+  // An XP strip sits on a pane outlined in the tab edge colour (Tabs.BuildPane), drawn only when there are tabs.
+  const dockField = fieldVariant(ps, undefined);
+  const xpTabs = tabsLook.variant === "xp";
+  const xpPane = xpTabs && tabs !== undefined && tabs.length > 0;
   const dock = document.init.dock;
   const [chosenTab, setActiveTab] = useState(tabs?.[0] ?? null);
   // The tab in use is the chosen one while it still exists, else the first, so a changed tab list needs no effect.
@@ -279,7 +299,9 @@ export function MenuPreview({
           {variant !== "bar" && <Header document={document} variant={variant} />}
 
           <p className="mm-hint mm-dock-cap">Dock</p>
-          <div className="mm-drop">
+          {/* The dock picker is a dropdown built from the field style (shell/dock.lua, Dropdown.createPicker), so it
+              takes the field variant and the arrow button as an item dropdown does; a stock field keeps its markup. */}
+          <div className={`mm-drop${dockField === "stock" ? "" : ` ${variantClass("field", dockField)}`}`}>
             <button
               type="button"
               className="mm-drop-header"
@@ -289,7 +311,7 @@ export function MenuPreview({
               }}
             >
               <span>{dockLabel}</span>
-              <span className="mm-drop-arrow">{dockOpen ? "▲" : "▼"}</span>
+              {arrowLook(ps, "down") !== undefined ? <Arrow direction="down" /> : <span className="mm-drop-arrow">{dockOpen ? "▲" : "▼"}</span>}
             </button>
             {dockOpen && (
               <div className="mm-drop-list">
@@ -311,7 +333,7 @@ export function MenuPreview({
           </div>
 
           {tabs && tabs.length > 0 && tabsLook.variant !== "stock" && (
-            <div className="mm-tabs-themed">
+            <div className={`mm-tabs-themed${xpTabs ? " mm-tabs-xp" : ""}`} style={xpTabs ? tabsLook.style : undefined}>
               <ChoiceStrip
                 look={tabsLook}
                 options={tabs.map((name) => ({
@@ -354,6 +376,7 @@ export function MenuPreview({
 
           <div className="mm-head-pad" />
 
+          <PaneWrap xp={xpPane} style={tabsLook.style}>
           {visible.length === 0 && <p className="mm-hint">No sections on this tab.</p>}
 
           {visible.map((section, sIndex) => {
@@ -394,6 +417,7 @@ export function MenuPreview({
               </section>
             );
           })}
+          </PaneWrap>
           <div className="mm-foot" />
         </div>
         <StatusBar ps={ps} />

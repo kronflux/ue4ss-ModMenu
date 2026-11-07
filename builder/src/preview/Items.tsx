@@ -17,14 +17,19 @@ import type {
   TextInputItem,
 } from "../schema";
 import { buttonChrome } from "./chrome";
+import { Arrow } from "./frames";
 import {
+  arrowLook,
   buttonLook,
+  checkLook,
   choiceLook,
   fieldVariant,
   lookVars,
   progressLook,
   segmentsLit,
+  sliderParts,
   sliderVariant,
+  stepperArrows,
   stepperButtonLook,
   textLookStyle,
   toggleVariant,
@@ -74,9 +79,14 @@ function MmButton({
 
 // The themed toggle shapes, as widgets/checkbox.lua builds them: a switch or square track with a knob,
 // a check box with a mark, or an On and Off chip.
-function ToggleControl({ variant, on }: { variant: string; on: boolean }) {
+function ToggleControl({ variant, on, face, ring }: { variant: string; on: boolean; face?: boolean; ring?: boolean }) {
   if (variant === "check") {
-    return <span className={`mm-tg-check${on ? " is-on" : ""}`}>{on ? "✓" : ""}</span>;
+    return (
+      <span className={`mm-tg-check${face ? " mm-tg-check-face" : ""}${on ? " is-on" : ""}`}>
+        {ring && <span className="mm-check-ring" />}
+        {on ? "✓" : ""}
+      </span>
+    );
   }
   if (variant === "text") {
     return <span className={`mm-tg-text${on ? " is-on" : ""}`}>{on ? "On" : "Off"}</span>;
@@ -101,6 +111,7 @@ function MmCheckbox({
   const on = actions.checks[valueKey] ?? item.default === true;
   const variant = toggleVariant(ps, item.look);
   if (variant !== "stock") {
+    const parts = variant === "check" ? checkLook(ps, item.look) : { face: false, ring: false };
     // The control shows the state, so the caption is the label alone, without ": ON" or ": OFF".
     return (
       <button
@@ -114,7 +125,7 @@ function MmCheckbox({
         }}
       >
         <span className="mm-toggle-label">{item.label}</span>
-        <ToggleControl variant={variant} on={on} />
+        <ToggleControl variant={variant} on={on} face={parts.face} ring={parts.ring} />
       </button>
     );
   }
@@ -165,7 +176,11 @@ function MmField({
 
 // The prefix and suffix sit inside the field, as the runtime draws them. The step buttons follow the field.
 function MmNumber({ item, fill }: { item: NumberItem; fill?: boolean }) {
-  const step = buttonLook(usePreviewStyle(), {});
+  const ps = usePreviewStyle();
+  const step = buttonLook(ps, {});
+  // With field.arrow the step buttons are an up and a down arrow stacked, each half the size and 1 tall.
+  const arrow = arrowLook(ps, "up");
+  const cell = arrow !== undefined ? Math.floor(arrow.size / 2) + 1 : 0;
   const width = item.fieldWidth ?? (fill === false ? 72 : 96);
   return (
     <div className="mm-number">
@@ -180,7 +195,13 @@ function MmNumber({ item, fill }: { item: NumberItem; fill?: boolean }) {
         />
         {item.suffix && <span className="mm-note">{item.suffix}</span>}
       </MmField>
-      {item.step !== undefined && (
+      {item.step !== undefined && arrow !== undefined && (
+        <span className="mm-step-stack">
+          <Arrow direction="up" height={cell} button />
+          <Arrow direction="down" height={cell} button />
+        </span>
+      )}
+      {item.step !== undefined && arrow === undefined && (
         <>
           <button type="button" className={`mm-btn mm-btn-inline mm-step ${step.className}`} style={step.style}>
             -
@@ -234,7 +255,7 @@ function MmDropdown({
         }}
       >
         <span>{selected}</span>
-        <span className="mm-drop-arrow">{open ? "▲" : "▼"}</span>
+        {arrowLook(ps, "down") !== undefined ? <Arrow direction="down" /> : <span className="mm-drop-arrow">{open ? "▲" : "▼"}</span>}
       </button>
       {open && (
         <div className="mm-drop-list" style={item.listMaxHeight ? { maxHeight: item.listMaxHeight } : undefined}>
@@ -268,15 +289,42 @@ function MmDropdown({
 // A themed slider rail, as widgets/slider.lua styles the engine slider: a rounded track of the
 // slider's thickness and a round, square or bar thumb at the value. A tint fills the track up to the
 // thumb, as the colour picker's channels show their colour.
-function SliderRail({ fraction, tint }: { fraction: number; tint?: string }) {
+// The pointer thumb is a box with a rounded point (mm-thumb-pointer), the sunken track is a dark line over
+// a light one (mm-track-light), and the ticks are a row of marks under the track (mm-tick).
+function SliderRail({
+  fraction,
+  tint,
+  pointer,
+  light,
+  ticks,
+}: {
+  fraction: number;
+  tint?: string;
+  pointer?: boolean;
+  light?: boolean;
+  ticks?: number;
+}) {
   const at = `${Math.min(1, Math.max(0, fraction)) * 100}%`;
-  return (
+  const rail = (
     <div className="mm-sl-rail">
-      <div className="mm-sl-track">
+      <div className={`mm-sl-track${light ? " mm-track-light" : ""}`}>
         {tint !== undefined && <span className="mm-sl-tint" style={{ width: at, background: tint }} />}
-        <span className="mm-sl-thumb" style={{ left: at }} />
+        <span className={`mm-sl-thumb${pointer ? " mm-thumb-pointer" : ""}`} style={{ left: at }} />
       </div>
     </div>
+  );
+  if (ticks === undefined || ticks < 1) {
+    return rail;
+  }
+  return (
+    <>
+      {rail}
+      <div className="mm-ticks">
+        {Array.from({ length: ticks }, (_, i) => (
+          <span key={i} className="mm-tick" />
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -287,6 +335,7 @@ function MmSlider({ item, fill }: { item: SliderItem; fill?: boolean }) {
   const value = sliderValue(item);
   const fraction = span > 0 ? (value - item.min) / span : 0;
   if (variant !== "stock") {
+    const parts = sliderParts(ps, item.look);
     return (
       <div
         className={`mm-slider${fill === false ? " mm-slider-inline" : ""} ${variantClass("slider", variant)}`}
@@ -298,7 +347,7 @@ function MmSlider({ item, fill }: { item: SliderItem; fill?: boolean }) {
           </span>
           {item.showValue !== false && <span className="mm-slider-value">{sliderText(value, item)}</span>}
         </div>
-        <SliderRail fraction={fraction} />
+        <SliderRail fraction={fraction} pointer={parts.pointer} light={parts.light} ticks={parts.ticks} />
       </div>
     );
   }
@@ -333,16 +382,26 @@ function MmStepper({ item }: { item: StepperItem }) {
   const flat = btn.flat;
   const btnClass = flat ? "mm-stepper-btn" : `mm-stepper-btn ${btn.className}`;
   const btnStyle = flat ? undefined : btn.style;
+  // With stepper.arrows and a field arrow the buttons are a left and a right arrow button.
+  const arrows = stepperArrows(ps, item.look);
   return (
     <div className={`mm-stepper${flat ? "" : " mm-stepper-themed"}`}>
       <span className="mm-stepper-label">{item.label}</span>
-      <span className={btnClass} style={btnStyle}>
-        -
-      </span>
+      {arrows ? (
+        <Arrow direction="left" button />
+      ) : (
+        <span className={btnClass} style={btnStyle}>
+          -
+        </span>
+      )}
       <span className="mm-stepper-readout">{sliderText(value, shaped)}</span>
-      <span className={btnClass} style={btnStyle}>
-        +
-      </span>
+      {arrows ? (
+        <Arrow direction="right" button />
+      ) : (
+        <span className={btnClass} style={btnStyle}>
+          +
+        </span>
+      )}
     </div>
   );
 }
@@ -404,6 +463,39 @@ function MmProgress({ item }: { item: ProgressItem }) {
   );
 }
 
+// A radio's ring. A drawn radio (rings or a bevel) shows its circles always and the choice only shows the dot;
+// the hover ring is a 2 unit outline just inside the edge, shown under the pointer (widgets/radio.lua).
+function RadioRing({ radio }: { radio?: ChoiceLook["radio"] }) {
+  if (radio === undefined) {
+    return <span className="mm-choice-ring" />;
+  }
+  return (
+    <span className={`mm-choice-ring${radio.custom ? " mm-radio-custom" : ""}`}>
+      {radio.bevel && (
+        <>
+          <span className="mm-radio-bevel mm-radio-bevel-dark" style={{ background: radio.bevel.dark }} />
+          <span className="mm-radio-bevel mm-radio-bevel-light" style={{ background: radio.bevel.light }} />
+        </>
+      )}
+      {radio.circles.map((circle, i) => (
+        <span
+          key={i}
+          className="mm-radio-ring"
+          style={{
+            width: circle.d,
+            height: circle.d,
+            left: `calc(${(14 - circle.d) / 2}px + var(--mm-ch-ring-shift, 0px))`,
+            top: `calc(${(14 - circle.d) / 2}px + var(--mm-ch-ring-shift, 0px))`,
+            background: circle.color,
+            boxShadow: circle.outline !== undefined ? `inset 0 0 0 1px ${circle.outline}` : undefined,
+          }}
+        />
+      ))}
+      {radio.hoverRing !== undefined && <span className="mm-radio-hover" />}
+    </span>
+  );
+}
+
 export type ChoiceOption = { key: string; label: string; on: boolean; onClick?: () => void };
 
 /**
@@ -437,7 +529,8 @@ export function ChoiceStrip({
           aria-pressed={opt.on}
           onClick={opt.onClick}
         >
-          {look.variant === "radio" && <span className="mm-choice-ring" />}
+          {look.variant === "radio" && <RadioRing radio={look.radio} />}
+          {look.variant === "xp" && <span className={`mm-tab-line${opt.on ? " is-on" : ""}`} />}
           <span className="mm-choice-text">{opt.label}</span>
         </button>
       ))}

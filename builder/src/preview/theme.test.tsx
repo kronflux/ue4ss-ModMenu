@@ -7,6 +7,7 @@ import { bevelToCss, colorCss, fontFamily, linearToSrgb, stopsToCss, styleVars, 
 import { PRESET_ORDER } from "../theme/presets.generated";
 import { hex, resolve } from "../theme/resolve";
 import {
+  arrowLook,
   buttonLook,
   choiceLook,
   fieldVariant,
@@ -244,6 +245,14 @@ describe("stage 2 looks", () => {
     expect(count(html("slate", closeOnly), /class="mm-cap /g)).toBe(1);
   });
 
+  it("colours the xp caption glyphs only when header.captionGlyph is set", () => {
+    expect(styleVars(resolve("slate", XP))["--mm-cap-xp-ink"]).toBeUndefined();
+    const dark = { ...XP, header: { ...XP_HEADER, captionGlyph: "#252536" } } as StyleOverrides;
+    expect(styleVars(resolve("slate", dark))["--mm-cap-xp-ink"]).toBe("rgb(37, 37, 54)");
+    expect(styleVars(resolve("xp-luna"))["--mm-cap-xp-ink"]).toBeUndefined();
+    expect(styleVars(resolve("xp-luna-silver"))["--mm-cap-xp-ink"]).toBe("rgb(37, 37, 54)");
+  });
+
   it("gives classic buttons a two-ring bevel and a sunken pressed look", () => {
     const look = buttonLook(previewStyle(resolve("slate", CLASSIC)), { variant: "primary" });
     expect(look.className).toContain("mm-variant-button-classic");
@@ -267,6 +276,22 @@ describe("stage 2 looks", () => {
     expect(String(primary.style["--mm-btn-hover-shadow"])).toContain("rgb(248, 179, 58)");
     expect(String(primary.style["--mm-btn-hover-shadow"])).not.toContain("rgb(140, 180, 240)");
     expect(String(primary.style["--mm-btn-pressed"])).toContain("linear-gradient");
+  });
+
+  it("draws a 1px default edge over a primary classic button's bevel in every state", () => {
+    const edged = { ...CLASSIC, button: { variant: "classic", height: 30, bevel: BEVEL, defaultEdge: "#000000" } } as StyleOverrides;
+    const ps = previewStyle(resolve("slate", edged));
+    const primary = buttonLook(ps, { variant: "primary" });
+    const ring = "inset 0 0 0 1px rgb(0, 0, 0)";
+    expect(String(primary.style.boxShadow).startsWith(ring)).toBe(true);
+    expect(String(primary.style["--mm-btn-hover-shadow"]).startsWith(ring)).toBe(true);
+    expect(String(primary.style["--mm-btn-pressed-shadow"]).startsWith(ring)).toBe(true);
+    expect(count(String(primary.style.boxShadow), /inset/g)).toBe(5);
+    const secondary = buttonLook(ps, { variant: "secondary" });
+    expect(String(secondary.style.boxShadow)).not.toContain(ring);
+    // Unset, the markup is the bevel alone.
+    const plain = buttonLook(previewStyle(resolve("slate", CLASSIC)), { variant: "primary" });
+    expect(count(String(plain.style.boxShadow), /inset/g)).toBe(4);
   });
 
   it("keeps a pill over a radius and an xp or classic button without its table as a fill", () => {
@@ -311,6 +336,161 @@ describe("stage 2 looks", () => {
     expect(vars["--mm-toggle-check-bevel"]).toContain("inset");
     expect(vars["--mm-field-bevel"]).toContain("inset");
     expect(vars["--mm-panel-shadow"]).toContain("inset");
+  });
+});
+
+describe("windows theme looks", () => {
+  const doc = fullDocument();
+  const html = (theme: string, style?: StyleOverrides) =>
+    renderToStaticMarkup(<MenuPreview document={{ ...doc, init: { ...doc.init, theme, style } }} />);
+  const has = (text: string, cls: string) => new RegExp(`class="[^"]*\\b${cls}\\b`).test(text);
+  const STOPS = ["#FFFFFF", "#ECEBE5", "#D6D0C5"];
+  const ARROW = { face: STOPS, hoverFace: ["#FFFFFF", "#FFFFFF"], glyph: "#4D6185", edge: "#7F9DB9", radius: 2, size: 17 };
+
+  // Each look is off unless its field is set: the markup with the field has the class, and slate alone does not.
+  const LOOKS: [string, string, StyleOverrides][] = [
+    ["mm-tabs-xp", "xp tab strip", { tabs: { variant: "xp", faceStops: STOPS, markLineStops: ["#FFC73C", "#E68B2C"], markFill: "#FCFCFE" } } as StyleOverrides],
+    ["mm-tab-line", "xp tab top line", { tabs: { variant: "xp", markLine: "#FFC73C", markFill: "#FCFCFE" } } as StyleOverrides],
+    ["mm-tab-pane", "xp tab pane outline", { tabs: { variant: "xp", edge: "#919B9C" } } as StyleOverrides],
+    ["mm-tg-check-face", "check face gradient", { toggle: { variant: "check", checkFace: ["#FFFFFF", "#F0F0EA"] } } as StyleOverrides],
+    ["mm-check-ring", "check hover ring", { toggle: { variant: "check", checkHoverRing: "#F8B33A" } } as StyleOverrides],
+    ["mm-radio-ring", "radio rings", { choice: { variant: "radio", radioRings: ["#FFFFFF", "#21A121"] } } as StyleOverrides],
+    ["mm-radio-bevel", "radio bevel", { choice: { variant: "radio", radioBevel: { light: "#FFFFFF", dark: "#808080" } } } as StyleOverrides],
+    ["mm-radio-hover", "radio hover ring", { choice: { variant: "radio", radioHoverRing: "#F8B33A" } } as StyleOverrides],
+    ["mm-thumb-pointer", "pointer slider thumb", { slider: { variant: "pointer" } } as StyleOverrides],
+    ["mm-tick", "slider ticks", { slider: { variant: "round", ticks: 5 } } as StyleOverrides],
+    ["mm-track-light", "sunken slider track", { slider: { variant: "round", trackLight: "#FFFFFF" } } as StyleOverrides],
+    ["mm-arrow", "arrow buttons", { field: { arrow: ARROW } } as StyleOverrides],
+  ];
+
+  it.each(LOOKS)("draws %s (%s) only when its field is set", (cls, _label, style) => {
+    expect(has(html("slate"), cls)).toBe(false);
+    expect(has(html("slate", style), cls)).toBe(true);
+  });
+
+  it("draws the xp tab line on every tab, shown on the selected one", () => {
+    const out = html("slate", { tabs: { variant: "xp", markLine: "#FFC73C", markFill: "#FCFCFE" } } as StyleOverrides);
+    expect(out.match(/class="mm-tab-line/g)?.length).toBe(2);
+    expect(out.match(/class="mm-tab-line is-on/g)?.length).toBe(1);
+  });
+
+  it("draws the pointer thumb as a box with a rounded point and the tick row inset by half of it", () => {
+    const vars = styleVars(resolve("slate", { slider: { variant: "pointer", size: 21, thumbRadius: 2 } } as StyleOverrides));
+    expect(vars["--mm-slider-size"]).toBe("21px");
+    expect(vars["--mm-slider-thumb-width"]).toBe("1px");
+    expect(vars["--mm-slider-pointer-width"]).toBe("11px");
+    expect(vars["--mm-slider-thumb-radius"]).toBe("2px");
+    const ticks = html("slate", { slider: { variant: "pointer", ticks: 5 } } as StyleOverrides);
+    expect(ticks.match(/class="mm-tick"/g)?.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("draws the arrow on the dropdown header, a stacked pair on a stepped number and left and right on a stepper", () => {
+    const out = html("slate", { field: { arrow: ARROW }, stepper: { arrows: true } } as StyleOverrides);
+    expect(out).toContain("mm-arrow-down");
+    expect(out).toContain("mm-arrow-up");
+    expect(out).toContain("mm-arrow-left");
+    expect(out).toContain("mm-arrow-right");
+    // Without stepper.arrows the stepper keeps its minus and plus.
+    const plain = html("slate", { field: { arrow: ARROW } } as StyleOverrides);
+    expect(plain).not.toContain("mm-arrow-left");
+    expect(plain).toContain("mm-arrow-down");
+  });
+
+  it("builds the triangle from 7, 5, 3 and 1 unit bars", () => {
+    const tri = html("slate", { field: { arrow: ARROW } } as StyleOverrides).match(/class="mm-arrow-tri"[^>]*style="([^"]*)"/)?.[1] ?? "";
+    expect(tri.split("px 0 0").length - 1).toBe(16);
+  });
+
+  it("insets the tick row by half the thumb width, rounded down", () => {
+    const inset = (slider: object) => styleVars(resolve("slate", { slider } as StyleOverrides))["--mm-slider-tick-inset"];
+    expect(inset({ variant: "pointer", ticks: 5 })).toBe("5px");
+    expect(inset({ variant: "pointer", ticks: 5, thumbWidth: 8 })).toBe("4px");
+    expect(inset({ variant: "round", ticks: 5, size: 17 })).toBe("8px");
+    expect(inset({ variant: "round" })).toBeUndefined();
+  });
+
+  it("lays the triangle out as Paint.TrianglePlan does, in a 7 by 4 or 4 by 7 box", () => {
+    const ps = previewStyle(resolve("slate", { field: { arrow: ARROW } } as StyleOverrides));
+    const shadows = (d: "up" | "down" | "left" | "right") => (arrowLook(ps, d)?.triangle ?? "").split(/\), (?=\d)/).map((s) => s.split(" ").slice(0, 2).join(" "));
+    const down = shadows("down");
+    const up = shadows("up");
+    const right = shadows("right");
+    const left = shadows("left");
+    expect([down.length, up.length, right.length, left.length]).toEqual([16, 16, 16, 16]);
+    // Down starts with the 7 wide bar at the top, up with the single cell centred on it.
+    expect(down.slice(0, 7)).toEqual(["0px 0px", "1px 0px", "2px 0px", "3px 0px", "4px 0px", "5px 0px", "6px 0px"]);
+    expect(up[0]).toBe("3px 0px");
+    // Right starts with the 7 tall column at the left, left with the single cell centred on it.
+    expect(right.slice(0, 7)).toEqual(["0px 0px", "0px 1px", "0px 2px", "0px 3px", "0px 4px", "0px 5px", "0px 6px"]);
+    expect(left[0]).toBe("0px 3px");
+    expect(arrowLook(ps, "down")?.box).toEqual({ w: 7, h: 4 });
+    expect(arrowLook(ps, "up")?.box).toEqual({ w: 7, h: 4 });
+    expect(arrowLook(ps, "left")?.box).toEqual({ w: 4, h: 7 });
+    expect(arrowLook(ps, "right")?.box).toEqual({ w: 4, h: 7 });
+    const out = html("slate", { field: { arrow: ARROW }, stepper: { arrows: true } } as StyleOverrides);
+    expect(out).toContain("width:4px;height:7px");
+    expect(out).toContain("width:7px;height:4px");
+  });
+
+  it("outlines only the outermost ring of a ring-only radio, never one with a bevel", () => {
+    const outlined = (choice: object) =>
+      /class="mm-radio-ring"[^>]*box-shadow:inset 0 0 0 1px/.test(html("slate", { choice } as StyleOverrides));
+    const rings = ["#FFFFFF", "#21A121"];
+    expect(outlined({ variant: "radio", radioRings: rings, radioEdge: "#1C5180" })).toBe(true);
+    // The choice style defaults radioEdge to the palette text, so a ring-only radio is outlined even without it.
+    expect(outlined({ variant: "radio", radioRings: rings })).toBe(true);
+    expect(outlined({ variant: "radio", radioRings: rings, radioEdge: "#1C5180", radioBevel: { light: "#FFFFFF", dark: "#808080" } })).toBe(false);
+    // Two rings per radio, one outlined: the outlined count is half the ring count.
+    const out = html("slate", { choice: { variant: "radio", radioRings: rings, radioEdge: "#1C5180" } } as StyleOverrides);
+    const all = out.match(/class="mm-radio-ring"/g)?.length ?? 0;
+    expect(all).toBeGreaterThan(0);
+    expect(out.match(/class="mm-radio-ring"[^>]*box-shadow/g)?.length).toBe(all / 2);
+  });
+
+  it("draws the dock picker with the field arrow, as the library builds it with the dropdown", () => {
+    const dock = (style?: StyleOverrides) => /<span>Left<\/span>(<span class="mm-(?:arrow|drop-arrow))/.exec(html("slate", style))?.[1];
+    expect(dock({ field: { arrow: ARROW } } as StyleOverrides)).toBe('<span class="mm-arrow');
+    expect(dock()).toBe('<span class="mm-drop-arrow');
+  });
+
+  it("keeps the progress trough inside a flex frame so its 200 px basis holds", () => {
+    const css = readFileSync(new URL("./MenuPreview.css", import.meta.url), "utf8");
+    expect(/\.mm-pr-frame \{[^}]*display: flex/.test(css)).toBe(true);
+  });
+
+  it("steps the xp tab line through 3 strips and insets it by the tab radius", () => {
+    const style = choiceLook(
+      previewStyle(resolve("slate", { tabs: { variant: "xp", radius: 5, markLineStops: ["#000000", "#FFFFFF"] } } as StyleOverrides)),
+      "tabs",
+      undefined,
+    ).style;
+    expect(style["--mm-tab-pad"]).toBe("5px");
+    expect(String(style["--mm-tab-line"]).match(/rgb\(/g)?.length).toBe(3);
+    expect(String(style["--mm-tab-line"])).toContain("33.333%");
+  });
+
+  it("gives the preview scroller scrollbar variables only when the theme sets a scroll style", () => {
+    expect(styleVars(resolve("slate"))["--mm-scroll-thumb"]).toBeUndefined();
+    const vars = styleVars(
+      resolve("slate", { scroll: { thumb: "#C0C0C0", thumbHover: "#FFFFFF", thumbEdge: "#808080", track: "#EEEEEE", width: 16, thumbRadius: 2 } } as StyleOverrides),
+    );
+    expect(vars["--mm-scroll-width"]).toBe("16px");
+    expect(vars["--mm-scroll-thumb"]).toBeDefined();
+    expect(vars["--mm-scroll-thumb-hover"]).toBeDefined();
+    expect(vars["--mm-scroll-thumb-border"]).toContain("1px");
+    expect(vars["--mm-scroll-track"]).toBeDefined();
+    expect(vars["--mm-scroll-thumb-radius"]).toBe("2px");
+    expect(html("slate", { scroll: { thumb: "#C0C0C0" } } as StyleOverrides)).toContain("--mm-scroll-thumb");
+    expect(html("slate")).not.toContain("--mm-scroll");
+  });
+
+  it("keeps the unset markup free of every new class", () => {
+    for (const theme of ["light", "dark", "slate"]) {
+      const out = html(theme);
+      for (const [cls] of LOOKS) {
+        expect([theme, cls, has(out, cls)]).toEqual([theme, cls, false]);
+      }
+    }
   });
 });
 

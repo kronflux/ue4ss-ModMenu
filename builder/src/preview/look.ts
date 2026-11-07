@@ -334,13 +334,15 @@ export function buttonLook(ps: PreviewStyle, item: ButtonOpts, over?: Record<str
       style["--mm-btn-pressed-shadow"] = edgeRing;
     } else {
       // A raised two-ring bevel that turns sunken while pressed; hover looks like rest.
-      const raised = bevelToCss(bevel, false, ps.css);
+      // A primary button with defaultEdge draws a 1px outline over the bevel's outer row in every state.
+      const edgeShadow = name === "primary" && isColor(b.defaultEdge) ? `inset 0 0 0 1px ${ps.css(b.defaultEdge)}, ` : "";
+      const raised = edgeShadow + bevelToCss(bevel, false, ps.css);
       style.background = ps.css(base);
       style.boxShadow = raised;
       style["--mm-btn-hover"] = ps.css(base);
       style["--mm-btn-pressed"] = ps.css(base);
       style["--mm-btn-hover-shadow"] = raised;
-      style["--mm-btn-pressed-shadow"] = bevelToCss(bevel, true, ps.css);
+      style["--mm-btn-pressed-shadow"] = edgeShadow + bevelToCss(bevel, true, ps.css);
     }
     if (minHeight !== undefined) style.minHeight = minHeight;
     typography(b, style);
@@ -560,8 +562,21 @@ export function progressLook(ps: PreviewStyle, item: { variant?: string; look?: 
   };
 }
 
+/**
+ * A radio's drawn parts (widgets/radio.lua): concentric circles from the edge inwards, a bevel of an
+ * outer dark and an inner light circle, and the hover ring. Present only when the choice style sets one.
+ */
+export type RadioParts = {
+  /** True when rings or a bevel replace the stock ring, so the circles are always shown. */
+  custom: boolean;
+  bevel?: { dark: string; light: string };
+  /** Each circle's diameter in units, from the outside in. */
+  circles: { d: number; color: string; outline?: string }[];
+  hoverRing?: string;
+};
+
 /** A choice strip's drawing settings, from the choice style for radio and multiselect or the tabs style for tabs. */
-export type ChoiceLook = { variant: string; style: VarStyle; textOn: string; textOff: string };
+export type ChoiceLook = { variant: string; style: VarStyle; textOn: string; textOff: string; radio?: RadioParts };
 
 /**
  * A choice strip's look (widgets/radio.lua and StyleLab MakeChoice). Joined sits in one frame,
@@ -601,8 +616,175 @@ export function choiceLook(ps: PreviewStyle, type: "choice" | "tabs", look: Look
     textOff = ps.css(p.muted);
   } else if (variant === "radio") {
     textOn = textOff;
+  } else if (variant === "xp") {
+    // An XP tab (shell/tabs.lua XpTab): rounded top corners, the face gradient or surface, the edge or line
+    // colour, the mark fill when selected and a top line shown on the selected tab.
+    const corner = Array.isArray(c.radius) ? c.radius[0] : c.radius;
+    const r = typeof corner === "number" && corner > 0 ? corner : 3;
+    const faceStops = colorStops(c.faceStops);
+    const lineStops = colorStops(c.markLineStops);
+    style["--mm-tab-radius"] = `${r}px ${r}px 0 0`;
+    style["--mm-tab-face"] = faceStops !== undefined ? stopsToCss(faceStops, false, ps.css) : ps.css(p.surface);
+    style["--mm-tab-edge"] = ps.css(isColor(c.edge) ? c.edge : p.line);
+    style["--mm-tab-mark"] = ps.css(markFill);
+    // The line keeps its 3 units on every tab, and the library draws it as 3 strips (steps = 3), so the preview
+    // steps through the same 3 colours instead of blending them. The line is inset by the tab's radius.
+    style["--mm-tab-pad"] = `${r}px`;
+    style["--mm-tab-line"] =
+      lineStops !== undefined ? steppedStops(lineStops, 3, ps.css) : ps.css(isColor(c.markLine) ? c.markLine : markFill);
+    textOn = ps.css(isColor(c.markText) ? c.markText : p.text);
+    textOff = ps.css(p.text);
   }
-  return { variant, style, textOn, textOff };
+  let radio: RadioParts | undefined;
+  if (variant === "radio") {
+    radio = radioParts(ps, c, style);
+  }
+  return { variant, style, textOn, textOff, radio };
+}
+
+/**
+ * A vertical gradient of n hard strips, coloured as Paint.Ramp colours them: the first strip is the first
+ * stop, the last is the last stop, and the ones between are mixed along the stops.
+ */
+export function steppedStops(stops: Color[], n: number, css: (c: Color) => string): string {
+  const parts: string[] = [];
+  for (let i = 0; i < n; i += 1) {
+    const t = n === 1 ? 0 : (i / (n - 1)) * (stops.length - 1);
+    const k = Math.min(stops.length - 1, Math.floor(t));
+    const color = mix(stops[k], stops[Math.min(stops.length - 1, k + 1)], t - k);
+    parts.push(`${css(color)} ${((i / n) * 100).toFixed(3)}% ${(((i + 1) / n) * 100).toFixed(3)}%`);
+  }
+  return `linear-gradient(180deg, ${parts.join(", ")})`;
+}
+
+const RING_BOX = 14;
+
+// The circles of a drawn radio, as Radio's custom branch lays them out: with a bevel the rings start 2
+// units in on each side, and the i-th ring is 4 units smaller than the one before, never under 2.
+function radioParts(ps: PreviewStyle, c: ResolvedEntry, style: VarStyle): RadioParts | undefined {
+  const rings = Array.isArray(c.radioRings) ? (c.radioRings as unknown[]).filter(isColor) : [];
+  const bevel = asBevel(c.radioBevel);
+  const hoverRing = isColor(c.radioHoverRing) ? ps.css(c.radioHoverRing) : undefined;
+  if (rings.length === 0 && bevel === undefined && hoverRing === undefined) {
+    return undefined;
+  }
+  const custom = rings.length > 0 || bevel !== undefined;
+  const base = bevel !== undefined ? 2 : 0;
+  const p = ps.resolved.palette;
+  const dot: unknown = isColor(c.markFill) ? c.markFill : isColor(c.markText) ? c.markText : p.text;
+  style["--mm-ch-dot"] = ps.css(dot as Color);
+  // The bevel's light circle sits 1 down and right, so the rings and the dot take half of that.
+  style["--mm-ch-ring-shift"] = bevel !== undefined ? "0.5px" : "0px";
+  if (hoverRing !== undefined) style["--mm-ch-hover-ring"] = hoverRing;
+  return {
+    custom,
+    bevel: bevel !== undefined && bevel.dark && bevel.light ? { dark: ps.css(bevel.dark), light: ps.css(bevel.light) } : undefined,
+    // Only the outermost circle of a ring-only radio carries the 1 unit outline, and only when radioEdge is set.
+    circles: rings.map((color, i) => ({
+      d: Math.max(2, RING_BOX - 2 * base - 4 * i),
+      color: ps.css(color as Color),
+      outline: i === 0 && bevel === undefined && isColor(c.radioEdge) ? ps.css(c.radioEdge) : undefined,
+    })),
+    hoverRing,
+  };
+}
+
+/** Which parts of a check box face a theme draws: the gradient face and the hover ring (widgets/checkbox.lua). */
+export function checkLook(ps: PreviewStyle, look: Look): { face: boolean; ring: boolean } {
+  const t = lookOf(ps, "toggle", look);
+  return { face: colorStops(t.checkFace) !== undefined, ring: isColor(t.checkHoverRing) };
+}
+
+/** What a themed slider adds to its rail: the pointer thumb, a tick row and the sunken track. */
+export function sliderParts(ps: PreviewStyle, look: Look): { pointer: boolean; ticks: number; light: boolean } {
+  const s = lookOf(ps, "slider", look);
+  const ticks = typeof s.ticks === "number" && s.ticks >= 1 ? Math.floor(s.ticks) : 0;
+  return { pointer: s.variant === "pointer", ticks, light: isColor(s.trackLight) };
+}
+
+export type ArrowDirection = "up" | "down" | "left" | "right";
+
+/**
+ * The cells of the arrow glyph's triangle, one per unit, as Paint.TrianglePlan lays out its 4 bars of
+ * 7, 5, 3 and 1 units: rows for up and down, columns for left and right, all in a 7 by 7 box.
+ */
+export function trianglePixels(direction: ArrowDirection): { x: number; y: number }[] {
+  const cells: { x: number; y: number }[] = [];
+  const reversed = direction === "up" || direction === "left";
+  for (let i = 1; i <= 4; i += 1) {
+    const length = reversed ? 2 * i - 1 : 9 - 2 * i;
+    const start = (7 - length) / 2;
+    for (let k = 0; k < length; k += 1) {
+      cells.push(direction === "left" || direction === "right" ? { x: i - 1, y: start + k } : { x: start + k, y: i - 1 });
+    }
+  }
+  return cells;
+}
+
+export type ArrowLook = {
+  className: string;
+  style: VarStyle;
+  /** The glyph's unit in px, and the triangle's box-shadow: one shadow per cell. */
+  scale: number;
+  triangle: string;
+  /** The button's width in units. */
+  size: number;
+  /** The triangle's box in px: 7 by 4 for up and down, 4 by 7 for left and right (Paint.TrianglePlan). */
+  box: { w: number; h: number };
+};
+
+/**
+ * An arrow button from the field style's arrow table (Paint.ArrowButton), or undefined when the theme has
+ * none. A missing hover or pressed face falls back to the face, and a face with no stops is the field fill.
+ * `height` is the number field's cell, half the size and 1.
+ */
+export function arrowLook(ps: PreviewStyle, direction: ArrowDirection, height?: number): ArrowLook | undefined {
+  const field = ps.resolved.field as ResolvedEntry | undefined;
+  const arrow = field?.arrow as ResolvedEntry | undefined;
+  if (typeof arrow !== "object" || arrow === null) {
+    return undefined;
+  }
+  const size = typeof arrow.size === "number" && arrow.size > 0 ? arrow.size : 17;
+  const h = height ?? size;
+  const faceStops = colorStops(arrow.face);
+  const faceOf = (stops: Color[] | undefined): string => {
+    const use = stops ?? faceStops;
+    if (use !== undefined) return stopsToCss(use, false, ps.css);
+    return isColor(field?.fill) ? ps.css(field.fill) : "transparent";
+  };
+  const bevel = asBevel(arrow.bevel);
+  const edge = isColor(arrow.edge) ? `inset 0 0 0 1px ${ps.css(arrow.edge)}` : "none";
+  const shadowOf = (sunken: boolean): string => {
+    const parts = [bevel !== undefined ? bevelToCss(bevel, sunken, ps.css) : "none", edge].filter((s) => s !== "none");
+    return parts.length > 0 ? parts.join(", ") : "none";
+  };
+  const scale = Math.max(1, Math.round(Math.min(size, h) / 17));
+  const glyph = ps.css(isColor(arrow.glyph) ? arrow.glyph : WHITE);
+  const triangle = trianglePixels(direction)
+    .map((cell) => `${cell.x * scale}px ${cell.y * scale}px 0 0 ${glyph}`)
+    .join(", ");
+  return {
+    className: `mm-arrow mm-arrow-${direction}${bevel !== undefined ? " mm-arrow-bevel" : ""}`,
+    style: {
+      width: size,
+      height: h,
+      borderRadius: radiusCss(arrow.radius),
+      "--mm-arrow-face": faceOf(undefined),
+      "--mm-arrow-hover": faceOf(colorStops(arrow.hoverFace)),
+      "--mm-arrow-pressed": faceOf(colorStops(arrow.pressedFace)),
+      "--mm-arrow-shadow": shadowOf(false),
+      "--mm-arrow-shadow-pressed": shadowOf(true),
+    },
+    scale,
+    triangle,
+    size,
+    box: direction === "left" || direction === "right" ? { w: 4 * scale, h: 7 * scale } : { w: 7 * scale, h: 4 * scale },
+  };
+}
+
+/** True when the stepper's item look asks for arrow buttons; they draw only with a field arrow (widgets/stepper.lua). */
+export function stepperArrows(ps: PreviewStyle, look: Look): boolean {
+  return lookOf(ps, "stepper", look).arrows === true && arrowLook(ps, "left") !== undefined;
 }
 
 /** A text style as inline CSS, for an item whose look changes its own text (labels). */

@@ -1,10 +1,9 @@
 // The window frames, status bar and still effects of the stage 2 themes, drawn from the resolved style.
 // Each part follows shell/chrome.lua or shell/effects.lua, named beside it. Nothing here moves: the
 // effects are drawn in one resting state, as the builder preview does for every look.
-import type { CSSProperties } from "react";
 import { bandFillCss, scanStrength } from "../theme/css";
 import type { Color } from "../theme/tokens";
-import { usePreviewStyle, type PreviewStyle, type VarStyle } from "./look";
+import { arrowLook, usePreviewStyle, type ArrowDirection, type PreviewStyle, type VarStyle } from "./look";
 
 // Chrome.Controls: the caption buttons of each control style in drawing order. A click on minimise or
 // close closes the menu and maximise does nothing, which the preview has no menu to show.
@@ -55,7 +54,11 @@ function CaptionButtons({ variant, captions }: { variant: string; captions: unkn
 export function WindowBand({ title, variant }: { title: string; variant: string }) {
   const ps = usePreviewStyle();
   const fill = bandFillCss(ps.resolved, ps.css);
-  const style: CSSProperties | undefined = fill !== undefined ? { background: fill } : undefined;
+  const style: VarStyle = fill !== undefined ? { background: fill } : {};
+  if (variant === "xpbar" && ps.resolved.header.captionGlyph !== undefined) {
+    // The glyph colour from header.captionGlyph; without it the stylesheet's white stands.
+    style["--mm-glyph"] = "var(--mm-cap-xp-ink)";
+  }
   return (
     <div className={`mm-band-window mm-band-${variant}`} style={style}>
       <h2 className="mm-title mm-band-title">{title}</h2>
@@ -80,6 +83,36 @@ export function MacHeader({ title }: { title: string }) {
       </span>
       <h2 className="mm-title mm-mac-title">{title}</h2>
     </div>
+  );
+}
+
+/**
+ * An arrow button (Paint.ArrowButton): a gradient face with an optional edge and bevel, and a triangle
+ * of 7, 5, 3 and 1 unit bars drawn as stacked box-shadows. Nothing when the theme has no field arrow.
+ * It is a span inside a button, and a button on its own (the number and stepper arrows).
+ */
+export function Arrow({ direction, height, button }: { direction: ArrowDirection; height?: number; button?: boolean }) {
+  const ps = usePreviewStyle();
+  const arrow = arrowLook(ps, direction, height);
+  if (arrow === undefined) {
+    return null;
+  }
+  const glyph = (
+    <span className="mm-arrow-glyph" style={{ width: arrow.box.w, height: arrow.box.h }} aria-hidden="true">
+      <span className="mm-arrow-tri" style={{ width: arrow.scale, height: arrow.scale, boxShadow: arrow.triangle }} />
+    </span>
+  );
+  if (button) {
+    return (
+      <button type="button" className={arrow.className} style={arrow.style} aria-label={direction}>
+        {glyph}
+      </button>
+    );
+  }
+  return (
+    <span className={arrow.className} style={arrow.style}>
+      {glyph}
+    </span>
   );
 }
 
