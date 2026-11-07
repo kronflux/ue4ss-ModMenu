@@ -218,6 +218,11 @@ local function ShowAll(widgets, on)
     end
 end
 
+-- The XP caption glyph colour: white unless the header sets captionGlyph.
+function M.XpGlyphInk(header)
+    return header.captionGlyph or WHITE
+end
+
 -- One caption button for a control style. Returns the control and the glyph colour it used.
 local function CaptionButton(row, style, def, resolved, suffix)
     local palette = resolved.palette
@@ -275,21 +280,22 @@ local function CaptionButton(row, style, def, resolved, suffix)
         local ring = Paint.Box(content, name .. "_Ring", { fill = Alpha(WHITE, 0), outline = WHITE, width = 1, radius = 3 }, 0)
         OverlayAdd(content, ring, 0)
         Paint.SetShown(ring, true)
+        local ink = M.XpGlyphInk(header)
         local glyph
         if def.kind == "min" then
-            glyph = Sized(content, name .. "_GlyphSize", Paint.Box(content, name .. "_Glyph", { fill = WHITE }, 0), 7, 3)
+            glyph = Sized(content, name .. "_GlyphSize", Paint.Box(content, name .. "_Glyph", { fill = ink }, 0), 7, 3)
             OverlayAdd(content, glyph, { 5, 0, 0, 5 }, H_LEFT, V_BOTTOM)
         elseif def.kind == "max" then
             -- A box with a heavy top edge.
             local box = Construct("/Script/UMG.Overlay", content, name .. "_Max")
             OverlayAdd(box, Sized(box, name .. "_MaxBoxSize", Paint.Box(box, name .. "_MaxBox",
-                { fill = Alpha(WHITE, 0), outline = WHITE, width = 1 }, 0), 10, 10))
-            OverlayAdd(box, Sized(box, name .. "_MaxTopSize", Paint.Box(box, name .. "_MaxTop", { fill = WHITE }, 0), 10, 3),
+                { fill = Alpha(ink, 0), outline = ink, width = 1 }, 0), 10, 10))
+            OverlayAdd(box, Sized(box, name .. "_MaxTopSize", Paint.Box(box, name .. "_MaxTop", { fill = ink }, 0), 10, 3),
                 0, H_FILL, V_TOP)
             glyph = Sized(content, name .. "_GlyphSize", box, 10, 10)
             OverlayAdd(content, glyph, 0, H_CENTER, V_CENTER)
         else
-            glyph = Glyph(content, name .. "_Glyph", "close", WHITE, 10, 2)
+            glyph = Glyph(content, name .. "_Glyph", "close", ink, 10, 2)
             OverlayAdd(content, glyph, 0, H_CENTER, V_CENTER)
         end
         Paint.SetShown(glyph, true)
@@ -440,6 +446,12 @@ function M.TopBand(S, stack, resolved, suffix)
     return band
 end
 
+--- The title text colour of the XP and Classic bars: title.color, or white when the style sets none.
+---@param resolved table
+function M.BandTitleColor(resolved)
+    return (resolved.title and resolved.title.color) or WHITE
+end
+
 --- The title and the caption buttons of a window, xpbar or classic header, drawn into the row that
 --- sits in the band.
 ---@param S table
@@ -457,8 +469,8 @@ function M.BandRow(S, row, resolved, suffix)
             Paint.TextSize(config, (tonumber(body.size) or 14) - 2, "fontItem"))
         HBoxAdd(row, title, true, { 14, 0, 10, 0 }, V_CENTER)
     else
-        -- White on the blue bar. XP lays a dark drop shadow under it, as Windows XP does.
-        local spec = WithColor(resolved.title, WHITE)
+        -- The style's title colour, white when it sets none. XP lays a dark drop shadow under it, as Windows XP does.
+        local spec = WithColor(resolved.title, M.BandTitleColor(resolved))
         spec.shadow = variant == "xpbar" and { x = 1, y = 1, color = resolved.header.titleShadow or Style.Hex("#0F1089") } or false
         title = Text(row, "ModMenu_Title_" .. suffix, config.title, spec,
             Paint.TextSize(config, resolved.title.size, "fontTitle"))

@@ -55,6 +55,19 @@ assert_eq("shade lifts black a quarter towards white", shaded[1].R, 0.25)
 assert_eq("shade lifts the second red channel", shaded[2].R, 1)
 assert_eq("shade lifts green 0.5 to 0.625", shaded[2].G, 0.625)
 
+-- XP caption glyphs are white unless the header sets captionGlyph.
+local darkInk = { R = 0.02, G = 0.02, B = 0.04, A = 1 }
+assert_eq("xp glyphs are white by default", Chrome.XpGlyphInk({}), { R = 1, G = 1, B = 1, A = 1 })
+assert_eq("a header with other fields keeps white xp glyphs", Chrome.XpGlyphInk({ controlGlyph = darkInk }), { R = 1, G = 1, B = 1, A = 1 })
+assert_eq("header.captionGlyph colours the xp glyphs", Chrome.XpGlyphInk({ captionGlyph = darkInk }), darkInk)
+
+-- The XP and Classic title text follows title.color, and is white only when the style sets none.
+local darkTitle = { R = 0.004, G = 0.005, B = 0.005, A = 1 }
+local whiteTitle = { R = 1, G = 1, B = 1, A = 1 }
+assert_eq("a dark title.color gives dark band title text", Chrome.BandTitleColor({ title = { color = darkTitle } }), darkTitle)
+assert_eq("a white title.color gives white band title text", Chrome.BandTitleColor({ title = { color = whiteTitle } }), whiteTitle)
+assert_eq("no title colour gives white band title text", Chrome.BandTitleColor({ title = {} }), whiteTitle)
+
 -- The shell draws the new header variants, and still draws an unknown name as the badge.
 assert_eq("an xpbar definition is an xpbar header", Build.HeaderVariant({ header = { variant = "xpbar" } }), "xpbar")
 assert_eq("a window definition is a window header", Build.HeaderVariant({ header = { variant = "window" } }), "window")
