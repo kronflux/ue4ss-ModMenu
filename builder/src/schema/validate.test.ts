@@ -574,6 +574,27 @@ describe("validateDocument for themes, style overrides and item looks", () => {
     expect(withInit({ style: { panel: { bevel: [] }, button: { faces: [] } } })).toEqual([]);
   });
 
+  it("reports a bad arrow button, scroll or XP control field with the library's messages", () => {
+    const cases: [Record<string, unknown>, string][] = [
+      [{ field: { arrow: { face: ["#FFFFFF"] } } }, "init.style.field.arrow.face: expected at least 2 colours"],
+      [{ field: { arrow: { wobble: 1 } } }, "init.style.field.arrow.wobble: unknown field"],
+      [{ field: { arrow: { glyph: "#12" } } }, "init.style.field.arrow.glyph: expected color"],
+      [{ field: { arrow: { size: "big" } } }, "init.style.field.arrow.size: expected number"],
+      [{ field: { arrow: { bevel: { light: "#12" } } } }, "init.style.field.arrow.bevel.light: expected color"],
+      [{ field: { arrow: ["#000000"] } }, "init.style.field.arrow: expected arrowbutton"],
+      [{ scroll: { thumb: 3 } }, "init.style.scroll.thumb: must be color"],
+      [{ scroll: { wobble: 1 } }, "init.style.scroll.wobble: unknown field"],
+      [{ stepper: { arrows: 1 } }, "init.style.stepper.arrows: must be boolean"],
+      [{ choice: { radioRings: ["#FFFFFF"] } }, "init.style.choice.radioRings: expected at least 2 colours"],
+      [{ toggle: { checkFace: ["#FFFFFF"] } }, "init.style.toggle.checkFace: expected at least 2 colours"],
+    ];
+    for (const [style, message] of cases) {
+      expect(withInit({ style }), message).toEqual([message]);
+    }
+    expect(withInit({ style: { field: { arrow: {} }, scroll: { thumb: "#FF0000", thumbRadius: [1, 2, 3, 4], width: 17 } } })).toEqual([]);
+    expect(withInit({ style: { tabs: { variant: "xp" }, slider: { variant: "pointer" }, stepper: { arrows: true } } })).toEqual([]);
+  });
+
   it("accepts the new header and button variants and a full set of stage 2 kinds", () => {
     expect(withInit({ style: { header: { variant: "mac", captions: "close" }, button: { variant: "classic" } } })).toEqual([]);
     expect(

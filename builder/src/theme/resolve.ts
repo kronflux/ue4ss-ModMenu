@@ -38,6 +38,7 @@ export const OBJECT_TYPES = [
   "tooltip",
   "confirm",
   "motion",
+  "scroll",
 ] as const;
 
 export type ObjectType = (typeof OBJECT_TYPES)[number];
@@ -48,7 +49,10 @@ export type ResolvedStyle = {
   subtitle?: string;
   footer?: string;
   palette: Record<string, Color>;
-} & Record<ObjectType, ResolvedEntry>;
+} & Record<Exclude<ObjectType, "scroll">, ResolvedEntry> & {
+  /** Absent unless a theme or an override sets a scroll field, so the shell keeps today's scroll bar. */
+  scroll?: ResolvedEntry;
+};
 
 /** A theme definition in the shape of a preset file: palette, object types, and optional base and parts borrowing. */
 export type ThemeDefinition = {
@@ -88,11 +92,15 @@ const FIXED_KINDS: Record<string, Record<string, string>> = {
   xpface: { edge: "color", glow: "color", defaultRing: "color", face: "stops", pressedFace: "stops" },
   frame: { edge: "color", fill: "color", radius: "radius", pad: "number", bevel: "bevel" },
   statusbar: { text: "string", fill: "color", line: "color" },
+  arrowbutton: {
+    face: "stops", hoverFace: "stops", pressedFace: "stops", edge: "color", glyph: "color", radius: "radius",
+    bevel: "bevel", size: "number",
+  },
 };
 // A faces entry is a map from button role to one of these.
 const FACE_KINDS: Record<string, string> = { fill: "color", text: "color" };
 // Every stage 2 kind. Their validation messages read `expected <kind>`.
-const STAGE2_KINDS = new Set(["stops", "bevel", "faces", "xpface", "frame", "statusbar"]);
+const STAGE2_KINDS = new Set(["stops", "bevel", "faces", "xpface", "frame", "statusbar", "arrowbutton"]);
 
 // A definition may carry these keys beside its object types.
 const DEFINITION_KEYS = new Set(["id", "stage", "name", "subtitle", "footer", "icon", "palette", "base", "parts"]);
@@ -385,8 +393,8 @@ function withoutColors(t: Dict, kinds: Record<string, string>): Dict {
 }
 
 // The part of a stage 2 value that a borrow keeps, which is only what is not a colour: a bevel keeps its
-// width, a frame its radius, pad and bevel width, and a status bar its text. Stops, faces and xp faces hold
-// nothing else, so nothing is kept. An empty result means the field is dropped.
+// width, a frame its radius, pad and bevel width, an arrow button its radius, size and bevel width, and a
+// status bar its text. Stops, faces and xp faces hold nothing else, so nothing is kept. An empty result means the field is dropped.
 function stripKind(kind: string, v: Dict): Dict {
   if (kind === "bevel") {
     return present(v.width) ? { width: v.width } : {};
@@ -394,10 +402,11 @@ function stripKind(kind: string, v: Dict): Dict {
   if (kind === "statusbar") {
     return present(v.text) ? { text: v.text } : {};
   }
-  if (kind === "frame") {
+  if (kind === "frame" || kind === "arrowbutton") {
     const out: Dict = {};
     if (present(v.radius)) out.radius = deepCopy(v.radius);
-    if (present(v.pad)) out.pad = v.pad;
+    if (kind === "frame" && present(v.pad)) out.pad = v.pad;
+    if (kind === "arrowbutton" && present(v.size)) out.size = v.size;
     if (isTable(v.bevel)) {
       const bevel = stripKind("bevel", v.bevel);
       if (Object.keys(bevel).length > 0) out.bevel = bevel;
@@ -927,11 +936,19 @@ const RESOLVERS: Record<ObjectType, Resolver> = {
   motion(t) {
     return merge({ pulse: false, cursor: false, glitch: false, sparkle: false, open: true, pop: true, shake: true }, t);
   },
+  // No defaults: resolveType leaves an unset scroll type absent.
+  scroll(t) {
+    return merge({}, t);
+  },
 };
 
 // Resolve one type from its raw entry. The result is normalized, so it shares no object with the
-// palette, another type or a preset.
-function resolveType(typeName: ObjectType, raw: unknown, p: Record<string, Color>, s: Dict): Dict {
+// palette, another type or a preset. The scroll type has no defaults, so it resolves to nothing until a
+// theme or an override sets a field.
+function resolveType(typeName: ObjectType, raw: unknown, p: Record<string, Color>, s: Dict): Dict | undefined {
+  if (typeName === "scroll" && (!isTable(raw) || Object.keys(raw).length === 0)) {
+    return undefined;
+  }
   return normalize(typeName, RESOLVERS[typeName](isTable(raw) ? raw : {}, p, s));
 }
 
@@ -1039,6 +1056,15 @@ function borrowed(typeName: string, id: string): Dict {
   return stripColors(typeName, presetRaw(id, new Set())[typeName]);
 }
 
+// An absent type, such as an unset scroll, leaves no key behind, as Lua's nil does.
+function setResolved(resolved: Dict, typeName: string, entry: Dict | undefined) {
+  if (entry === undefined) {
+    delete resolved[typeName];
+  } else {
+    resolved[typeName] = entry;
+  }
+}
+
 /**
  * Resolve a theme, a style override table and legacy colours into one complete style, as Style.Resolve does.
  * Throws an Error naming the problem for an unknown preset, an unknown type or field, or a value of the wrong kind.
@@ -1072,7 +1098,7 @@ export function resolve(
     }
   }
   for (const typeName of OBJECT_TYPES) {
-    resolved[typeName] = resolveType(typeName, raw[typeName], p, resolved);
+    setResolved(resolved, typeName, resolveType(typeName, raw[typeName], p, resolved));
   }
 
   // A type override runs after every default, so it changes only its own type; derived fields inside
@@ -1093,7 +1119,7 @@ export function resolve(
       entry = mergeType(typeName, start, normalize(typeName, fields));
     }
     if (entry !== undefined) {
-      resolved[typeName] = resolveType(typeName, entry, p, resolved);
+      setResolved(resolved, typeName, resolveType(typeName, entry, p, resolved));
     }
   }
 

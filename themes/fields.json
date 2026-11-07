@@ -55,6 +55,7 @@
       "closeStops": "stops",
       "titleShadow": "color",
       "controlGlyph": "color",
+      "captionGlyph": "color",
       "controlFace": "color",
       "captions": "enum:all|close"
     },
@@ -116,7 +117,7 @@
       "statusColor": "color"
     },
     "tabs": {
-      "variant": "enum:stock|joined|chips|tabs",
+      "variant": "enum:stock|joined|chips|tabs|xp",
       "radius": "radius",
       "pill": "boolean",
       "markFill": "color",
@@ -126,7 +127,10 @@
       "edge": "color",
       "tabText": "color",
       "markWidth": "number",
-      "markHeight": "number"
+      "markHeight": "number",
+      "faceStops": "stops",
+      "markLineStops": "stops",
+      "markLine": "color"
     },
     "button": {
       "variant": "enum:fill|soft|ghost|underline|xp|classic",
@@ -145,7 +149,8 @@
       "hoverAmount": "number",
       "faces": "faces",
       "bevel": "bevel",
-      "xp": "xpface"
+      "xp": "xpface",
+      "defaultEdge": "color"
     },
     "toggle": {
       "variant": "enum:stock|switch|square|check|text",
@@ -163,17 +168,23 @@
       "checkMark": "color",
       "checkEdgeWidth": "number",
       "offEdge": "color",
-      "checkBevel": "bevel"
+      "checkBevel": "bevel",
+      "checkFace": "stops",
+      "checkHoverRing": "color"
     },
     "slider": {
-      "variant": "enum:stock|round|square|bar",
+      "variant": "enum:stock|round|square|bar|pointer",
       "thickness": "number",
       "size": "number",
       "track": "color",
       "thumbFill": "color",
       "thumbEdge": "color",
       "thumbHover": "color",
-      "thumbWidth": "number"
+      "thumbWidth": "number",
+      "thumbRadius": "number",
+      "ticks": "number",
+      "tickColor": "color",
+      "trackLight": "color"
     },
     "progress": {
       "variant": "enum:stock|bar|segments",
@@ -201,7 +212,10 @@
       "markWidth": "number",
       "markHeight": "number",
       "radioEdge": "color",
-      "radioFill": "color"
+      "radioFill": "color",
+      "radioRings": "stops",
+      "radioHoverRing": "color",
+      "radioBevel": "bevel"
     },
     "field": {
       "variant": "enum:stock|frame",
@@ -214,7 +228,8 @@
       "hint": "color",
       "headerFill": "color",
       "headerText": "color",
-      "bevel": "bevel"
+      "bevel": "bevel",
+      "arrow": "arrowbutton"
     },
     "list": {
       "fill": "color",
@@ -229,7 +244,8 @@
       "height": "number",
       "radius": "radius",
       "pill": "boolean",
-      "valueWidth": "number"
+      "valueWidth": "number",
+      "arrows": "boolean"
     },
     "tooltip": {
       "fill": "color",
@@ -252,6 +268,14 @@
       "open": "boolean",
       "pop": "boolean",
       "shake": "boolean"
+    },
+    "scroll": {
+      "track": "color",
+      "thumb": "color",
+      "thumbHover": "color",
+      "thumbEdge": "color",
+      "thumbRadius": "radius",
+      "width": "number"
     }
   }
 }

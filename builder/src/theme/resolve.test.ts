@@ -139,7 +139,7 @@ describe("resolve", () => {
       expect(resolved.id).toBe(id);
       for (const typeName of OBJECT_TYPES) {
         for (const [field, kind] of Object.entries(FIELDS.types[typeName])) {
-          const value = resolved[typeName][field];
+          const value = resolved[typeName]?.[field];
           if (kind === "color" && value !== undefined) {
             expect(typeof value.R, `${id} ${typeName}.${field}`).toBe("number");
           }
@@ -157,6 +157,33 @@ describe("resolve", () => {
     expect(() => resolve("slate", { button: { wobble: 1 } })).toThrow("style.button.wobble: unknown field");
     expect(() => resolve("slate", { button: { radius: "big" } })).toThrow("style.button.radius: must be radius");
     expect(() => resolve("slate", { button: "nope" })).toThrow("style.button: unknown preset nope");
+  });
+
+  it("resolves no scroll type unless a theme or an override sets one", () => {
+    for (const id of PRESET_ORDER) {
+      // A preset resolves a scroll type exactly when its own file sets one.
+      if ((PRESETS[id] as Record<string, unknown>).scroll !== undefined) {
+        expect(resolve(id).scroll, id).toBeDefined();
+      } else {
+        expect(resolve(id).scroll, id).toBeUndefined();
+      }
+    }
+    expect(resolve("slate", { scroll: { thumb: "#FF0000" } }).scroll?.thumb).toEqual({ R: 1, G: 0, B: 0, A: 1 });
+    expect(() => resolve("slate", { scroll: { thumb: 3 } })).toThrow("style.scroll.thumb: must be color");
+  });
+
+  it("leaves header.captionGlyph unset unless a theme or an override sets it", () => {
+    expect(resolve("slate").header.captionGlyph).toBeUndefined();
+    expect(resolve("xp-luna").header.captionGlyph).toBeUndefined();
+    expect(resolve("xp-luna-silver").header.captionGlyph).toEqual(resolve("slate", { header: { captionGlyph: "#252536" } }).header.captionGlyph);
+    expect(() => resolve("slate", { header: { captionGlyph: 3 } })).toThrow("style.header.captionGlyph: must be color");
+  });
+
+  it("accepts the xp tabs and pointer slider variants and rejects a bad arrow button", () => {
+    const resolved = resolve("slate", { tabs: { variant: "xp" }, slider: { variant: "pointer" } });
+    expect([resolved.tabs.variant, resolved.slider.variant]).toEqual(["xp", "pointer"]);
+    expect(() => resolve("slate", { field: { arrow: { face: ["#FFFFFF"] } } })).toThrow("style.field.arrow.face: expected at least 2 colours");
+    expect(() => resolve("slate", { field: { arrow: { wobble: 1 } } })).toThrow("style.field.arrow.wobble: unknown field");
   });
 
   it("turns the open, pop and shake motions off for light and dark and on for slate", () => {

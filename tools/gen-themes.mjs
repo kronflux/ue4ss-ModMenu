@@ -64,18 +64,23 @@ const PRESET_ORDER = [
   "terminal",
   "hologram",
   "frost",
-  "win11-light",
-  "win11-dark",
   "mac-light",
   "mac-dark",
   "xp-luna",
+  "xp-luna-silver",
+  "xp-luna-olive",
+  "xp-embedded",
+  "xp-royale",
   "xp-royale-noir",
+  "xp-zune",
   "windows-classic",
+  "win11-light",
+  "win11-dark",
 ];
 
 const KINDS = new Set([
   "color", "number", "boolean", "string", "radius", "font", "text", "roles", "shadow", "table",
-  "stops", "bevel", "faces", "xpface", "frame", "statusbar",
+  "stops", "bevel", "faces", "xpface", "frame", "statusbar", "arrowbutton",
 ]);
 
 // The roles a button style may colour, and the keys each role takes. A role may also name its own
@@ -94,6 +99,10 @@ const FIXED_KINDS = {
   xpface: { edge: "color", glow: "color", defaultRing: "color", face: "stops", pressedFace: "stops" },
   frame: { edge: "color", fill: "color", radius: "radius", pad: "number", bevel: "bevel" },
   statusbar: { text: "string", fill: "color", line: "color" },
+  arrowbutton: {
+    face: "stops", hoverFace: "stops", pressedFace: "stops", edge: "color", glyph: "color", radius: "radius",
+    bevel: "bevel", size: "number",
+  },
 };
 const FACE_KEYS = { fill: "color", text: "color" };
 
@@ -203,6 +212,8 @@ function describeKind(kind) {
       return "a frame table { edge, fill, radius, pad, bevel }";
     case "statusbar":
       return "a status bar table { text, fill, line }";
+    case "arrowbutton":
+      return "an arrow button table { face, hoverFace, pressedFace, edge, glyph, radius, bevel, size }";
     case "table":
       return "a table or a list";
     default:
@@ -267,6 +278,7 @@ function validateValue(kind, value, where, name, ctx) {
     case "xpface":
     case "frame":
     case "statusbar":
+    case "arrowbutton":
       if (!isKeyTable(value)) fail();
       for (const [key, sub] of Object.entries(value)) {
         if (!Object.hasOwn(FIXED_KINDS[kind], key)) {

@@ -284,9 +284,12 @@ function shownStyle(doc: MenuDocument): { resolved: ResolvedStyle; ok: boolean }
 export function StylePanel({
   document,
   onPatchInit,
+  openTypes = [],
 }: {
   document: MenuDocument;
   onPatchInit: (patch: Partial<MenuDocument["init"]>) => void;
+  /** Groups that start expanded; the panel starts with every group closed. */
+  openTypes?: readonly string[];
 }) {
   const { resolved, ok } = shownStyle(document);
   const style = document.init.style;
@@ -334,6 +337,7 @@ export function StylePanel({
           <Group
             key={type}
             type={type}
+            initiallyOpen={openTypes.includes(type)}
             summary={
               <>
                 {type} <Changed count={count} />
@@ -364,7 +368,7 @@ export function StylePanel({
                 name={field}
                 label={`${type}.${field}`}
                 kind={kind}
-                current={resolved[type][field]}
+                current={resolved[type]?.[field]}
                 stored={entry.fields[field]}
                 check={(value) => styleIssues({ [type]: { [field]: value } }, type)}
                 onSet={(value) =>
@@ -383,8 +387,18 @@ export function StylePanel({
 
 // A collapsible group that builds its fields only while open, so a closed panel adds no inputs to the
 // page: 19 types hold over 200 fields, and their labels would match other fields' label searches.
-function Group({ type, summary, children }: { type: string; summary: ReactNode; children: () => ReactNode }) {
-  const [open, setOpen] = useState(false);
+function Group({
+  type,
+  summary,
+  children,
+  initiallyOpen = false,
+}: {
+  type: string;
+  summary: ReactNode;
+  children: () => ReactNode;
+  initiallyOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(initiallyOpen);
   return (
     <details className="ed-style-type" data-type={type} open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
       <summary>{summary}</summary>

@@ -37,17 +37,23 @@ local FIXED_KINDS = {
     xpface = { edge = "color", glow = "color", defaultRing = "color", face = "stops", pressedFace = "stops" },
     frame = { edge = "color", fill = "color", radius = "radius", pad = "number", bevel = "bevel" },
     statusbar = { text = "string", fill = "color", line = "color" },
+    arrowbutton = {
+        face = "stops", hoverFace = "stops", pressedFace = "stops", edge = "color", glyph = "color",
+        radius = "radius", bevel = "bevel", size = "number",
+    },
 }
 -- A faces entry is a map from button role to one of these.
 local FACE_KINDS = { fill = "color", text = "color" }
 -- Every stage 2 kind. Their validation messages read `<path>: expected <kind>`.
-local STAGE2_KINDS = { stops = true, bevel = true, faces = true, xpface = true, frame = true, statusbar = true }
+local STAGE2_KINDS = {
+    stops = true, bevel = true, faces = true, xpface = true, frame = true, statusbar = true, arrowbutton = true,
+}
 
 -- Types resolve in this order because some defaults read an earlier type: choice reads button,
 -- tabs reads choice, and field, list, stepper and tooltip read button or field.
 local TYPE_ORDER = {
     "panel", "header", "title", "body", "hint", "data", "section", "button", "toggle", "slider",
-    "progress", "choice", "tabs", "field", "list", "stepper", "tooltip", "confirm", "motion",
+    "progress", "choice", "tabs", "field", "list", "stepper", "tooltip", "confirm", "motion", "scroll",
 }
 
 -- A definition may carry these keys beside its object types.
@@ -355,8 +361,8 @@ local function WithoutKeys(t, colorKinds)
 end
 
 -- The part of a stage 2 value that a borrow keeps, which is only what is not a colour: a bevel keeps
--- its width, a frame its radius, pad and bevel width, and a status bar its text. Stops, faces and
--- xp faces hold nothing else, so nothing is kept. An empty result means the field is dropped.
+-- its width, a frame its radius, pad and bevel width, an arrow button its radius, size and bevel width,
+-- and a status bar its text. Stops, faces and xp faces hold nothing else, so nothing is kept. An empty result means the field is dropped.
 local function StripKind(kind, v)
     if kind == "bevel" then
         if v.width ~= nil then
@@ -366,13 +372,16 @@ local function StripKind(kind, v)
         if v.text ~= nil then
             return { text = v.text }
         end
-    elseif kind == "frame" then
+    elseif kind == "frame" or kind == "arrowbutton" then
         local out = {}
         if v.radius ~= nil then
             out.radius = DeepCopy(v.radius)
         end
-        if v.pad ~= nil then
+        if kind == "frame" and v.pad ~= nil then
             out.pad = v.pad
+        end
+        if kind == "arrowbutton" and v.size ~= nil then
+            out.size = v.size
         end
         if type(v.bevel) == "table" then
             local bevel = StripKind("bevel", v.bevel)
@@ -951,8 +960,12 @@ function RESOLVERS.motion(t)
 end
 
 --- Resolve one type from its raw entry. The result is normalized, so no table in it is shared
---- with the palette, another type or a preset.
+--- with the palette, another type or a preset. The scroll type has no defaults, so it resolves to nil
+--- until a theme or an override sets a field, and the shell keeps today's scroll bar.
 local function ResolveType(typeName, raw, p, s)
+    if typeName == "scroll" and (raw == nil or next(raw) == nil) then
+        return nil
+    end
     local resolver = RESOLVERS[typeName]
     local entry = raw or {}
     if resolver ~= nil then

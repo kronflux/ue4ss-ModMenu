@@ -1,0 +1,32 @@
+{
+  "input": {
+    "presets": {
+      "stage3-arrow-source": {
+        "id": "stage3-arrow-source",
+        "stage": 2,
+        "field": {
+          "arrow": {
+            "face": ["#FFFFFF", "#000000"],
+            "edge": "#0000FF",
+            "glyph": "#00FF00",
+            "radius": 3,
+            "size": 15,
+            "bevel": { "light": "#FFFFFF", "dark": "#000000", "width": 2 }
+          }
+        },
+        "scroll": { "thumb": "#FF0000", "thumbRadius": 3, "width": 17 }
+      }
+    },
+    "theme": "slate",
+    "style": {
+      "field": "stage3-arrow-source",
+      "scroll": "stage3-arrow-source"
+    }
+  },
+  "expect": {
+    "field.arrow": { "radius": 3, "size": 15, "bevel": { "width": 2 } },
+    "scroll.thumbRadius": 3,
+    "scroll.width": 17
+  },
+  "absent": ["field.arrow.face", "field.arrow.edge", "field.arrow.glyph", "scroll.thumb"]
+}

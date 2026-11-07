@@ -198,3 +198,102 @@ test("an unknown field fails with the file and the field named", () => {
     (err) => err instanceof Error && err.message.includes("slate.json") && err.message.includes("button.wobble"),
   );
 });
+
+test("the field list declares the arrow button kind, the scroll type and the XP control fields", () => {
+  const fields = JSON.parse(fs.readFileSync(path.join(ROOT, "themes", "fields.json"), "utf8"));
+  const t = fields.types;
+  assert.equal(t.field.arrow, "arrowbutton");
+  assert.equal(t.stepper.arrows, "boolean");
+  assert.match(t.tabs.variant, /\|xp(\||$)/);
+  assert.match(t.slider.variant, /\|pointer(\||$)/);
+  assert.equal(t.tabs.faceStops, "stops");
+  assert.equal(t.tabs.markLineStops, "stops");
+  assert.equal(t.tabs.markLine, "color");
+  assert.equal(t.toggle.checkFace, "stops");
+  assert.equal(t.toggle.checkHoverRing, "color");
+  assert.equal(t.choice.radioRings, "stops");
+  assert.equal(t.choice.radioHoverRing, "color");
+  assert.equal(t.choice.radioBevel, "bevel");
+  assert.equal(t.slider.thumbRadius, "number");
+  assert.equal(t.slider.ticks, "number");
+  assert.equal(t.slider.tickColor, "color");
+  assert.equal(t.slider.trackLight, "color");
+  assert.deepEqual(t.scroll, {
+    track: "color",
+    thumb: "color",
+    thumbHover: "color",
+    thumbEdge: "color",
+    thumbRadius: "radius",
+    width: "number",
+  });
+});
+
+test("an arrow button or scroll entry with a bad value fails with the file and field named", () => {
+  const cases = [
+    [(s) => (s.field = { arrow: { face: ["#FFFFFF"] } }), "field.arrow.face"],
+    [(s) => (s.field = { arrow: { wobble: 1 } }), "field.arrow.wobble"],
+    [(s) => (s.field = { arrow: { glyph: "#12" } }), "field.arrow.glyph"],
+    [(s) => (s.field = { arrow: { size: "big" } }), "field.arrow.size"],
+    [(s) => (s.field = { arrow: { bevel: { light: "#12" } } }), "field.arrow.bevel.light"],
+    [(s) => (s.field = { arrow: ["#000000"] }), "field.arrow"],
+    [(s) => (s.scroll = { thumb: 3 }), "scroll.thumb"],
+    [(s) => (s.scroll = { wobble: 1 }), "scroll.wobble"],
+    [(s) => (s.slider = { variant: "triangle" }), "slider.variant"],
+    [(s) => (s.tabs = { variant: "xpish" }), "tabs.variant"],
+  ];
+  for (const [change, field] of cases) {
+    const dir = tempRoot();
+    const file = path.join(dir, "themes", "presets", "slate.json");
+    const slate = JSON.parse(fs.readFileSync(file, "utf8"));
+    change(slate);
+    fs.writeFileSync(file, JSON.stringify(slate, null, 2) + "\n");
+    assert.throws(
+      () => generate(dir),
+      (err) => err instanceof Error && err.message.includes("slate.json") && err.message.includes(field),
+      `expected an error naming slate.json and ${field}`,
+    );
+  }
+});
+
+test("an arrow button, scroll and XP control entry is accepted and written to both outputs", () => {
+  const dir = tempRoot();
+  const file = path.join(dir, "themes", "presets", "slate.json");
+  const slate = JSON.parse(fs.readFileSync(file, "utf8"));
+  slate.field = {
+    arrow: {
+      face: ["#FFFFFF", "#ECE9D8"],
+      hoverFace: ["#FFFFFF", "#FFF0CF"],
+      pressedFace: ["#ECE9D8", "#FFFFFF"],
+      edge: "#003C74",
+      glyph: "#4D6185",
+      radius: 3,
+      size: 17,
+      bevel: { light: "#FFFFFF", dark: "#808080", width: 1 },
+    },
+  };
+  slate.scroll = { track: "#F4F3EE", thumb: "#C0D0F8", thumbHover: "#D8E4FF", thumbEdge: "#003C74", thumbRadius: 3, width: 17 };
+  slate.tabs = { variant: "xp", faceStops: ["#FFFFFF", "#ECE9D8"], markLineStops: ["#FFC83C", "#E5A01A"], markLine: "#E5A01A" };
+  slate.slider = { variant: "pointer", thumbRadius: 2, ticks: 5, tickColor: "#808080", trackLight: "#FFFFFF" };
+  slate.stepper = { arrows: true };
+  fs.writeFileSync(file, JSON.stringify(slate, null, 2) + "\n");
+  const files = generate(dir);
+  assert.match(files.get("core/presets.lua"), /hoverFace = \{ "#FFFFFF", "#FFF0CF" \}/);
+  assert.match(files.get("builder/src/theme/presets.generated.ts"), /hoverFace: \[ "#FFFFFF", "#FFF0CF" \]/);
+  assert.match(files.get("core/presets.lua"), /thumbRadius = 3/);
+  assert.match(files.get("builder/src/theme/presets.generated.ts"), /scroll: \{/);
+});
+
+test("the preset order lists the Windows ids after mac-dark and the Windows 11 ids last", () => {
+  const dir = tempRoot();
+  const slate = fs.readFileSync(path.join(dir, "themes", "presets", "slate.json"), "utf8");
+  const ids = [
+    "xp-luna", "xp-luna-silver", "xp-luna-olive", "xp-embedded", "xp-royale", "xp-royale-noir", "xp-zune",
+    "windows-classic", "win11-light", "win11-dark",
+  ];
+  for (const id of ids) {
+    fs.writeFileSync(path.join(dir, "themes", "presets", `${id}.json`), slate.replace('"id": "slate"', `"id": "${id}"`));
+  }
+  const text = generate(dir).get("builder/src/theme/presets.generated.ts");
+  const order = /PRESET_ORDER: readonly string\[\] = \[([\s\S]*?)\];/.exec(text)[1].match(/"[^"]+"/g).map((s) => JSON.parse(s));
+  assert.deepEqual(order.slice(order.indexOf("mac-dark")), ["mac-dark", ...ids]);
+});
