@@ -849,6 +849,9 @@ function M.BuildContent(S)
     Dock.BuildChrome(S, contentBox, suffix)
 
     Tabs.BuildStrip(S, contentBox, suffix)
+    -- An XP strip has a pane under it with its own outline; the content goes inside it. Any other
+    -- variant gets contentBox back unchanged.
+    contentBox = Tabs.BuildPane(S, contentBox, suffix)
 
     AddSpacer(contentBox, "ModMenu_HeadPad_" .. suffix, config.spacing.headPad)
 
