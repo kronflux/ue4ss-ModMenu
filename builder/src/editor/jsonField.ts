@@ -5,7 +5,7 @@ export type Parsed = { ok: true; value: unknown } | { ok: false; message?: strin
 
 // The kinds whose JSON value is checked with the library validator, so the editor words a bad value
 // as the validator does and never stores it.
-export const CHECKED_KINDS = ["stops", "bevel", "faces", "xpface", "frame", "statusbar"];
+export const CHECKED_KINDS = ["stops", "bevel", "faces", "xpface", "frame", "statusbar", "arrowbutton"];
 
 export function parseJson(allowFalse: boolean, check?: (value: unknown) => StyleIssue[]) {
   return (text: string): Parsed => {

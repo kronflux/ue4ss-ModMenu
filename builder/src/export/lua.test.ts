@@ -457,4 +457,18 @@ describe("printLua for the stage 2 style kinds", () => {
     expect(validateDocument(doc)).toEqual([]);
     await expect(printLua(doc)).toMatchFileSnapshot("../../../tooling/lua/fixtures/builder_stage2_export.lua");
   });
+
+  it("exports an arrow button and a scroll type to the Lua suite's fixture", async () => {
+    const doc = emptyDocument();
+    doc.init.theme = "slate";
+    doc.init.style = {
+      field: { arrow: { face: ["#D4D0C8", "#C0C0C0"], size: 16 } },
+      scroll: { thumb: "#FF0000", width: 17 },
+    };
+    expect(validateDocument(doc)).toEqual([]);
+    const lua = printLua(doc);
+    expect(lua).toContain("arrow = {");
+    expect(lua).toContain("scroll = {");
+    await expect(lua).toMatchFileSnapshot("../../../tooling/lua/fixtures/builder_stage3_export.lua");
+  });
 });

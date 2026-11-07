@@ -89,3 +89,17 @@ test("edit the stage 2 fields of mac-light", async ({ page }) => {
     }, { timeout: 3000 })
     .toEqual({ barStops: ["#000080", "#1084D0"] });
 });
+
+// The scroll type has no preset values; its fields are edited like any other type's.
+test("edit the scroll thumb colour", async ({ page }) => {
+  await gotoFresh(page);
+  await page.locator(".ed-tree-label").filter({ has: page.locator(".ed-tree-hint", { hasText: "init" }) }).click();
+  await page.locator('details[data-type="scroll"] > summary').click();
+  await page.getByLabel("scroll.thumb", { exact: true }).fill("#FF0000");
+  await expect
+    .poll(async () => {
+      const text = await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY);
+      return JSON.parse(text ?? "{}").init?.style;
+    }, { timeout: 3000 })
+    .toEqual({ scroll: { thumb: "#FF0000" } });
+});

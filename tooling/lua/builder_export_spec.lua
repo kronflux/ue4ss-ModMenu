@@ -212,6 +212,16 @@ if stage2Init ~= nil and stage2Config ~= nil then
     assert_eq("the exported bar stops resolve as a list of two colours", #stage2Config.resolved.header.barStops, 2)
     assert_eq("the exported progress frame keeps its pad", stage2Config.resolved.progress.frame.pad, 2)
 end
+
+-- The stage 3 document: an arrow button on the field type and a scroll type written by the builder.
+local stage3Init, _, stage3Config = checkExport("stage 3 document", "builder_stage3_export.lua", 1)
+if stage3Init ~= nil and stage3Config ~= nil then
+    assert_eq("the exported field arrow keeps its size", stage3Config.resolved.field.arrow.size, 16)
+    assert_eq("the exported field arrow face resolves as a list of two colours", #stage3Config.resolved.field.arrow.face, 2)
+    assert_eq("the exported scroll width resolves", stage3Config.resolved.scroll.width, 17)
+    assert_eq("the exported scroll thumb resolves to the fixture's red", stage3Config.resolved.scroll.thumb, { R = 1, G = 0, B = 0, A = 1 })
+end
+
 -- The library rejects a field the builder would reject, with the same words. This is the other direction:
 -- the builder's messages for these cases are in builder/src/schema/validate.test.ts.
 local function registerError(item)
