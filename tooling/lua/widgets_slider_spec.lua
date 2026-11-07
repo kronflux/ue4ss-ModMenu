@@ -186,3 +186,119 @@ local bar = Slider.BarSpec(sl)
 assert_eq("the bar takes the track colour", bar.fill, sl.track)
 assert_eq("the bar's radius is half its thickness", bar.radius, 2)
 assert_eq("a bar fill override wins over the track", Slider.BarSpec(sl, sl.thumbHover).fill, sl.thumbHover)
+
+-- Pointer thumb: a box thumbWidth by size, rounded to a point at the bottom.
+local ptr = { variant = "pointer", size = 21, thumbRadius = 2, thumbEdge = sl.thumbEdge, thumbHover = sl.thumbHover }
+local pn, ph = Slider.ThumbSpecs(ptr, false)
+assert_eq("a pointer thumb is 11 wide and 21 tall by default", pn.size, { 11, 21 })
+assert_eq("a pointer thumb's top corners take thumbRadius", { pn.radius[1], pn.radius[2] }, { 2, 2 })
+assert_eq("a pointer thumb's bottom corners are half the width", { pn.radius[3], pn.radius[4] }, { 5.5, 5.5 })
+assert_eq("a pointer thumb has an edge", pn.outline, sl.thumbEdge)
+assert_eq("a pointer thumb draws its edge 1 wide", pn.width, 1)
+assert_eq("a pointer hover takes thumbHover", ph.fill, sl.thumbHover)
+ptr.thumbWidth = 9
+pn = Slider.ThumbSpecs(ptr, false)
+assert_eq("thumbWidth sets the pointer's width", pn.size, { 9, 21 })
+assert_eq("thumbWidth sets the pointer's bottom radii", { pn.radius[3], pn.radius[4] }, { 4.5, 4.5 })
+
+-- Building a slider tree, on a fake engine.
+local fakeMeta = {}
+fakeMeta.__index = function(self, key)
+    if key == "IsValid" then
+        return function()
+            return true
+        end
+    end
+    local isMethod = key:match("^AddChild") or key:match("^Set") or key:match("^Is") or key:match("^Get")
+    if key:match("^%u") and not isMethod then
+        local v = setmetatable({}, { __index = function(t, k)
+            local c = setmetatable({}, getmetatable(t))
+            rawset(t, k, c)
+            return c
+        end })
+        rawset(self, key, v)
+        return v
+    end
+    return function(w, ...)
+        local args = { ... }
+        w.calls[#w.calls + 1] = { key, args }
+        if key == "SetVisibility" then
+            w.visibility = args[1]
+        end
+        if key:match("^AddChildTo") or key == "SetContent" then
+            w.children[#w.children + 1] = args[1]
+            return setmetatable({ calls = {}, children = {} }, fakeMeta)
+        end
+        return nil
+    end
+end
+local created = {}
+local realConstruct, realFName, realFind = StaticConstructObject, FName, StaticFindObject
+StaticFindObject = function(path)
+    return { path = path, IsValid = function() return true end }
+end
+FName = function(n)
+    return n
+end
+StaticConstructObject = function(cls, outer, name)
+    local w = setmetatable({ class = cls.path, name = name, calls = {}, children = {} }, fakeMeta)
+    created[#created + 1] = w
+    return w
+end
+local function buildSlider(look, variant)
+    created = {}
+    local r = {}
+    for k, v in pairs(slate) do
+        r[k] = v
+    end
+    r.slider = {}
+    for k, v in pairs(slate.slider) do
+        r.slider[k] = v
+    end
+    r.slider.variant = variant
+    for k, v in pairs(look) do
+        r.slider[k] = v
+    end
+    local values = {}
+    local ctx = {
+        umg = require("ModMenu.core.umg"),
+        item = { id = "v", label = "V", min = 0, max = 10, step = 1 },
+        namePrefix = "T",
+        config = { resolved = r },
+        section = { id = "s" },
+        ValueKey = function(a, b)
+            return a .. "." .. b
+        end,
+        values = values,
+        contentBox = setmetatable({ calls = {}, children = {} }, fakeMeta),
+        liveControls = {},
+        Input = { IsTouch = function() return false end },
+    }
+    local ok, err = pcall(Slider.build, ctx)
+    return ok, err
+end
+local function named(pattern, class)
+    local out = {}
+    for _, w in ipairs(created) do
+        if w.name:match(pattern) and (class == nil or w.class:find(class, 1, true)) then
+            out[#out + 1] = w
+        end
+    end
+    return out
+end
+local tickColor = { R = 0, G = 0, B = 0, A = 1 }
+local okTicks, errTicks = buildSlider({ ticks = 5, tickColor = tickColor }, "pointer")
+assert_true("a pointer slider with ticks builds: " .. tostring(errTicks), okTicks)
+local ticks = named("_Tick%d+$", "UMG.Border")
+assert_eq("ticks = 5 builds 5 tick Borders", #ticks, 5)
+assert_eq("the ticks are numbered from 1", { ticks[1].name:match("_Tick1$") ~= nil, ticks[5].name:match("_Tick5$") ~= nil }, { true, true })
+assert_eq("a tick is shown hit-test invisible", ticks[1].visibility, 3)
+buildSlider({}, "pointer")
+assert_eq("a pointer slider without ticks has no tick widgets", #named("_Tick"), 0)
+buildSlider({}, "round")
+assert_eq("a round slider has no tick widgets", #named("_Tick"), 0)
+buildSlider({ trackLight = tickColor }, "pointer")
+assert_true("a trackLight slider draws a track line and a light line", #named("_TrackLine$") == 1 and #named("_TrackLight$") == 1)
+buildSlider({}, "round")
+assert_eq("a slider without trackLight has no light line", #named("_TrackLight"), 0)
+StaticConstructObject, FName, StaticFindObject = realConstruct, realFName, realFind

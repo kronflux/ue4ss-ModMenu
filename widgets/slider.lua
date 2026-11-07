@@ -34,6 +34,12 @@ local ITEM_PAD = 8
 local THUMB_ROOM = 4
 local TOUCH_THUMB_SCALE = 1.5
 local WHITE = { R = 1, G = 1, B = 1, A = 1 }
+local CLEAR = { R = 0, G = 0, B = 0, A = 0 }
+-- The pointer thumb's default box, and a tick mark's size.
+local POINTER_WIDTH = 11
+local POINTER_SIZE = 21
+local TICK_WIDTH = 1
+local TICK_HEIGHT = 4
 
 local function Prefix(sectionId, index)
     return string.format("Register(%s) items[%d]", tostring(sectionId), index)
@@ -172,26 +178,35 @@ function Slider.Variant(resolved, item)
 end
 
 --- The normal and hovered thumb shapes for a themed slider, as StyleLab's MakeSlider draws them.
---- thumbWidth is the thumb's edge width. A touch thumb is larger, because a finger covers more than a pointer.
+--- thumbWidth is the thumb's edge width; for the pointer variant it is the box's width instead. A touch thumb is larger, because a finger covers more than a pointer.
 ---@param sl table resolved slider fields
 ---@param touch boolean
 ---@return table normal
 ---@return table hover
 function Slider.ThumbSpecs(sl, touch)
-    local size = tonumber(sl.size) or 16
+    local pointer = sl.variant == "pointer"
+    local size = tonumber(sl.size) or (pointer and POINTER_SIZE or 16)
+    local pointerWidth = tonumber(sl.thumbWidth) or POINTER_WIDTH
     if touch then
         size = math.floor(size * TOUCH_THUMB_SCALE + 0.5)
+        pointerWidth = math.floor(pointerWidth * TOUCH_THUMB_SCALE + 0.5)
     end
     local dims, radius, pill = { size, size }, 0, false
-    if sl.variant == "round" then
+    if pointer then
+        -- The box ends in a rounded point: its top corners take thumbRadius, its bottom corners half the width.
+        local top = tonumber(sl.thumbRadius) or 0
+        dims, radius = { pointerWidth, size }, { top, top, pointerWidth / 2, pointerWidth / 2 }
+    elseif sl.variant == "round" then
         radius, pill = 1, true
     elseif sl.variant == "square" then
         radius = 2
     elseif sl.variant == "bar" then
         dims, radius = { 6, size + 4 }, 2
     end
+    -- On a pointer, thumbWidth is the box's width, so its edge is 1 wide.
+    local edgeWidth = pointer and 1 or sl.thumbWidth or 2
     local normal = { fill = sl.thumbFill or WHITE, radius = radius, pill = pill, size = dims,
-        outline = sl.thumbEdge, width = sl.thumbWidth or 2 }
+        outline = sl.thumbEdge, width = edgeWidth }
     local hover = {}
     for k, v in pairs(normal) do
         hover[k] = v
@@ -218,6 +233,10 @@ end
 ---@param barFill table|nil
 function Slider.StyleEngine(slider, sl, touch, barFill)
     local bar = Slider.BarSpec(sl, barFill)
+    if sl.trackLight ~= nil and barFill == nil then
+        -- The track's two lines are drawn behind the slider, so the engine bar draws nothing.
+        bar = { fill = CLEAR, radius = bar.radius }
+    end
     local normal, hover = Slider.ThumbSpecs(sl, touch)
     pcall(function()
         local st = slider.WidgetStyle
@@ -372,6 +391,50 @@ local function HasCapture(widget)
     return ok and (captured == true or captured == 1)
 end
 
+-- A SizeBox that fixes only the sizes given, holding one widget.
+local function Sized(umg, outer, name, content, w, h)
+    local box = umg.Construct("/Script/UMG.SizeBox", outer, name)
+    pcall(function()
+        if w ~= nil then
+            box:SetWidthOverride(w)
+        end
+        if h ~= nil then
+            box:SetHeightOverride(h)
+        end
+        box:SetContent(content)
+    end)
+    return box
+end
+
+-- This adds a row of sl.ticks marks under the track, 1 by 4 units, spread with fill slots. The row is
+-- inset by half the thumb's width, so the first and last marks sit under the thumb's ends.
+local function BuildTicks(ctx, root, name, sl, touch)
+    local umg = ctx.umg
+    local count = math.floor(sl.ticks)
+    local thumb = Slider.ThumbSpecs(sl, touch)
+    local row = umg.Construct("/Script/UMG.HorizontalBox", root, name .. "_Ticks")
+    for i = 1, count do
+        local tick = Paint.Box(row, name .. "_Tick" .. i, { fill = sl.tickColor or WHITE }, 0)
+        Paint.SetShown(tick, true)
+        local sized = Sized(umg, row, name .. "_TickSize" .. i, tick, TICK_WIDTH, TICK_HEIGHT)
+        pcall(function()
+            row:AddChildToHorizontalBox(sized):SetSize({ SizeRule = 0, Value = 0.0 })
+        end)
+        if i < count then
+            local gap = umg.Construct("/Script/UMG.Spacer", row, name .. "_TickGap" .. i)
+            pcall(function()
+                row:AddChildToHorizontalBox(gap):SetSize({ SizeRule = 1, Value = 1.0 })
+            end)
+        end
+    end
+    Paint.SetShown(row, true)
+    pcall(function()
+        local slot = root:AddChildToVerticalBox(row)
+        local inset = math.floor(thumb.size[1] / 2)
+        slot:SetPadding({ Left = inset, Top = 0, Right = inset, Bottom = 0 })
+    end)
+end
+
 function Slider.build(ctx)
     local umg = ctx.umg
     local item = ctx.item
@@ -466,10 +529,43 @@ function Slider.build(ctx)
             slider:SetSliderHandleColor(colors.textPrimary)
         end)
     end
+    if themed and sl.trackLight ~= nil then
+        -- The track is a dark line over a light one, behind the slider, centred on its height.
+        local stack = umg.Construct("/Script/UMG.Overlay", size, name .. "_TrackStack")
+        local lines = umg.Construct("/Script/UMG.VerticalBox", stack, name .. "_TrackLines")
+        local thickness = tonumber(sl.thickness) or 4
+        local dark = Sized(umg, lines, name .. "_TrackLineSize", Paint.Box(lines, name .. "_TrackLine",
+            { fill = sl.track or WHITE }, 0), nil, math.max(1, thickness - 1))
+        local light = Sized(umg, lines, name .. "_TrackLightSize", Paint.Box(lines, name .. "_TrackLight",
+            { fill = sl.trackLight }, 0), nil, 1)
+        pcall(function()
+            lines:AddChildToVerticalBox(dark)
+            lines:AddChildToVerticalBox(light)
+            local linesSlot = stack:AddChildToOverlay(lines)
+            linesSlot:SetHorizontalAlignment(0)
+            linesSlot:SetVerticalAlignment(2)
+            -- The lines run nearly the full track, as a groove does; the ticks inset by half the thumb
+            -- instead, because they mark where the thumb's centre can stop.
+            linesSlot:SetPadding({ Left = THUMB_ROOM, Top = 0, Right = THUMB_ROOM, Bottom = 0 })
+            local sliderSlot = stack:AddChildToOverlay(slider)
+            sliderSlot:SetHorizontalAlignment(0)
+            sliderSlot:SetVerticalAlignment(0)
+        end)
+        Paint.SetShown(lines, true)
+        pcall(function()
+            size:SetContent(stack)
+        end)
+    else
+        pcall(function()
+            size:SetContent(slider)
+        end)
+    end
     pcall(function()
-        size:SetContent(slider)
         root:AddChildToVerticalBox(size)
     end)
+    if themed and tonumber(sl.ticks) ~= nil and sl.ticks >= 1 then
+        BuildTicks(ctx, root, name, sl, touch)
+    end
 
     umg.AddToContent(ctx, root, {
         fill = ctx.layout == "horizontal" and item.fill == true,
