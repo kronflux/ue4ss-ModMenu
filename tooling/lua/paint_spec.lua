@@ -356,3 +356,230 @@ Util.Log = realLog
 StaticFindObject = realFind
 Paint.SetFonts({})
 Paint.ResetSession()
+
+-- Triangles and arrow buttons. TrianglePlan is pure; Triangle and ArrowButton are built from a fake
+-- UMG: every widget records its class, name, children, visibility and the calls made on it.
+local function Ws(bars, key)
+    local out = {}
+    for i, bar in ipairs(bars) do
+        out[i] = bar[key]
+    end
+    return out
+end
+local down = Paint.TrianglePlan("down", 1)
+assert_eq("TrianglePlan down: widths 7, 5, 3, 1", Ws(down, "w"), { 7, 5, 3, 1 })
+assert_eq("TrianglePlan down: one unit tall at y 0 to 3", { Ws(down, "h"), Ws(down, "y") }, { { 1, 1, 1, 1 }, { 0, 1, 2, 3 } })
+assert_eq("TrianglePlan down: bars are centred on the 7 unit box", Ws(down, "x"), { 0, 1, 2, 3 })
+assert_eq("TrianglePlan up: the bars run narrowest first", Ws(Paint.TrianglePlan("up", 1), "w"), { 1, 3, 5, 7 })
+assert_eq("TrianglePlan scale 2 doubles every number", Paint.TrianglePlan("down", 2)[2], { x = 2, y = 2, w = 10, h = 2 })
+local leftPlan = Paint.TrianglePlan("left", 1)
+assert_eq("TrianglePlan left: heights 1, 3, 5, 7", Ws(leftPlan, "h"), { 1, 3, 5, 7 })
+assert_eq("TrianglePlan left: one unit wide", Ws(leftPlan, "w"), { 1, 1, 1, 1 })
+local rightPlan = Paint.TrianglePlan("right", 1)
+assert_eq("TrianglePlan right: heights 7, 5, 3, 1", Ws(rightPlan, "h"), { 7, 5, 3, 1 })
+assert_eq("TrianglePlan right: columns at x 0 to 3, centred on the 7 unit height", { Ws(rightPlan, "x"), Ws(rightPlan, "y") },
+    { { 0, 1, 2, 3 }, { 0, 1, 2, 3 } })
+
+local tri = { R = 0, G = 0, B = 0, A = 1 }
+local created = {}
+local fakeMeta = {}
+local function Vivify()
+    return setmetatable({}, {
+        __index = function(t, k)
+            local v = Vivify()
+            rawset(t, k, v)
+            return v
+        end,
+    })
+end
+fakeMeta.__index = function(self, key)
+    if key == "IsValid" then
+        return function()
+            return true
+        end
+    end
+    local isMethod = key:match("^AddChild") or key:match("^Set") or key:match("^Is") or key:match("^Get")
+    if key:match("^%u") and not isMethod then
+        local v = Vivify()
+        rawset(self, key, v)
+        return v
+    end
+    return function(w, ...)
+        local args = { ... }
+        w.calls[#w.calls + 1] = { key, args }
+        if key == "SetVisibility" then
+            w.visibility = args[1]
+        end
+        if key:match("^AddChildTo") or key == "SetContent" then
+            w.children[#w.children + 1] = args[1]
+            local slot = setmetatable({ calls = {}, children = {} }, fakeMeta)
+            rawset(w, "slots", rawget(w, "slots") or {})
+            w.slots[#w.slots + 1] = slot
+            return slot
+        end
+        return nil
+    end
+end
+local realConstruct, realFName, realFindObject = StaticConstructObject, FName, StaticFindObject
+StaticFindObject = function(path)
+    return { path = path, IsValid = function() return true end }
+end
+FName = function(n)
+    return n
+end
+StaticConstructObject = function(cls, outer, name)
+    local w = setmetatable({ class = cls.path, name = name, calls = {}, children = {} }, fakeMeta)
+    created[#created + 1] = w
+    return w
+end
+local function Count(class)
+    local n = 0
+    for _, w in ipairs(created) do
+        if w.class:find(class, 1, true) then
+            n = n + 1
+        end
+    end
+    return n
+end
+
+local widget = Paint.Triangle(nil, "Tri", "down", tri, 1)
+assert_eq("Triangle: one Overlay holds the bars", widget.class, "/Script/UMG.Overlay")
+assert_eq("Triangle: four bars", #widget.children, 4)
+assert_eq("Triangle: shown hit-test invisible", widget.visibility, 3)
+assert_eq("Triangle: bars are flat Borders", Count("UMG.Border"), 4)
+-- Each bar is placed by its plan entry: sized to w by h and padded in by x and y.
+for i, bar in ipairs(Paint.TrianglePlan("down", 1)) do
+    local sized = widget.children[i]
+    assert_eq("Triangle: bar " .. i .. " is sized by the plan", { sized.calls[1][2][1], sized.calls[2][2][1] }, { bar.w, bar.h })
+    assert_eq("Triangle: bar " .. i .. " is placed by the plan", widget.slots[i].calls[1][2][1],
+        { Left = bar.x, Top = bar.y, Right = 0, Bottom = 0 })
+    assert_eq("Triangle: bar " .. i .. " is shown hit-test invisible", sized.visibility, 3)
+end
+-- Directions: "down" and "up" point at the bottom and the top; "right" and "left" at the right and
+-- the left, the tip being the one-unit bar.
+assert_eq("TrianglePlan: down points down (tip is the last bar, at y 3)", Paint.TrianglePlan("down", 1)[4].y, 3)
+assert_eq("TrianglePlan: up points up (tip is the first bar, at y 0)", Paint.TrianglePlan("up", 1)[1].y, 0)
+assert_eq("TrianglePlan: right points right (tip is the last bar, at x 3)", Paint.TrianglePlan("right", 1)[4].x, 3)
+assert_eq("TrianglePlan: left points left (tip is the first bar, at x 0)", Paint.TrianglePlan("left", 1)[1].x, 0)
+
+created = {}
+local face = { { R = 1, G = 1, B = 1, A = 1 }, { R = 0.5, G = 0.5, B = 0.5, A = 1 } }
+local hoverFace = { { R = 0.9, G = 0.9, B = 1, A = 1 }, { R = 0.4, G = 0.4, B = 1, A = 1 } }
+local plain = Paint.ArrowButton(nil, "Arr", { face = face, hoverFace = hoverFace, edge = outline, radius = 3,
+    glyph = tri }, "down", {})
+assert_true("ArrowButton: rest, hover and pressed looks", plain.states.rest ~= nil and plain.states.hover ~= nil
+    and plain.states.pressed ~= nil)
+assert_true("ArrowButton: rest uses face", plain.states.rest.gradient.stops == face)
+assert_true("ArrowButton: hover uses hoverFace", plain.states.hover.gradient.stops == hoverFace)
+assert_true("ArrowButton: a missing pressedFace falls back to face", plain.states.pressed.gradient.stops == face)
+assert_eq("ArrowButton: the look carries the radius", plain.states.rest.radius, 3)
+assert_eq("ArrowButton: the edge is drawn by the edge widget, not a look key", plain.states.rest.edge, nil)
+assert_true("ArrowButton: the button is a shape button with three shapes", plain.button.shapes.normal ~= nil
+    and plain.button.shapes.hover ~= nil and plain.button.shapes.pressed ~= nil)
+assert_true("ArrowButton: an edge draws an edge widget", plain.button.edge ~= nil)
+assert_eq("ArrowButton: default size 17", { plain.root.calls[1][1], plain.root.calls[1][2][1] }, { "SetWidthOverride", 17 })
+assert_eq("ArrowButton: no bevel, no shift", plain.states.pressed.shift, nil)
+Paint.ShowState(plain.button, "hover")
+assert_eq("ArrowButton: hover shows the hover shape", plain.button.shapes.hover.visibility, 3)
+assert_eq("ArrowButton: hover hides the rest shape", plain.button.shapes.normal.visibility, 2)
+
+local noHover = Paint.ArrowButton(nil, "Arr2", { face = face, glyph = tri }, "up", { size = 20 })
+assert_true("ArrowButton: without hoverFace, hover reuses face", noHover.states.hover.gradient.stops == face)
+assert_eq("ArrowButton: opts.size is used", noHover.root.calls[1][2][1], 20)
+assert_eq("ArrowButton: arrow.size wins over opts.size", Paint.ArrowButton(nil, "Arr3", { face = face, glyph = tri, size = 12 },
+    "up", { size = 20 }).root.calls[1][2][1], 12)
+assert_true("ArrowButton: no edge, no edge widget", noHover.button.edge == nil)
+
+local bevel = { light = white, dark = black, width = 1 }
+local beveled = Paint.ArrowButton(nil, "Arr4", { face = face, glyph = tri, bevel = bevel }, "down", {})
+assert_eq("ArrowButton bevel: rest is a gradient and a raised bevel", #beveled.states.rest.layers, 2)
+assert_true("ArrowButton bevel: rest bevel is raised", beveled.states.rest.layers[2].bevel == bevel and not beveled.states.rest.layers[2].sunken)
+assert_true("ArrowButton bevel: pressed bevel is sunken", beveled.states.pressed.layers[2].sunken == true)
+assert_eq("ArrowButton bevel: pressed shifts the glyph 1 down and right", beveled.states.pressed.shift, { x = 1, y = 1 })
+assert_eq("ArrowButton bevel: rest has no shift", beveled.states.rest.shift, nil)
+Paint.ShowState(beveled.button, "pressed")
+local moved = nil
+for _, call in ipairs(beveled.button.content.calls) do
+    if call[1] == "SetRenderTranslation" then
+        moved = call[2][1]
+    end
+end
+assert_eq("ArrowButton bevel: pressing moves the glyph", moved, { X = 1, Y = 1 })
+assert_eq("ArrowButton: the glyph is shown hit-test invisible", beveled.button.content.visibility, 3)
+
+-- Face-less arrows (a borrowed arrow keeps only radius, size and bevel width) never error.
+local function BrushCalls()
+    local n = 0
+    for _, w in ipairs(created) do
+        for _, call in ipairs(w.calls) do
+            if call[1] == "SetBrushColor" then
+                n = n + 1
+            end
+        end
+    end
+    return n
+end
+created = {}
+local derived = Paint.ArrowButton(nil, "Arr5", { radius = 3, glyph = tri }, "down", { face = face })
+assert_true("ArrowButton face-less: opts.face is the rest face", derived.states.rest.gradient.stops == face)
+assert_true("ArrowButton face-less: hover and pressed use opts.face", derived.states.hover.gradient.stops == face
+    and derived.states.pressed.gradient.stops == face)
+local fillColor = { R = 0.2, G = 0.2, B = 0.2, A = 1 }
+local flatArrow = Paint.ArrowButton(nil, "Arr6", { glyph = tri }, "down", { fill = fillColor })
+assert_true("ArrowButton face-less: opts.fill gives a flat look", flatArrow.states.rest.fill == fillColor
+    and flatArrow.states.rest.gradient == nil)
+local bare = Paint.ArrowButton(nil, "Arr7", { glyph = tri, bevel = bevel }, "down", {})
+assert_true("ArrowButton face-less: nothing at all still builds, a bevel over a flat look",
+    bare.states.rest.layers[1].fill ~= nil and bare.states.pressed.shift ~= nil)
+assert_eq("ArrowButton: opts.height sets the height, default is size", {
+    Paint.ArrowButton(nil, "Arr8", { face = face, glyph = tri }, "down", { size = 17, height = 9 }).root.calls[2][2][1],
+    plain.root.calls[2][2][1],
+}, { 9, 17 })
+
+-- Nothing is recoloured with SetBrushColor after the build, whichever state is shown.
+for _, arrow in ipairs({ { face = face, hoverFace = hoverFace, edge = outline, radius = 3, glyph = tri },
+    { face = face, glyph = tri, bevel = bevel, radius = 2, edge = outline } }) do
+    created = {}
+    local built = Paint.ArrowButton(nil, "Arr9", arrow, "down", {})
+    local afterBuild = BrushCalls()
+    for _, state in ipairs({ "hover", "pressed", "normal", "disabled", "hover" }) do
+        Paint.ShowState(built.button, state)
+    end
+    assert_eq("ArrowButton: no SetBrushColor after the build", BrushCalls(), afterBuild)
+    assert_true("ArrowButton: the edge widget is never given SetBrushColor", built.button.edge == nil
+        or #built.button.edge.calls == 0 or (function()
+            for _, call in ipairs(built.button.edge.calls) do
+                if call[1] == "SetBrushColor" then
+                    return false
+                end
+            end
+            return true
+        end)())
+end
+
+-- An arrow face is capped at 4 strips however many stops it has, so a button stays a few widgets.
+local manyStops = {}
+for n = 1, 8 do
+    manyStops[n] = n % 2 == 0 and face[1] or face[2]
+end
+created = {}
+local capped = Paint.ArrowButton(nil, "Cap", { face = manyStops, glyph = tri }, "down", {})
+assert_eq("ArrowButton: eight stops cap at 4 strips", capped.states.rest.gradient.steps, 4)
+local stripCount = 0
+for _, w in ipairs(created) do
+    if w.name:match("_Strip%d+$") then
+        stripCount = stripCount + 1
+    end
+end
+assert_true("ArrowButton: three looks build at most 12 strips", stripCount <= 12 and stripCount > 0)
+assert_eq("ArrowButton: two stops give two strips", Paint.ArrowButton(nil, "Cap2", { face = face, glyph = tri }, "down", {}).states.rest.gradient.steps, 2)
+
+-- TouchArrow grows the size to 28 under touch and leaves desktop and larger arrows alone.
+local base = { face = face, size = 17 }
+assert_true("TouchArrow: desktop returns the arrow itself", Paint.TouchArrow(base, { pointerMode = "mouse" }) == base)
+assert_true("TouchArrow: no config returns the arrow itself", Paint.TouchArrow(base, nil) == base)
+assert_eq("TouchArrow: touch raises 17 to 28", Paint.TouchArrow(base, { pointerMode = "touch" }).size, 28)
+assert_eq("TouchArrow: touch leaves 40 alone", Paint.TouchArrow({ face = face, size = 40 }, { pointerMode = "touch" }).size, 40)
+assert_eq("TouchArrow: the original is not changed", base.size, 17)
+
+StaticConstructObject, FName, StaticFindObject = realConstruct, realFName, realFindObject

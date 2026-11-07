@@ -710,6 +710,135 @@ function M.Cross(outer, name, color, size, thickness)
     return stack
 end
 
+--- The bars of a triangle: 7, 5, 3 and 1 units wide times scale, one unit (times scale) tall,
+--- centred on a 7 by 4 box. "down" is widest first, "up" the reverse. "left" and "right" swap
+--- width and height, on a 4 by 7 box: "right" is tallest first, "left" the reverse.
+---@param direction string "down"|"up"|"left"|"right"
+---@param scale number|nil
+---@return table[] bars { x, y, w, h } in the box's units times scale
+function M.TrianglePlan(direction, scale)
+    local s = tonumber(scale) or 1
+    local bars = {}
+    for i = 1, 4 do
+        local reversed = direction == "up" or direction == "left"
+        local length = reversed and (2 * i - 1) or (9 - 2 * i)
+        if direction == "left" or direction == "right" then
+            bars[i] = { x = (i - 1) * s, y = (7 - length) / 2 * s, w = s, h = length * s }
+        else
+            bars[i] = { x = (7 - length) / 2 * s, y = (i - 1) * s, w = length * s, h = s }
+        end
+    end
+    return bars
+end
+
+--- A triangle drawn from flat Borders, one per bar of TrianglePlan, in an Overlay shown hit-test
+--- invisible so clicks pass through it. The bars are flat, so none is ever recoloured.
+---@param outer any
+---@param name string
+---@param direction string
+---@param color table
+---@param scale number|nil
+---@return any
+function M.Triangle(outer, name, direction, color, scale)
+    local stack = Umg.Construct("/Script/UMG.Overlay", outer, name)
+    for i, bar in ipairs(M.TrianglePlan(direction, scale)) do
+        local sized = Sized(stack, name .. "_BarSize" .. i,
+            M.Box(stack, name .. "_Bar" .. i, { fill = color }, 0), bar.w, bar.h)
+        AddToOverlay(stack, sized, { bar.x, bar.y, 0, 0 }, H_LEFT, V_TOP)
+        SetShown(sized, true)
+    end
+    SetShown(stack, true)
+    return stack
+end
+
+local ARROW_FACE_STEPS = 4
+-- The shortest side of an arrow button under touch, as the scrollbar and other controls grow.
+local TOUCH_ARROW_SIZE = 28
+
+--- The arrow style to build with: under pointerMode "touch" a copy whose size is at least 28, so a
+--- finger can hit it; otherwise the arrow as given.
+---@param arrow table
+---@param config table|nil
+---@return table
+function M.TouchArrow(arrow, config)
+    if config == nil or config.pointerMode ~= "touch" then
+        return arrow
+    end
+    local copy = {}
+    for k, v in pairs(arrow) do
+        copy[k] = v
+    end
+    copy.size = math.max(arrow.size or 17, TOUCH_ARROW_SIZE)
+    return copy
+end
+
+--- A square button with a gradient face, an optional edge and a triangle glyph. arrow is the style's
+--- arrowbutton: face, hoverFace?, pressedFace?, edge?, glyph, radius?, bevel?, size?. A missing hover
+--- or pressed face falls back to face. With a bevel the looks are a raised bevel over the face and,
+--- pressed, a sunken one, and the glyph moves 1 down and right. Each look is its own shape, swapped
+--- by visibility, so no rounded or outlined shape is recoloured.
+--- The face is arrow.face, else opts.face (stops the caller derives from its palette), else a flat
+--- look filled with opts.fill (transparent when absent), so a borrowed arrow that keeps only radius,
+--- size and bevel never errors. hoverFace and pressedFace fall back to the resolved rest face.
+--- opts: size? (arrow.size wins, default 17), height? (default size), face?, fill?, glyphScale?
+--- (default max(1, round(min(size, height) / 17))).
+--- Returns the widget to place, the shape button (as StateButton returns it, for ShowState) and
+--- the three looks.
+---@param outer any
+---@param name string
+---@param arrow table
+---@param direction string
+---@param opts table|nil
+---@return table { root, button, states = { rest, hover, pressed } }
+function M.ArrowButton(outer, name, arrow, direction, opts)
+    opts = opts or {}
+    local size = arrow.size or opts.size or 17
+    local height = opts.height or size
+    local restStops = arrow.face or opts.face
+    local function Look(stops, sunken)
+        local face
+        if stops ~= nil and #stops > 0 then
+            -- An arrow face is about 17 units tall, so it gets at most ARROW_FACE_STEPS strips
+            -- instead of a full gradient's 12, which keeps a button to a few widgets.
+            face = {
+                gradient = { stops = stops, steps = math.min(#stops, ARROW_FACE_STEPS), radius = arrow.radius },
+                radius = arrow.radius,
+            }
+        else
+            face = { fill = opts.fill or Alpha(WHITE, 0), radius = arrow.radius }
+        end
+        if arrow.bevel == nil then
+            return face
+        end
+        return {
+            layers = { face, { bevel = arrow.bevel, sunken = sunken } },
+            radius = arrow.radius,
+            shift = sunken and { x = 1, y = 1 } or nil,
+        }
+    end
+    local states = {
+        rest = Look(restStops, false),
+        hover = Look(arrow.hoverFace or restStops, false),
+        pressed = Look(arrow.pressedFace or restStops, true),
+    }
+    local edge = nil
+    if arrow.edge ~= nil then
+        edge = { outline = arrow.edge, width = 1, radius = arrow.radius }
+    end
+
+    -- The glyph sits in its own Overlay so it is centred, and is shown hit-test invisible so the
+    -- button keeps the pointer.
+    local scale = opts.glyphScale or math.max(1, math.floor(math.min(size, height) / 17 + 0.5))
+    local holder = Umg.Construct("/Script/UMG.Overlay", outer, name .. "_Glyph")
+    AddToOverlay(holder, M.Triangle(holder, name .. "_Tri", direction, arrow.glyph or WHITE, scale), 0, H_CENTER, V_CENTER)
+    SetShown(holder, true)
+
+    local button = M.StateButton(outer, name, {
+        normal = states.rest, hover = states.hover, pressed = states.pressed, edge = edge,
+    }, holder, { pad = 0 })
+    return { root = Sized(outer, name .. "_Size", button.root, size, height), button = button, states = states }
+end
+
 ------------------------------------------------------------------------------------------
 -- Text
 ------------------------------------------------------------------------------------------
