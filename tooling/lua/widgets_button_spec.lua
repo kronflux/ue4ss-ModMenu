@@ -358,6 +358,29 @@ if okStyle and okPaint and type(Button.States) == "function" then
     assert_eq("classic normal fills with the role face", classicStates.normal.layers[1].fill, classic.button.roles.primary.fill)
     assert_eq("a theme with no height gives no height", classicStates.height, nil)
 
+    -- defaultEdge draws a 1-wide outline over the bevel's outer row of a primary classic button, in every state.
+    local classicEdged = Style.Resolve({
+        base = "slate",
+        button = {
+            variant = "classic",
+            radius = 0,
+            bevel = { light = "#DFDFDF", dark = "#0A0A0A", innerLight = "#FFFFFF", innerDark = "#808080" },
+            defaultEdge = "#000000",
+        },
+    })
+    local edge = classicEdged.button.defaultEdge
+    local primaryEdged = Button.States(classicEdged, { variant = "primary" })
+    for _, state in ipairs({ "normal", "hover", "pressed" }) do
+        assert_true("a primary classic button draws the default edge when " .. state, hasOutline(primaryEdged[state], edge))
+    end
+    local ringLayer = primaryEdged.normal.layers[#primaryEdged.normal.layers]
+    assert_eq("the default edge is the topmost layer", ringLayer.outline, edge)
+    assert_eq("the default edge is 1 wide", ringLayer.width, 1)
+    assert_true("the default edge is a hollow shape", ringLayer.fill.A == 0)
+    assert_true("a non-primary classic button has no default edge", not hasOutline(Button.States(classicEdged, {}).normal, edge))
+    assert_true("a disabled classic button has no default edge", not hasOutline(Button.States(classicEdged, { variant = "primary", enabled = false }).normal, edge))
+    assert_eq("a classic button without defaultEdge keeps two layers", #classicStates.normal.layers, 2)
+
     local bare = Button.States(Style.Resolve({ base = "slate", button = { variant = "classic" } }), { variant = "primary" })
     assert_true("classic with no bevel draws a flat role fill", bare.normal.layers == nil and bare.normal.fill ~= nil)
 

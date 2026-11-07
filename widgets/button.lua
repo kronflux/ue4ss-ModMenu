@@ -258,11 +258,20 @@ local function Look(b, palette, roleName)
     elseif variant == "classic" then
         -- A raised two-ring bevel that turns sunken while pressed, with the caption moving one unit
         -- down and right. Hover looks like rest, as in Windows Classic.
-        local raised = { layers = { { fill = base }, { bevel = b.bevel, sunken = false } } }
+        -- A primary button with defaultEdge gets a 1-wide outline over the bevel's outer row, in every
+        -- state, as its own hollow shape so no rounded or outlined shape is ever recoloured.
+        local function Stack(sunken)
+            local layers = { { fill = base }, { bevel = b.bevel, sunken = sunken } }
+            if roleName == "primary" and b.defaultEdge ~= nil then
+                layers[#layers + 1] = { fill = Alpha(b.defaultEdge, 0), outline = b.defaultEdge, width = 1, radius = 0 }
+            end
+            return layers
+        end
+        local raised = { layers = Stack(false) }
         look.text = role.text
         look.normal = raised
         look.hover = raised
-        look.pressed = { layers = { { fill = base }, { bevel = b.bevel, sunken = true } }, shift = { x = 1, y = 1 } }
+        look.pressed = { layers = Stack(true), shift = { x = 1, y = 1 } }
     elseif variant == "fill" then
         look.text = role.text
         local hover, pressed
