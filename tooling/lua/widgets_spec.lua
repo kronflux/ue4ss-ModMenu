@@ -81,3 +81,129 @@ Checkbox.onItemState(shapedCtrl, true, true, { paint = fakePaint })
 assert_true("enabling a themed toggle leaves its look to the poll", #shown == 1)
 Checkbox.onItemState({ asButton = true, paint = {} }, false, true, { paint = fakePaint })
 assert_true("disabling a stock toggle changes nothing", #shown == 1)
+
+-- Check box insides, built from a fake UMG: every widget records its class, name, children and the
+-- calls made on it.
+do
+    local Umg = require("ModMenu.core.umg")
+    local Paint = require("ModMenu.core.paint")
+    local created = {}
+    local fakeMeta = {}
+    local function Vivify()
+        return setmetatable({}, {
+            __index = function(t, k)
+                local v = Vivify()
+                rawset(t, k, v)
+                return v
+            end,
+        })
+    end
+    fakeMeta.__index = function(self, key)
+        if key == "IsValid" then
+            return function()
+                return true
+            end
+        end
+        local isMethod = key:match("^AddChild") or key:match("^Set") or key:match("^Is") or key:match("^Get")
+        if key:match("^%u") and not isMethod then
+            local v = Vivify()
+            rawset(self, key, v)
+            return v
+        end
+        return function(w, ...)
+            local args = { ... }
+            w.calls[#w.calls + 1] = { key, args }
+            if key == "SetVisibility" then
+                w.visibility = args[1]
+            end
+            if key:match("^AddChildTo") or key == "SetContent" then
+                w.children[#w.children + 1] = args[1]
+                return setmetatable({ calls = {}, children = {} }, fakeMeta)
+            end
+            return nil
+        end
+    end
+    local realConstruct, realFName, realFindObject = StaticConstructObject, FName, StaticFindObject
+    StaticFindObject = function(path)
+        return { path = path, IsValid = function() return true end }
+    end
+    FName = function(n)
+        return n
+    end
+    StaticConstructObject = function(cls, _outer, name)
+        local w = setmetatable({ class = cls.path, name = name, calls = {}, children = {} }, fakeMeta)
+        created[#created + 1] = w
+        return w
+    end
+
+    local function Named(suffix)
+        local out = {}
+        for _, w in ipairs(created) do
+            if w.name:sub(-#suffix) == suffix then
+                out[#out + 1] = w
+            end
+        end
+        return out
+    end
+    local function StripCount(prefix)
+        local n = 0
+        for _, w in ipairs(created) do
+            if w.name:find(prefix .. "_Strip%d+$") then
+                n = n + 1
+            end
+        end
+        return n
+    end
+
+    -- A themed check box build, returning its live control and the poll context.
+    local function BuildChecked(toggle)
+        created = {}
+        local resolved = Style.Resolve({ name = "Mine", base = "slate", toggle = toggle })
+        local values, live = {}, {}
+        local ctx = {
+            umg = Umg,
+            paint = Paint,
+            item = { id = "c", label = "Check" },
+            section = { id = "s" },
+            values = values,
+            liveControls = live,
+            namePrefix = "Chk",
+            config = { resolved = resolved },
+            ValueKey = function(s, i) return s .. "." .. i end,
+            contentBox = Umg.Construct("/Script/UMG.VerticalBox", nil, "ContentBox"),
+            IsValid = function() return true end,
+            Input = { ReleaseClick = function() return false end },
+        }
+        Checkbox.build(ctx)
+        return live[1], ctx
+    end
+
+    local faceStops = { "#FFFFFF", "#ECE9D8", "#D6D0C5" }
+    local ringColor = "#F9A63A"
+    local ctrl, ctx = BuildChecked({ variant = "check", checkFace = faceStops, checkHoverRing = ringColor })
+    assert_true("a check box with checkFace draws a gradient of 3 or more strips named _CheckFace",
+        StripCount("Chk_CheckFace") >= 3)
+    assert_eq("the face gradient is one widget", #Named("_CheckFace"), 1)
+    assert_eq("the face gradient is hit-test invisible, so its strips take no click",
+        Named("_CheckFace")[1] and Named("_CheckFace")[1].visibility, 3)
+    assert_eq("the check box has one hover ring", #Named("_CheckHover"), 1)
+    local ring = Named("_CheckHover")[1]
+    assert_true("the check box has a hover ring to inspect", ring ~= nil)
+    if ring ~= nil then
+        assert_eq("the hover ring is hidden at rest", ring.visibility, 2)
+        rawset(ctrl.widget, "IsHovered", function() return true end)
+        Checkbox.poll(ctrl, ctx)
+        assert_eq("the hover ring is shown after a hover poll", ring.visibility, 3)
+        rawset(ctrl.widget, "IsHovered", function() return false end)
+        Checkbox.poll(ctrl, ctx)
+        assert_eq("the hover ring is hidden again when the pointer leaves", ring.visibility, 2)
+    end
+
+    BuildChecked({ variant = "check" })
+    assert_eq("without checkFace there is no face gradient", StripCount("Chk_CheckFace"), 0)
+    assert_eq("without checkHoverRing there is no hover ring", #Named("_CheckHover"), 0)
+    assert_eq("without the new fields the off box is built as today", #Named("_BoxOff"), 1)
+    assert_eq("without the new fields the on box is built as today", #Named("_BoxOn"), 1)
+
+    StaticConstructObject, FName, StaticFindObject = realConstruct, realFName, realFindObject
+end

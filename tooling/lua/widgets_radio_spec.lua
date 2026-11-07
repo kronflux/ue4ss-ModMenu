@@ -122,3 +122,179 @@ assert_eq("the chosen caption takes the mark text", opts[2].text.color, cs.markT
 Radio.apply(themedCtrl, "c", {})
 assert_eq("choosing another option hides the old mark", opts[2].marksOn[1].vis, 2)
 assert_eq("and shows the new one", opts[3].marksOn[1].vis, 3)
+
+-- Radio insides, built from a fake UMG: every widget records its class, name, children and calls.
+do
+    local Umg = require("ModMenu.core.umg")
+    local created = {}
+    local fakeMeta = {}
+    local function Vivify()
+        return setmetatable({}, {
+            __index = function(t, k)
+                local v = Vivify()
+                rawset(t, k, v)
+                return v
+            end,
+        })
+    end
+    fakeMeta.__index = function(self, key)
+        if key == "IsValid" then
+            return function()
+                return true
+            end
+        end
+        local isMethod = key:match("^AddChild") or key:match("^Set") or key:match("^Is") or key:match("^Get")
+        if key:match("^%u") and not isMethod then
+            local v = Vivify()
+            rawset(self, key, v)
+            return v
+        end
+        return function(w, ...)
+            local args = { ... }
+            w.calls[#w.calls + 1] = { key, args }
+            if key == "SetVisibility" then
+                w.visibility = args[1]
+            end
+            if key:match("^AddChildTo") or key == "SetContent" then
+                w.children[#w.children + 1] = args[1]
+                local slot = setmetatable({ calls = {}, children = {} }, fakeMeta)
+                if rawget(w, "slotOf") == nil then
+                    rawset(w, "slotOf", {})
+                end
+                rawget(w, "slotOf")[args[1]] = slot
+                return slot
+            end
+            return nil
+        end
+    end
+    local realConstruct, realFName, realFindObject = StaticConstructObject, FName, StaticFindObject
+    StaticFindObject = function(path)
+        return { path = path, IsValid = function() return true end }
+    end
+    FName = function(n)
+        return n
+    end
+    StaticConstructObject = function(cls, _outer, name)
+        local w = setmetatable({ class = cls.path, name = name, calls = {}, children = {} }, fakeMeta)
+        created[#created + 1] = w
+        return w
+    end
+
+    local function Named(pattern)
+        local out = {}
+        for _, w in ipairs(created) do
+            if w.name:find(pattern) then
+                out[#out + 1] = w
+            end
+        end
+        return out
+    end
+    local function WidthOf(w)
+        for _, call in ipairs(w.calls) do
+            if call[1] == "SetWidthOverride" then
+                return call[2][1]
+            end
+        end
+        return nil
+    end
+    local function Hex(c) return Style.Hex(c) end
+
+    local function BuildOption(choice)
+        created = {}
+        local base = { variant = "radio", markFill = Hex("#2C62F6"), markText = Hex("#FFFFFF") }
+        for k, v in pairs(choice) do
+            base[k] = v
+        end
+        local theme = { variant = "radio", cs = base, p = { text = Hex("#000000") }, size = 12, hintSize = 10 }
+        local opt = Radio._buildOption(Umg, nil, "R", "Caption", theme, function() end)
+        return opt
+    end
+
+    local rings = { Hex("#1C5180"), Hex("#E0E0DA"), Hex("#FFFFFF") }
+    local opt = BuildOption({ radioRings = rings, radioHoverRing = Hex("#F9A63A") })
+    local circles = Named("_Ring%d+$")
+    assert_eq("a radio with 3 rings has 3 circle Borders", #circles, 3)
+    for _, w in ipairs(circles) do
+        assert_eq("a ring is a Border: " .. w.name, w.class, "/Script/UMG.Border")
+    end
+    local sizes = Named("_Ring%d+_Size$")
+    assert_eq("each ring has a size", #sizes, 3)
+    local w1, w2, w3 = WidthOf(sizes[1]), WidthOf(sizes[2]), WidthOf(sizes[3])
+    assert_true("the rings shrink", w1 ~= nil and w2 ~= nil and w3 ~= nil and w1 > w2 and w2 > w3)
+    assert_eq("each ring is inset 2 more units a side than the last", { w1 - w2, w2 - w3 }, { 4, 4 })
+    assert_eq("the radio has one hover ring", #Named("_RadioHover$"), 1)
+    local ring = Named("_RadioHover$")[1]
+    assert_true("the radio has a hover ring to inspect", ring ~= nil)
+    if ring ~= nil then
+        assert_eq("the radio hover ring is hidden at rest", ring.visibility, 2)
+        rawset(opt.widget, "IsHovered", function() return true end)
+        local ctx = { Input = { ReleaseClick = function() return false end } }
+        Radio._pollOption(opt, ctx)
+        assert_eq("the radio hover ring is shown after a hover poll", ring.visibility, 3)
+        rawset(opt.widget, "IsHovered", function() return false end)
+        Radio._pollOption(opt, ctx)
+        assert_eq("the radio hover ring is hidden when the pointer leaves", ring.visibility, 2)
+    end
+
+    -- The outermost ring carries the radio edge, and only when the style sets one.
+    local edgeColor = Hex("#003C74")
+    BuildOption({ radioRings = rings, radioEdge = edgeColor })
+    local edgeOutline = Named("_Ring1$")[1].Background.OutlineSettings
+    assert_eq("an edged radio's first ring is outlined 1 wide", edgeOutline.Width, 1)
+    assert_eq("an edged radio's first ring is outlined in radioEdge", edgeOutline.Color.SpecifiedColor, edgeColor)
+    assert_eq("an edged radio's second ring has no outline", Named("_Ring2$")[1].Background.OutlineSettings.Width, 0)
+    BuildOption({ radioRings = rings })
+    assert_eq("without radioEdge the first ring has no outline", Named("_Ring1$")[1].Background.OutlineSettings.Width, 0)
+
+    BuildOption({ radioBevel = { light = Hex("#FFFFFF"), dark = Hex("#808080"), width = 1 } })
+    local dark, light = Named("_RadioBevelDark$"), Named("_RadioBevelLight$")
+    assert_true("a radio bevel draws an outer dark circle and an inner light circle", #dark == 1 and #light == 1)
+    assert_eq("the dark circle is shown hit-test invisible", dark[1].visibility, 3)
+    assert_eq("the light circle is shown hit-test invisible", light[1].visibility, 3)
+    local function PadOf(parent, child)
+        local slots = rawget(parent, "slotOf")
+        local slot = slots and slots[child]
+        for _, call in ipairs(slot and slot.calls or {}) do
+            if call[1] == "SetPadding" then
+                local m = call[2][1]
+                return { m.Left, m.Top, m.Right, m.Bottom }
+            end
+        end
+        return nil
+    end
+    local bevelRing = Named("_Ring$")[1]
+    assert_eq("the dark circle fills the ring", PadOf(bevelRing, dark[1]), { 0, 0, 0, 0 })
+    assert_eq("the light circle is offset 1 down and right", PadOf(bevelRing, light[1]), { 1, 1, 0, 0 })
+
+    -- With both a bevel and rings, the rings sit inside the bevel and are centred on the light circle.
+    BuildOption({ radioBevel = { light = Hex("#FFFFFF"), dark = Hex("#808080"), width = 1 },
+        radioRings = { Hex("#FFFFFF"), Hex("#EEEEEE") } })
+    local both = Named("_Ring$")[1]
+    local bothSizes = Named("_Ring%d+_Size$")
+    assert_eq("with a bevel, the first ring is 10 wide", WidthOf(bothSizes[1]), 10)
+    assert_eq("with a bevel, the second ring is 6 wide", WidthOf(bothSizes[2]), 6)
+    assert_eq("with a bevel, the ring is centred on the light circle", PadOf(both, bothSizes[1]), { 1, 1, 0, 0 })
+    assert_eq("with a bevel, the dot is centred on the light circle", PadOf(both, Named("_DotSize$")[1]), { 1, 1, 0, 0 })
+    assert_eq("with a bevel, the ring size is shown hit-test invisible", bothSizes[1].visibility, 3)
+
+    -- A disabled radio hides the hover ring and shows its normal look.
+    local hoverOpt = BuildOption({ radioRings = rings, radioHoverRing = Hex("#F9A63A") })
+    rawset(hoverOpt.widget, "IsHovered", function() return true end)
+    local pollCtx = { Input = { ReleaseClick = function() return false end } }
+    Radio._pollOption(hoverOpt, pollCtx)
+    assert_eq("a hovered option shows its ring", hoverOpt.hoverRing.visibility, 3)
+    Radio.onItemState({ optionCtrls = { hoverOpt } }, false, true, {})
+    assert_eq("disabling the radio hides the hover ring", hoverOpt.hoverRing.visibility, 2)
+    assert_eq("disabling the radio shows the normal state", hoverOpt.paint.lastState, "normal")
+    Radio.onItemState({ optionCtrls = { hoverOpt } }, true, true, {})
+    assert_eq("enabling the radio leaves the ring to the poll", hoverOpt.hoverRing.visibility, 2)
+
+    BuildOption({})
+    assert_eq("without the new fields there are no ring circles", #Named("_Ring%d+$"), 0)
+    assert_eq("without the new fields there is no hover ring", #Named("_RadioHover$"), 0)
+    assert_eq("without the new fields there is no bevel", #Named("_RadioBevel"), 0)
+    assert_eq("without the new fields the off ring is built as today", #Named("_RingOff$"), 1)
+    assert_eq("without the new fields the on ring is built as today", #Named("_RingOn$"), 1)
+
+    StaticConstructObject, FName, StaticFindObject = realConstruct, realFName, realFindObject
+end

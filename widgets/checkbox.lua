@@ -223,13 +223,39 @@ local function BuildCheck(ctx, name, t, m, themeH)
     local radius = ScaleRadius(BoxRadius(t, themeH), m)
     local edgeWidth = t.checkEdgeWidth or 1
     local stack = umg.Construct("/Script/UMG.Overlay", ctx.contentBox, name .. "_Box")
-    local off = paint.Box(stack, name .. "_BoxOff",
-        { fill = t.checkOff, outline = t.checkEdge, width = edgeWidth, radius = radius }, 0)
-    local on = paint.Box(stack, name .. "_BoxOn",
-        { fill = t.checkOn, outline = t.checkEdgeOn, width = edgeWidth, radius = radius }, 0)
+    local off, on
+    if t.checkFace ~= nil then
+        -- The face is one gradient under both looks, so only the outline swaps with the state. The
+        -- outlines have a clear fill, so the gradient shows through them.
+        local faceRadius = type(radius) == "number" and math.max(0, radius - edgeWidth) or 0
+        local face = paint.Gradient(stack, name .. "_CheckFace", { stops = t.checkFace, radius = faceRadius })
+        AddToOverlay(paint, stack, face, edgeWidth)
+        -- Hit-test invisible, so the strips never take a click from the toggle under them.
+        SetShown(face, true)
+        off = paint.Box(stack, name .. "_BoxOff",
+            { fill = Alpha(t.checkEdge, 0), outline = t.checkEdge, width = edgeWidth, radius = radius }, 0)
+        on = paint.Box(stack, name .. "_BoxOn",
+            { fill = Alpha(t.checkEdgeOn or t.checkEdge, 0), outline = t.checkEdgeOn or t.checkEdge,
+                width = edgeWidth, radius = radius }, 0)
+    else
+        off = paint.Box(stack, name .. "_BoxOff",
+            { fill = t.checkOff, outline = t.checkEdge, width = edgeWidth, radius = radius }, 0)
+        on = paint.Box(stack, name .. "_BoxOn",
+            { fill = t.checkOn, outline = t.checkEdgeOn, width = edgeWidth, radius = radius }, 0)
+    end
     local mark = BuildMark(ctx, name, t.checkMark, m)
     AddToOverlay(paint, stack, off, 0)
     AddToOverlay(paint, stack, on, 0)
+    -- The hover ring is a 2-unit outline just inside the edge. It is shown while the pointer is over
+    -- the toggle (Checkbox.poll) and written hidden here, before the tree is first shown.
+    local hover = nil
+    if t.checkHoverRing ~= nil then
+        local ringRadius = type(radius) == "number" and math.max(0, radius - edgeWidth) or 0
+        hover = paint.Box(stack, name .. "_CheckHover",
+            { fill = Alpha(t.checkHoverRing, 0), outline = t.checkHoverRing, width = 2, radius = ringRadius }, 0)
+        AddToOverlay(paint, stack, hover, edgeWidth)
+        SetShown(hover, false)
+    end
     AddToOverlay(paint, stack, mark, 0)
     -- A sunken bevel goes over the whole box, as Windows Classic draws its check box. The bevel's
     -- lines are their own shapes and are never swapped, so the on and off shapes stay as they are.
@@ -237,7 +263,7 @@ local function BuildCheck(ctx, name, t, m, themeH)
     if t.checkBevel ~= nil then
         boxed = paint.Bevelled(ctx.contentBox, name .. "_BoxBevel", stack, t.checkBevel, true)
     end
-    return Sized(umg, ctx.contentBox, name .. "_Size", boxed, 20 * m, 20 * m), { on, mark }, { off }
+    return Sized(umg, ctx.contentBox, name .. "_Size", boxed, 20 * m, 20 * m), { on, mark }, { off }, hover
 end
 
 --- A chip that reads On or Off. Each word is its own TextBlock in its own colour, so switching
@@ -280,6 +306,20 @@ local function ShowOn(ctrl, on)
     end
 end
 
+--- Show the hover ring while the pointer is over the toggle, and hide it otherwise. The state is
+--- the one the shape button last showed, so a disabled toggle shows no ring.
+local function ShowHoverRing(ctrl)
+    if ctrl.hoverRing == nil or ctrl.paint == nil then
+        return
+    end
+    local state = ctrl.paint.lastState
+    local hot = state == "hover" or state == "pressed"
+    if ctrl.ringShown ~= hot then
+        ctrl.ringShown = hot
+        SetShown(ctrl.hoverRing, hot)
+    end
+end
+
 --- Build a themed toggle: Button(clear, with a hover wash) > row(label, control). Returns the
 --- root to add to the content box and the live control fields.
 local function BuildShaped(ctx, variant, current, t)
@@ -297,9 +337,9 @@ local function BuildShaped(ctx, variant, current, t)
     -- The control shows the state, so the caption is the label alone, without ": ON" or ": OFF".
     umg.SetLabelText(label, paint.Caption(item.label, body))
 
-    local control, onShapes, offShapes
+    local control, onShapes, offShapes, hoverRing
     if variant == "check" then
-        control, onShapes, offShapes = BuildCheck(ctx, name, t, m, themeH)
+        control, onShapes, offShapes, hoverRing = BuildCheck(ctx, name, t, m, themeH)
     elseif variant == "text" then
         control, onShapes, offShapes = BuildText(ctx, name, t, resolved, m, themeH)
     else
@@ -338,6 +378,7 @@ local function BuildShaped(ctx, variant, current, t)
         paint = sb,
         onShapes = onShapes,
         offShapes = offShapes,
+        hoverRing = hoverRing,
     }
     -- Every shape's first visibility is written here, before the tree is first shown.
     ShowOn(ctrl, current)
@@ -449,6 +490,7 @@ function Checkbox.poll(ctrl, ctx)
     end
     if ctrl.shaped then
         ctx.paint.TrackPointer(ctrl.paint)
+        ShowHoverRing(ctrl)
         if ctx.Input.ReleaseClick(ctrl, ctrl.widget) then
             FireToggle(ctrl, ctx, "release")
         end
@@ -498,6 +540,7 @@ function Checkbox.onItemState(ctrl, enabled, _visible, ctx)
     end
     if paint ~= nil and ctrl.paint ~= nil then
         paint.ShowState(ctrl.paint, "normal")
+        ShowHoverRing(ctrl)
     end
 end
 

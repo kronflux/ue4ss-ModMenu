@@ -145,6 +145,7 @@ local function OptionContent(umg, outer, name, caption, theme)
         text:SetJustification(1)
     end)
     local on, off = {}, {}
+    local hover = nil
 
     if variant == "tabs" then
         local stack = umg.Construct("/Script/UMG.VerticalBox", content, name .. "_Stack")
@@ -176,17 +177,61 @@ local function OptionContent(umg, outer, name, caption, theme)
         local ring = umg.Construct("/Script/UMG.Overlay", content, name .. "_Ring")
         local edge = cs.radioEdge or p.text
         local fillOn = cs.radioFill or cs.markFill
-        local ringOff = Paint.Box(ring, name .. "_RingOff", { fill = Clear(edge), outline = edge, width = 1,
-            radius = 1, pill = true }, 0)
-        local ringOn = Paint.Box(ring, name .. "_RingOn", { fill = fillOn, outline = fillOn, width = 1,
-            radius = 1, pill = true }, 0)
-        local dot = Paint.Box(ring, name .. "_Dot", { fill = cs.markText or p.text, radius = 1, pill = true }, 0)
-        OverlayAdd(ring, ringOff, 0)
-        OverlayAdd(ring, ringOn, 0)
-        OverlayAdd(ring, Sized(umg, ring, name .. "_DotSize", dot, 6, 6), 0, H_CENTER, V_CENTER)
-        on[#on + 1] = ringOn
+        local rings = cs.radioRings
+        local bevel = cs.radioBevel
+        local custom = rings ~= nil or bevel ~= nil
+        local dotFill = cs.markText or p.text
+        local centre = 0
+        if custom then
+            -- A drawn radio (Windows themes): the circles below are always shown, and choosing only
+            -- shows the dot, which takes the mark fill.
+            dotFill = cs.markFill or dotFill
+            local base = 0
+            if bevel ~= nil and bevel.dark ~= nil and bevel.light ~= nil then
+                -- An outer dark circle, and an inner light one offset 1 down and right.
+                local dark = Paint.Box(ring, name .. "_RadioBevelDark", { fill = bevel.dark, radius = 1, pill = true }, 0)
+                local light = Paint.Box(ring, name .. "_RadioBevelLight", { fill = bevel.light, radius = 1, pill = true }, 0)
+                OverlayAdd(ring, dark, 0)
+                OverlayAdd(ring, light, { 1, 1, 0, 0 })
+                SetShown(dark, true)
+                SetShown(light, true)
+                base = 2
+                -- The light circle is centred half a unit down and right of the dark one, so the
+                -- rings and the dot take the same offset to stay centred on it.
+                centre = { 1, 1, 0, 0 }
+            end
+            -- Concentric circles from the edge inwards, the i-th inset (i - 1) * 2 units a side.
+            for i, color in ipairs(rings or {}) do
+                local d = math.max(2, 14 - 2 * base - 4 * (i - 1))
+                -- Without a bevel, the outermost circle carries the edge, as the XP radio's dark blue one.
+                local edged = i == 1 and bevel == nil and cs.radioEdge ~= nil
+                local circle = Paint.Box(ring, name .. "_Ring" .. i, { fill = color, radius = 1, pill = true,
+                    outline = edged and cs.radioEdge or nil, width = edged and 1 or 0 }, 0)
+                local sized = Sized(umg, ring, name .. "_Ring" .. i .. "_Size", circle, d, d)
+                OverlayAdd(ring, sized, centre, H_CENTER, V_CENTER)
+                SetShown(sized, true)
+            end
+        else
+            local ringOff = Paint.Box(ring, name .. "_RingOff", { fill = Clear(edge), outline = edge, width = 1,
+                radius = 1, pill = true }, 0)
+            local ringOn = Paint.Box(ring, name .. "_RingOn", { fill = fillOn, outline = fillOn, width = 1,
+                radius = 1, pill = true }, 0)
+            OverlayAdd(ring, ringOff, 0)
+            OverlayAdd(ring, ringOn, 0)
+            on[#on + 1] = ringOn
+            off[#off + 1] = ringOff
+        end
+        -- The hover ring is a 2-unit outline just inside the edge, shown while the pointer is over
+        -- the option (Radio._pollOption) and written hidden here, before the tree is first shown.
+        if cs.radioHoverRing ~= nil then
+            hover = Paint.Box(ring, name .. "_RadioHover", { fill = Clear(cs.radioHoverRing),
+                outline = cs.radioHoverRing, width = 2, radius = 1, pill = true }, 0)
+            OverlayAdd(ring, hover, 1)
+            SetShown(hover, false)
+        end
+        local dot = Paint.Box(ring, name .. "_Dot", { fill = dotFill, radius = 1, pill = true }, 0)
+        OverlayAdd(ring, Sized(umg, ring, name .. "_DotSize", dot, 6, 6), centre, H_CENTER, V_CENTER)
         on[#on + 1] = dot
-        off[#off + 1] = ringOff
         local line = umg.Construct("/Script/UMG.HorizontalBox", content, name .. "_Line")
         local ringSlot = line:AddChildToHorizontalBox(Sized(umg, line, name .. "_RingSize", ring, 14, 14))
         pcall(function()
@@ -211,7 +256,7 @@ local function OptionContent(umg, outer, name, caption, theme)
         on[#on + 1] = mark
         OverlayAdd(content, text, { 8, 5, 8, 5 }, H_CENTER, V_CENTER)
     end
-    return content, text, on, off
+    return content, text, on, off, hover
 end
 
 --- Build one themed option as a Paint state button with a transparent face that washes in on
@@ -225,7 +270,7 @@ end
 ---@return table opt
 function Radio._buildOption(umg, outer, name, caption, theme, onClick)
     local cs, p = theme.cs, theme.p
-    local content, text, on, off = OptionContent(umg, outer, name, caption, theme)
+    local content, text, on, off, hover = OptionContent(umg, outer, name, caption, theme)
     local wash = {
         normal = { fill = Alpha(p.text, 0), radius = cs.radius, pill = cs.pill },
         hover = { fill = Alpha(p.text, 0.08), radius = cs.radius, pill = cs.pill },
@@ -240,6 +285,7 @@ function Radio._buildOption(umg, outer, name, caption, theme, onClick)
         text = text,
         marksOn = on,
         marksOff = off,
+        hoverRing = hover,
         theme = theme,
         enabled = true,
         wasPressed = false,
@@ -287,6 +333,14 @@ function Radio._pollOption(opt, ctx)
         return
     end
     Paint.TrackPointer(opt.paint)
+    if opt.hoverRing ~= nil then
+        local state = opt.paint.lastState
+        local hot = state == "hover" or state == "pressed"
+        if opt.ringShown ~= hot then
+            opt.ringShown = hot
+            SetShown(opt.hoverRing, hot)
+        end
+    end
     if ctx.Input.ReleaseClick(opt, opt.widget) then
         FireThemedOption(opt, ctx)
     end
@@ -579,6 +633,23 @@ function Radio.pollClick(ctrl, ctx)
         end
     end
     return false
+end
+
+--- ItemState calls this when the radio's state changes. The shell stops polling a disabled control,
+--- so a hover ring shown at that moment would stay; a disabled themed option shows its normal look.
+function Radio.onItemState(ctrl, enabled, _visible, _ctx)
+    if enabled then
+        return
+    end
+    for _, opt in ipairs(ctrl.optionCtrls or {}) do
+        if opt.paint ~= nil then
+            Paint.ShowState(opt.paint, "normal")
+        end
+        if opt.hoverRing ~= nil then
+            opt.ringShown = false
+            SetShown(opt.hoverRing, false)
+        end
+    end
 end
 
 --- Paint the given value as chosen. A nil value clears the choice. A value that no option holds
