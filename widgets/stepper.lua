@@ -228,9 +228,23 @@ function Stepper.build(ctx)
         states = States(resolved, item)
         caption = Button.CaptionStyle(ctx, states)
     end
+    -- With stepper.arrows and a field.arrow look, the buttons are left and right arrow buttons.
+    local arrowStyle = nil
+    if resolved ~= nil and Style.ForItem(resolved, "stepper", item.look).arrows == true then
+        arrowStyle = Style.ForItem(resolved, "field", nil).arrow
+        if arrowStyle ~= nil then
+            arrowStyle = Paint.TouchArrow(arrowStyle, ctx.config)
+        end
+    end
     local function AddButton(key, text, dir)
         local button_ctrl
-        if states ~= nil then
+        local placed
+        if arrowStyle ~= nil then
+            local built = Paint.ArrowButton(root, name .. "_" .. key, arrowStyle, dir < 0 and "left" or "right",
+                { fill = Style.ForItem(resolved, "field", nil).fill })
+            button_ctrl = built.button
+            placed = built.root
+        elseif states ~= nil then
             -- A flat look gives CreateFilledButton's tree in the same colours, so light and dark
             -- keep today's stepper buttons.
             button_ctrl = Paint.StateButton(root, name .. "_" .. key, states, text, caption)
@@ -242,7 +256,7 @@ function Stepper.build(ctx)
         end
         button_ctrl.dir = dir
         pcall(function()
-            local slot = root:AddChildToHorizontalBox(button_ctrl.root)
+            local slot = root:AddChildToHorizontalBox(placed or button_ctrl.root)
             slot:SetSize({ SizeRule = 0, Value = 0.0 })
             slot:SetPadding({ Left = BUTTON_GAP, Top = 0, Right = 0, Bottom = 0 })
             slot:SetVerticalAlignment(2)

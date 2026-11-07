@@ -19,6 +19,7 @@ Dropdown.type = "dropdown"
 
 local VIS_VISIBLE = 0
 local VIS_COLLAPSED = 1
+local VIS_HIT_TEST_INVISIBLE = 3
 
 local DROPDOWN_LIST_MAX_HEIGHT = 320
 local DROPDOWN_SEARCHABLE_MAX_ROWS = 400
@@ -289,15 +290,33 @@ local function CreatePicker(outer, namePrefix, options, selectedValue, dropOpts,
         valueSlot:SetVerticalAlignment(2)
     end)
 
-    local arrowLabel = Umg.Construct("/Script/UMG.TextBlock", headerRow, namePrefix .. "_Arrow")
-    Umg.StyleText(arrowLabel, fontDropdown, headerText, headerSpec)
-    Umg.SetLabelText(arrowLabel, "▼")
-    local arrowSlot = headerRow:AddChildToHorizontalBox(arrowLabel)
-    pcall(function()
-        arrowSlot:SetSize({ SizeRule = 0, Value = 0.0 })
-        arrowSlot:SetPadding({ Left = 4, Top = 8, Right = 10, Bottom = 8 })
-        arrowSlot:SetVerticalAlignment(2)
-    end)
+    local arrowLabel, arrowBtn
+    local arrowStyle = themed ~= nil and themed.field.arrow or nil
+    if arrowStyle ~= nil then
+        -- The arrow button is decoration: shown hit-test invisible, so a click anywhere on the
+        -- header still reaches the header button.
+        arrowBtn = Paint.ArrowButton(headerRow, namePrefix .. "_ArrowBtn", Paint.TouchArrow(arrowStyle, config), "down",
+            { fill = themed.field.fill })
+        pcall(function()
+            arrowBtn.root:SetVisibility(VIS_HIT_TEST_INVISIBLE)
+        end)
+        local arrowSlot = headerRow:AddChildToHorizontalBox(arrowBtn.root)
+        pcall(function()
+            arrowSlot:SetSize({ SizeRule = 0, Value = 0.0 })
+            arrowSlot:SetPadding({ Left = 4, Top = 2, Right = 2, Bottom = 2 })
+            arrowSlot:SetVerticalAlignment(2)
+        end)
+    else
+        arrowLabel = Umg.Construct("/Script/UMG.TextBlock", headerRow, namePrefix .. "_Arrow")
+        Umg.StyleText(arrowLabel, fontDropdown, headerText, headerSpec)
+        Umg.SetLabelText(arrowLabel, "▼")
+        local arrowSlot = headerRow:AddChildToHorizontalBox(arrowLabel)
+        pcall(function()
+            arrowSlot:SetSize({ SizeRule = 0, Value = 0.0 })
+            arrowSlot:SetPadding({ Left = 4, Top = 8, Right = 10, Bottom = 8 })
+            arrowSlot:SetVerticalAlignment(2)
+        end)
+    end
 
     local headerPaint
     if themed == nil then
@@ -407,6 +426,7 @@ local function CreatePicker(outer, namePrefix, options, selectedValue, dropOpts,
         headerPaint = headerPaint,
         headerLabel = valueLabel,
         arrowLabel = arrowLabel,
+        arrowBtn = arrowBtn,
         optionsBox = optionsBox,
         optionRows = {},
         optionBg = colors.dropdownOptionBg,
@@ -421,6 +441,9 @@ local function CreatePicker(outer, namePrefix, options, selectedValue, dropOpts,
     -- Option buttons spawn on first expand, not at menu build.
     return root, picker
 end
+
+-- The spec builds a header from a fake UMG through this.
+Dropdown._createPicker = CreatePicker
 
 function Dropdown.validate(item, sectionId, index)
     local prefix = string.format("Register(%s) items[%d]", tostring(sectionId), index)
@@ -525,6 +548,7 @@ function Dropdown.liveControl(picker, extra)
         headerPaint = picker.headerPaint,
         headerLabel = picker.headerLabel,
         arrowLabel = picker.arrowLabel,
+        arrowBtn = picker.arrowBtn,
         optionsBox = picker.optionsBox,
         optionRows = picker.optionRows,
         optionBg = picker.optionBg,
@@ -598,6 +622,10 @@ function Dropdown.poll(ctrl, ctx)
         end
     end
     Track(ctrl.headerPaint)
+    if ctrl.arrowBtn ~= nil and ctrl.headerPaint ~= nil then
+        -- The arrow is hit-test invisible and never sees the pointer, so it shows the header's state.
+        Paint.ShowState(ctrl.arrowBtn.button, ctrl.headerPaint.lastState or "normal")
+    end
     if Input.ReleaseClick(ctrl, ctrl.headerBtn) then
         ToggleHeader(ctrl, ctx, "release")
     end

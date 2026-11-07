@@ -193,7 +193,33 @@ function Number.build(ctx)
         stepStates = Stepper._states(ctx.config.resolved, {})
         stepCaption = Button.CaptionStyle(ctx, stepStates)
     end
+    -- With field.arrow the two step buttons are an up and a down arrow button stacked in a
+    -- VerticalBox, each arrow.size wide and arrow.size/2 + 1 tall.
+    local function AddArrowStack(row, arrow)
+        local stack = umg.Construct("/Script/UMG.VerticalBox", row, ctx.namePrefix .. "_StepStack")
+        -- Under touch each button is at least 28 on both sides; otherwise size by size/2 + 1.
+        local touch = ctx.config.pointerMode == "touch"
+        arrow = Paint.TouchArrow(arrow, ctx.config)
+        local cellHeight = touch and arrow.size or math.floor((arrow.size or 17) / 2) + 1
+        for _, spec in ipairs({ { key = "StepUp", direction = "up", dir = 1 }, { key = "StepDown", direction = "down", dir = -1 } }) do
+            local stepName = ctx.namePrefix .. "_" .. spec.key
+            local built = Paint.ArrowButton(stack, stepName, arrow, spec.direction, { height = cellHeight, fill = field.fill })
+            built.button.dir = spec.dir
+            stack:AddChildToVerticalBox(built.root)
+            table.insert(stepButtons, built.button)
+        end
+        local slot = row:AddChildToHorizontalBox(stack)
+        pcall(function()
+            slot:SetSize({ SizeRule = 0, Value = 0.0 })
+            slot:SetPadding({ Left = 6, Top = 0, Right = 0, Bottom = 0 })
+            slot:SetVerticalAlignment(2)
+        end)
+    end
     local function AddStepButtons(row)
+        if field ~= nil and field.arrow ~= nil then
+            AddArrowStack(row, field.arrow)
+            return
+        end
         local colors = Theme.Of(ctx.config)
         for _, spec in ipairs({ { key = "minus", text = "-" }, { key = "plus", text = "+" } }) do
             local stepName = ctx.namePrefix .. "_" .. spec.key
@@ -301,6 +327,12 @@ end
 --- ItemState calls this when the number's state changes. The shell stops polling a disabled
 --- number, so a press on a step button is dropped here rather than fired once it is enabled again.
 function Number.onItemState(ctrl, enabled, _visible, ctx)
+    -- A shaped (arrow) step button shows its disabled shape; a flat one keeps today's look.
+    for _, stepCtrl in ipairs(ctrl.stepButtons or {}) do
+        if stepCtrl.flat == false then
+            Paint.SetEnabled(stepCtrl, enabled)
+        end
+    end
     if enabled then
         return
     end
