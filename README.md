@@ -1168,6 +1168,23 @@ ModMenu.Init({
 | `frost` | Frost | Ice with glints |
 | `mac-light` | macOS Light | Window with traffic lights |
 | `mac-dark` | macOS Dark | Window with traffic lights |
+| `xp-luna` | Windows XP | Luna Blue |
+| `xp-luna-silver` | Windows XP | Luna Silver |
+| `xp-luna-olive` | Windows XP | Luna Olive Green |
+| `xp-embedded` | Windows XP | Embedded |
+| `xp-royale` | Windows XP | Royale |
+| `xp-royale-noir` | Windows XP | Royale Noir |
+| `xp-zune` | Windows XP | Zune |
+| `windows-classic` | Windows 98 | Windows Classic |
+
+The eight Windows presets copy the colours, title bars, tabs, push buttons, fields, check boxes, radio buttons, sliders, progress bars and scrollbars of the matching Windows theme. They are drawn from boxes and solid colours, with no textures, so some shapes are approximations:
+
+- The radio button's shading is concentric rings, not a radial gradient.
+- The slider's pointer thumb is a box with rounded bottom corners.
+- Arrow triangles are built from stacked bars.
+- The scrollbar thumb is one colour. It has no grip lines and no arrow buttons.
+- The font is Roboto, because Tahoma is not a game font.
+- ModMenu has no mixed check state, no menu bar, no tree or list view and no group box frame, so the presets do not draw them.
 
 `theme` also takes a theme definition table with the same shape as a preset file, so you can write a custom theme in code. `ModMenu.ResolveStyle(theme, style, colors)` returns the complete style that `Init` would draw, without building any widget, for tests and tools.
 
@@ -1190,6 +1207,7 @@ A theme is split into object types. Each type styles one kind of part, and `styl
 | `field` | `textinput`, `number` and `keybind` items, and the `dropdown` header |
 | `list` | The dropdown's option list |
 | `stepper` | `stepper` items |
+| `scroll` | The scrollbar of the panel and of the dropdown list |
 | `tooltip` | The tooltip card |
 | `confirm` | The confirm card and the dim overlay behind it |
 | `motion` | Animations, listed under **Motion** below |
@@ -1227,6 +1245,8 @@ The caption buttons do not move or resize the menu. Minimise and close both clos
 
 Set `header.captions = "close"` to draw only the close button. The default is `"all"`.
 
+On the `xpbar` title bar the caption glyphs are white. Set `header.captionGlyph` to a colour to change them; Luna Silver sets it to a dark colour.
+
 ```lua
 ModMenu.Init({
     theme = "slate",
@@ -1242,12 +1262,70 @@ These field kinds are new. Each is listed in `themes/fields.json`.
 - `bevel`: raised or sunken light and dark edge lines, with an optional inner ring.
 - `faces`: a fill and text colour for each button role.
 - `xpface`: an XP button's `edge`, `glow` and `defaultRing` colours, plus its `face` and `pressedFace` gradients.
+- `button.defaultEdge` (a `color`): draws a 1-unit outline over the outer row of a primary `classic` button's bevel, in every state. Unset, the button has no outline.
 - `frame`: an outlined or bevelled box around a trough, with padding.
 - `statusbar`: a status strip with its fill, line and text.
+- `arrowbutton`: a square button with a triangle on it, with the fixed keys below.
 
-An override of a `bevel`, `frame`, `statusbar`, `xpface` or `faces` field merges key by key, so you change one key and keep the rest. An override of a `stops` field replaces the whole list.
+An override of a `bevel`, `frame`, `statusbar`, `xpface`, `faces` or `arrowbutton` field merges key by key, so you change one key and keep the rest. An override of a `stops` field replaces the whole list.
 
 The `button` type has two new variants: `xp` and `classic`. Set `button.variant` in a theme to use one. `header.variant` takes `window`, `mac`, `xpbar` or `classic`, as above.
+
+An `arrowbutton` value, like `frame`, merges key by key. A borrowed `arrowbutton` keeps its `radius`, `size` and `bevel.width`, and drops its colours.
+
+| Key | Kind | Effect |
+|-----|------|--------|
+| `face` | `stops` | Gradient of the button at rest |
+| `hoverFace` | `stops` | Gradient on hover; `face` when unset |
+| `pressedFace` | `stops` | Gradient while pressed; `face` when unset |
+| `edge` | colour | Outline |
+| `glyph` | colour | The triangle |
+| `radius` | radius | Corner radius |
+| `bevel` | `bevel` | Raised edge that sinks when pressed, as on the Classic push button |
+| `size` | number | Width in units; the default is 17 |
+
+### Fields for Windows controls
+
+Each field below is off until you set it. With the field unset, the control draws as before.
+
+| Type | Field | Effect |
+|------|-------|--------|
+| `tabs` | `variant = "xp"` | Tabs with rounded top corners. The selected tab is `markFill`, 2 units taller, and joins the pane below it |
+| `tabs` | `faceStops` | Gradient of an unselected `xp` tab, top to bottom |
+| `tabs` | `markLine`, `markLineStops` | The 3-unit top line on the selected tab, and on a hovered tab. `markLineStops` draws it as a gradient |
+| `toggle` | `checkFace` | `stops` that fill the check box inside, inside the `checkEdge` outline |
+| `toggle` | `checkHoverRing` | Colour of a 2-unit inner ring that shows on hover |
+| `choice` | `radioRings` | `stops` drawn as concentric circles from the edge inwards, for a light-centre radio button |
+| `choice` | `radioHoverRing` | Colour of the inner ring on hover |
+| `choice` | `radioBevel` | A `bevel` drawn as two circles, dark outside and light inside, the inner one 1 unit down and right |
+| `slider` | `variant = "pointer"` | A thumb `thumbWidth` wide with top corners `thumbRadius` and bottom corners at half the width |
+| `slider` | `ticks` | A number of tick marks under the track, in `tickColor` |
+| `slider` | `trackLight` | Draws the track sunken, with a line of this colour under the `track` line |
+| `field` | `arrow` | An `arrowbutton`. The dropdown header shows it in place of the text arrow, and a `number` item with `step` shows an up and a down arrow button in place of plus and minus |
+| `stepper` | `arrows = true` | The stepper's buttons become left and right arrow buttons in the `field.arrow` look |
+| `header` | `captionGlyph` | Colour of the `xpbar` caption glyphs |
+
+### The `scroll` type
+
+`scroll` styles the scrollbar of the panel and of the dropdown list. When a theme sets none of its fields, the bar keeps its current look.
+
+| Field | Kind | Effect |
+|-------|------|--------|
+| `track` | colour | The bar's background |
+| `thumb` | colour | The thumb |
+| `thumbHover` | colour | The thumb on hover and while dragged |
+| `thumbEdge` | colour | The thumb's outline |
+| `thumbRadius` | radius | The thumb's corner radius |
+| `width` | number | The bar's thickness. On a touch device it stays 28 |
+
+The native bar has no arrow buttons and takes one colour for the thumb, so `scroll` cannot draw XP's gradient thumb or grip lines. The library writes the brushes before the menu first shows. If the engine ignores a write, that part keeps its current look.
+
+```lua
+ModMenu.Init({
+    theme = "slate",
+    style = { scroll = { thumb = "#4A90D9", thumbHover = "#6AB0F9", width = 14 } },
+})
+```
 
 ### Borrowing an object type from another preset
 

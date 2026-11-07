@@ -18,11 +18,13 @@ The lab opens on F7 or the console command `modmenulab`. Lines go to `UE4SS.log`
 
 ## Test steps
 
-Record the result of each step as the log lines it produced. A step with no line is a failure.
+Record the result of each step as the log lines it produced. A step with no line is a failure,
+except the visual-only steps T7, T11, T15, T16, T17, T19 and T26, whose expected column describes
+only what to see. Judge those by sight and record what you saw.
 
 | Step | Action | Expected log line |
 |---|---|---|
-| 1 | Launch the game, wait for the main menu | `Init ok`, nine `Register ... ok` lines, the first for `LabTheme` |
+| 1 | Launch the game, wait for the main menu | `Init ok`, ten `Register ... ok` lines, the first for `LabTheme` |
 | 2 | Press F7 | `[ModMenu] OPEN tag=ModMenuLab`, no crash |
 | 3 | Buttons tab: hover the `default` button, then move off | `button b_default pointer state hover`, then `normal`; note whether the fill changed colour or only showed the stock grey |
 | 4 | Buttons tab: click `default` | `click path=...`, `b_default -> nil` |
@@ -60,7 +62,7 @@ Each switch writes two lines. The lab writes `theme -> <id>`, and the library wr
 | T1 | Press F7, then click the Theme tab | `[ModMenu] OPEN tag=ModMenuLab`; the dropdown shows `dark` |
 | T2 | Click `Next theme` | `theme -> slate`, then `[ModMenu] built theme=slate ...`; the menu stays open in Slate and the dropdown shows `slate` |
 | T3 | Click `Next theme` until the dropdown shows `dark` again, taking a screenshot of each preset | one `theme -> <id>` and one `built theme=<id>` line per click, for every id from `ModMenu.Themes()` in order; no crash |
-| T4 | Pick `light` in the dropdown first, then click `Previous theme` | `theme -> mac-dark`; the list wraps to the last preset |
+| T4 | Pick `light` in the dropdown first, then click `Previous theme` | `theme -> windows-classic`; the list wraps to the last preset |
 | T5 | Pick `glass` in the dropdown | `theme -> glass`, then `built theme=glass ...` |
 | T6 | Pick `slate`, then `light`, and compare the two `built` lines | `ms` under 250 for slate; slate's `widgets` at most 3 times light's |
 | T7 | In each screenshot, check the buttons, toggles, choices and panel corners | no engine-default grey button, no light rim on a rounded shape, no blur outside the panel's corners |
@@ -74,6 +76,43 @@ Each switch writes two lines. The lab writes `theme -> <id>`, and the library wr
 | T15 | On any preset except `light` and `dark`, open the tab with the most sections | sections fade in one after another with no visible stutter |
 | T16 | Check the values that need an in-game look: the macOS title bar's vertical position and `cozy` buttons at least 38 tall | each matches the intended look |
 | T17 | On `light` and `dark`, open the menu and click any button | nothing animates: no fade on open and no pop |
+
+## Windows preset steps
+
+The Windows tab holds one of each control the Windows presets restyle: two check boxes, radio
+buttons, a slider with ticks, a dropdown, a number field with step 5, a stepper, a progress bar,
+and 30 filler lines below them so the panel scrollbar shows. The tab strip is the tab look.
+
+Run steps T18 to T27 once for each of the eight presets, in this order: `xp-luna`,
+`xp-luna-silver`, `xp-luna-olive`, `xp-embedded`, `xp-royale`, `xp-royale-noir`, `xp-zune`,
+`windows-classic`. Pick the preset in the Theme tab, then open the Windows tab. Compare each
+preset with its reference screenshot, which is supplied with this round and kept outside the
+repository. The files are in `C:/Users/Richard/Workspace/UE4SS-UI/` and are named
+`xp_luna_sample.png`, `xp_luna_silver_sample.png`, `xp_luna_olive_sample.png`,
+`xp_embedded_sample.png`, `xp_royale_sample.png`, `xp_royale_noir_sample.png`,
+`xp_zune_sample.png` and `9x_classic_sample.png`, in the order of the presets above. The builder
+previews are in `.hyperfocus/previews/<id>.png`, with a `<id>-scrolled.png` beside each.
+
+Some shapes are approximations that the menu can draw without textures. The radio's shading is
+concentric rings. The slider's pointer thumb is a box with rounded bottom corners. Arrow
+triangles are stacked bars. The scrollbar thumb is one colour, with no arrow buttons. The font is
+Roboto, not Tahoma. Do not record these as failures.
+
+| Step | Action | Expected log line |
+|---|---|---|
+| T18 | Pick the preset in the Theme tab | `theme -> <id>`, then `[ModMenu] built theme=<id> ...` with `ms` under 250; no crash |
+| T19 | Look at the tab strip, then hover an unselected tab | the selected tab sits higher, is filled like the pane, and has the coloured top line; the hovered tab shows the same line, and it goes when the pointer leaves |
+| T20 | Windows tab: hover each check box and click the first | the box has the preset's gradient or flat fill and a hover ring; `w_chk_off -> true`, and the box shows its mark |
+| T21 | Windows tab: hover each radio button and click `Second` | rings or bevel show, with a hover ring; `w_radio -> Second` and the dot moves |
+| T22 | Windows tab: drag the slider and release | the thumb is a pointer shape with a tick row under the track; `w_slider -> ...` in steps of 10 |
+| T23 | Windows tab: click the dropdown's arrow button, then pick `Gamma` | the list opens from the arrow button; `w_drop -> Gamma`; the arrow button shows hover and pressed looks |
+| T24 | Windows tab: click the number field's up arrow, then its down arrow | `w_num -> 25`, then `w_num -> 20`; the two arrow buttons are stacked at the right |
+| T25 | Windows tab: click the stepper's right arrow, then its left arrow | `w_step -> 4`, then `w_step -> 3`; the buttons are arrows when the preset sets `stepper.arrows` |
+| T26 | Windows tab: scroll with the wheel, then drag the scrollbar thumb | the thumb and track show the preset's colours, and the thumb follows the drag; `w_last` becomes visible at the end |
+| T27 | Click the caption buttons: minimise, then reopen with F7; maximise; close | minimise and close each log `CLOSED tag=ModMenuLab`; maximise logs nothing, the menu pops and stays open |
+
+If T26 shows today's grey scrollbar in a preset that sets `scroll`, the engine ignored the brush
+writes. Record that, because the thickness is then the only change.
 
 ## Comparing runs
 

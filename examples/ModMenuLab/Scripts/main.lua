@@ -100,7 +100,7 @@ local okInit, initErr = pcall(ModMenu.Init, {
     theme = START_THEME,
     -- Fonts are merged across Init calls, so the theme switches below do not pass them again.
     fonts = FONTS,
-    tabs = { "Theme", "Buttons", "Inputs", "Widgets", "Layout", "Controls", "Multi" },
+    tabs = { "Theme", "Buttons", "Inputs", "Widgets", "Layout", "Controls", "Multi", "Windows" },
     consoleCommand = "modmenulab",
     ignoreLook = true,
     autosave = true,
@@ -346,6 +346,35 @@ reg({
               onChange = report("ms_2") },
         } },
     },
+})
+
+-- The Windows tab holds one of each control the Windows presets restyle, then a list long enough
+-- that the panel scrollbar shows. The tab strip itself shows the tab look.
+local windowsItems = {
+    { type = "checkbox", id = "w_chk_off", label = "Check box, off", default = false, onChange = report("w_chk_off") },
+    { type = "checkbox", id = "w_chk_on", label = "Check box, on", default = true, onChange = report("w_chk_on") },
+    { type = "radio", id = "w_radio", label = "Radio buttons", options = { "First", "Second", "Third" },
+      default = "First", onChange = report("w_radio") },
+    { type = "slider", id = "w_slider", label = "Slider with ticks", min = 0, max = 100, step = 10, default = 50,
+      integer = true, onChange = report("w_slider") },
+    { type = "dropdown", id = "w_drop", label = "Dropdown", options = { "Alpha", "Beta", "Gamma", "Delta" },
+      default = "Alpha", onChange = report("w_drop") },
+    { type = "number", id = "w_num", label = "Number with step 5", default = 20, min = 0, max = 100, step = 5,
+      integer = true, onChange = report("w_num") },
+    { type = "stepper", id = "w_step", label = "Stepper", min = 0, max = 10, step = 1, default = 3,
+      integer = true, onChange = report("w_step") },
+    { type = "progress", id = "w_prog", label = "Progress", default = 0.6 },
+    { type = "separator" },
+}
+for i = 1, 30 do
+    windowsItems[#windowsItems + 1] = { type = "label", label = string.format("Scroll filler line %02d", i) }
+end
+windowsItems[#windowsItems + 1] = { type = "button", id = "w_last", label = "Last item", onClick = report("w_last") }
+
+reg({
+    id = "LabWindows", title = "Windows controls", tab = "Windows",
+    description = "One of each control the Windows presets restyle, then a list long enough to show the scrollbar.",
+    items = windowsItems,
 })
 
 -- enabled and visible: each toggle button flips one flag and logs the new value.
