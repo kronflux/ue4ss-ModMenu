@@ -25,6 +25,8 @@ local FIXTURES = {
     "stage2-kinds",
     "stage2-borrow",
     "stage2-merge",
+    "stage3-arrow",
+    "stage3-arrow-borrow",
 }
 
 local function ReadFixture(name)
@@ -129,7 +131,7 @@ for _, name in ipairs({ "light", "dark" }) do
     )
     local nonzero = {}
     for typeName in pairs(Fields.types) do
-        local entry = resolved[typeName]
+        local entry = resolved[typeName] or {}
         for _, key in ipairs({ "radius", "width" }) do
             if entry[key] ~= nil and entry[key] ~= 0 then
                 nonzero[#nonzero + 1] = typeName .. "." .. key
@@ -152,7 +154,7 @@ end
 local function LinearColors(resolved)
     for typeName, kinds in pairs(Fields.types) do
         for field, kind in pairs(kinds) do
-            local v = resolved[typeName][field]
+            local v = (resolved[typeName] or {})[field]
             if kind == "color" and v ~= nil and type(v) ~= "table" then
                 return false
             end
@@ -179,15 +181,32 @@ for _, id in ipairs(Style.Ids()) do
     assert_true("preset " .. id .. " ok", valid)
 end
 
--- Stages 1 and 2 ship light, dark and 32 StyleLab presets; the loop above resolves each of them.
--- The five Windows presets are drafts outside themes/presets until they are polished.
+-- Stages 1 and 2 ship light, dark and 32 StyleLab presets, and stage 3 adds the eight Windows
+-- presets; the loop above resolves each of them. The Windows 11 drafts stay outside themes/presets.
 local ids = Style.Ids()
-assert_eq("Ids holds the 34 presets of stages 1 and 2", #ids, 34)
+assert_eq("Ids holds the 42 presets", #ids, 42)
 assert_eq(
     "Ids ends with the five stage 2 presets in the spec's order",
     { table.unpack(ids, 30, 34) },
     { "terminal", "hologram", "frost", "mac-light", "mac-dark" }
 )
+assert_eq(
+    "Ids ends with mac-dark and the eight Windows presets in the spec's order",
+    { table.unpack(ids, 34, 42) },
+    {
+        "mac-dark", "xp-luna", "xp-luna-silver", "xp-luna-olive", "xp-embedded", "xp-royale", "xp-royale-noir",
+        "xp-zune", "windows-classic",
+    }
+)
+do
+    local classic = Style.Resolve("windows-classic")
+    assert_eq("windows-classic resolves the classic button variant", classic.button.variant, "classic")
+    assert_true("windows-classic sets the radio bevel", type(classic.choice.radioBevel) == "table")
+    assert_true("windows-classic sets the dropdown arrow bevel", type(classic.field.arrow) == "table" and type(classic.field.arrow.bevel) == "table")
+    assert_eq("windows-classic resolves the classic header", classic.header.variant, "classic")
+    assert_true("windows-classic sets the check box bevel", type(classic.toggle.checkBevel) == "table")
+    assert_true("windows-classic sets the field bevel", type(classic.field.bevel) == "table")
+end
 assert_eq("Ids puts nord before terminal", ids[29], "nord")
 do
     assert_eq("mac-light uses the mac header", Style.Resolve("mac-light").header.variant, "mac")
@@ -321,6 +340,30 @@ assert_eq("a faces list is rejected", Bad({ button = { faces = { "x" } } }), "he
 assert_eq("a face entry list is rejected", Bad({ button = { faces = { primary = { "x" } } } }), "here: button.faces.primary: expected table")
 assert_eq("an empty bevel table is accepted", Bad({ panel = { bevel = {} } }), "no error")
 assert_eq("an empty faces table is accepted", Bad({ button = { faces = {} } }), "no error")
+
+-- Stage 3: the arrow button kind, the scroll type and the XP control fields.
+assert_eq("an arrow face needs two stops", Bad({ field = { arrow = { face = { "#FFFFFF" } } } }), "here: field.arrow.face: expected at least 2 colours")
+assert_eq("an arrow names an unknown key", Bad({ field = { arrow = { wobble = 1 } } }), "here: field.arrow.wobble is not a known field")
+assert_eq("an arrow glyph must be a colour", Bad({ field = { arrow = { glyph = "#12" } } }), "here: field.arrow.glyph: expected color")
+assert_eq("an arrow size must be a number", Bad({ field = { arrow = { size = "big" } } }), "here: field.arrow.size: expected number")
+assert_eq("an arrow bevel is checked", Bad({ field = { arrow = { bevel = { light = "#12" } } } }), "here: field.arrow.bevel.light: expected color")
+assert_eq("an arrow list is rejected", Bad({ field = { arrow = { "#000000" } } }), "here: field.arrow: expected arrowbutton")
+assert_eq("an empty arrow table is accepted", Bad({ field = { arrow = {} } }), "no error")
+assert_eq("a scroll colour must be a colour", Bad({ scroll = { thumb = 3 } }), "here: scroll.thumb must be color")
+assert_eq("a scroll names an unknown field", Bad({ scroll = { wobble = 1 } }), "here: scroll.wobble is not a known field")
+assert_eq("a scroll takes its fields", Bad({ scroll = { thumb = "#FF0000", thumbRadius = { 1, 2, 3, 4 }, width = 17 } }), "no error")
+assert_eq("tabs gain the xp variant", Bad({ tabs = { variant = "xp" } }), "no error")
+assert_eq("a slider gains the pointer variant", Bad({ slider = { variant = "pointer" } }), "no error")
+assert_eq("the stepper takes arrows", Bad({ stepper = { arrows = true } }), "no error")
+assert_eq("the stepper arrows field is a boolean", Bad({ stepper = { arrows = 1 } }), "here: stepper.arrows must be boolean")
+assert_eq("a radio ring list needs two colours", Bad({ choice = { radioRings = { "#FFFFFF" } } }), "here: choice.radioRings: expected at least 2 colours")
+assert_eq("a check face needs two colours", Bad({ toggle = { checkFace = { "#FFFFFF" } } }), "here: toggle.checkFace: expected at least 2 colours")
+assert_eq("every new arrow field is in the field list", { Fields.types.field.arrow, Fields.types.scroll.thumbRadius, Fields.types.stepper.arrows }, { "arrowbutton", "radius", "boolean" })
+assert_eq("light resolves no scroll type", Style.Resolve("light").scroll, nil)
+assert_eq("dark resolves no scroll type", Style.Resolve("dark").scroll, nil)
+assert_eq("slate resolves no scroll type", slate.scroll, nil)
+assert_eq("a scroll override resolves", Style.Resolve("slate", { scroll = { thumb = "#FF0000" } }).scroll.thumb, { R = 1, G = 0, B = 0, A = 1 })
+assert_eq("a scroll look borrow of an unset type is empty", Style.ForItem(slate, "scroll"), {})
 
 -- An override of a fixed-key kind is merged key by key, and a look fills the same defaults as Resolve.
 local lookBevel = Style.ForItem(slate, "field", { bevel = { light = "#FFFFFF", dark = "#000000" } })

@@ -173,6 +173,10 @@ local specs = {
     "chrome_spec.lua",
     "effects_spec.lua",
     "motion_spec.lua",
+    "tabs_spec.lua",
+    "widgets_arrows_spec.lua",
+    "scroll_spec.lua",
+    "windows_presets_spec.lua",
 }
 
 -- Specs reach the encoder through this global so they can check its JSON output directly.

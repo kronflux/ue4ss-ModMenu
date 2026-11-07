@@ -1,0 +1,157 @@
+{
+  "id": "windows-classic",
+  "stage": 2,
+  "name": "Windows 98",
+  "subtitle": "Windows Classic",
+  "footer": "Windows Classic: two-ring 3D bevels that press in, a navy-to-sky title bar, sunken fields and radio buttons, and a sunken trough of navy blocks.",
+  "palette": {
+    "bg": "#D4D0C8",
+    "text": "#000000",
+    "muted": "#808080",
+    "accent": "#0A246A",
+    "accentText": "#FFFFFF",
+    "danger": "#800000",
+    "surface": "#D4D0C8",
+    "line": "#808080",
+    "track": "#FFFFFF"
+  },
+  "panel": {
+    "radius": 0,
+    "width": 0,
+    "bandInset": 3,
+    "pad": 12,
+    "bevel": { "light": "#D4D0C8", "dark": "#404040", "innerLight": "#FFFFFF", "innerDark": "#808080" },
+    "statusBar": {
+      "text": "Ready",
+      "fill": "#D4D0C8",
+      "line": "#808080"
+    }
+  },
+  "header": {
+    "variant": "classic",
+    "barStops": ["#0A246A", "#A6CAF0"],
+    "controlFace": "#D4D0C8"
+  },
+  "button": {
+    "variant": "classic",
+    "radius": 0,
+    "height": 30,
+    "bevel": { "light": "#FFFFFF", "dark": "#404040", "innerLight": "#D4D0C8", "innerDark": "#808080" },
+    "defaultEdge": "#000000",
+    "faces": {
+      "primary": { "fill": "#D4D0C8", "text": "#000000" },
+      "secondary": { "fill": "#D4D0C8", "text": "#000000" },
+      "danger": { "fill": "#D4D0C8", "text": "#000000" }
+    }
+  },
+  "title": {
+    "font": "roboto",
+    "typeface": "Bold",
+    "size": 13,
+    "color": "#FFFFFF"
+  },
+  "body": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 13
+  },
+  "data": {
+    "font": "roboto",
+    "typeface": "Bold",
+    "size": 16,
+    "color": "#000000"
+  },
+  "toggle": {
+    "variant": "check",
+    "radius": 0,
+    "checkOff": "#FFFFFF",
+    "checkOn": "#FFFFFF",
+    "checkEdgeWidth": 0,
+    "checkMark": "#000000",
+    "checkBevel": { "light": "#FFFFFF", "dark": "#808080", "innerLight": "#D4D0C8", "innerDark": "#404040" }
+  },
+  "slider": {
+    "variant": "pointer",
+    "thickness": 2,
+    "size": 20,
+    "thumbWidth": 11,
+    "thumbRadius": 0,
+    "ticks": 5,
+    "tickColor": "#404040",
+    "track": "#808080",
+    "trackLight": "#FFFFFF",
+    "thumbFill": "#D4D0C8",
+    "thumbEdge": "#404040",
+    "thumbHover": "#D4D0C8"
+  },
+  "progress": {
+    "variant": "segments",
+    "segments": 14,
+    "gap": 2,
+    "height": 10,
+    "radius": 0,
+    "fill": "#0A246A",
+    "track": "#D4D0C8",
+    "frame": {
+      "fill": "#D4D0C8",
+      "pad": 1,
+      "bevel": { "light": "#FFFFFF", "dark": "#808080" }
+    }
+  },
+  "choice": {
+    "variant": "radio",
+    "radioFill": "#FFFFFF",
+    "markFill": "#000000",
+    "radioBevel": { "light": "#FFFFFF", "dark": "#808080", "innerLight": "#D4D0C8", "innerDark": "#404040" }
+  },
+  "tabs": {
+    "variant": "xp",
+    "radius": 1,
+    "markFill": "#D4D0C8",
+    "markText": "#000000",
+    "tabText": "#000000",
+    "edge": "#808080",
+    "faceStops": ["#D4D0C8", "#D4D0C8"]
+  },
+  "field": {
+    "fill": "#FFFFFF",
+    "outline": "#808080",
+    "radius": 0,
+    "bevel": { "light": "#FFFFFF", "dark": "#808080", "innerLight": "#D4D0C8", "innerDark": "#404040" },
+    "arrow": {
+      "face": ["#D4D0C8", "#D4D0C8"],
+      "glyph": "#000000",
+      "radius": 0,
+      "bevel": { "light": "#FFFFFF", "dark": "#404040", "innerLight": "#D4D0C8", "innerDark": "#808080" },
+      "size": 16
+    }
+  },
+  "list": {
+    "fill": "#FFFFFF",
+    "text": "#000000",
+    "hover": "#0A246A",
+    "radius": 0
+  },
+  "stepper": {
+    "arrows": true
+  },
+  "tooltip": {
+    "fill": "#FFFFE1",
+    "text": "#000000",
+    "radius": 0,
+    "outline": "#000000",
+    "width": 1
+  },
+  "scroll": {
+    "track": "#EAE8E4",
+    "thumb": "#D4D0C8",
+    "thumbHover": "#D4D0C8",
+    "thumbEdge": "#808080",
+    "thumbRadius": 0,
+    "width": 16
+  },
+  "section": {
+    "color": "#000000",
+    "line": "#808080"
+  }
+}

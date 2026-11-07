@@ -1,0 +1,181 @@
+{
+  "id": "xp-zune",
+  "stage": 2,
+  "name": "Windows XP",
+  "subtitle": "Zune",
+  "footer": "Zune: a charcoal title bar with bubble caption buttons, grey 3D push buttons with an orange default ring, a grey selection and an orange bar in a framed trough.",
+  "palette": {
+    "bg": "#E2E2E2",
+    "text": "#000000",
+    "muted": "#646464",
+    "accent": "#BEBEBE",
+    "accentText": "#000000",
+    "danger": "#C1272D",
+    "surface": "#FDFDFD",
+    "line": "#969696",
+    "track": "#FFFFFF"
+  },
+  "panel": {
+    "radius": [8, 8, 0, 0],
+    "width": 4,
+    "outline": "#292929",
+    "pad": 14,
+    "statusBar": {
+      "text": "Ready",
+      "fill": "#F4F4F4",
+      "line": "#E0E0E0"
+    }
+  },
+  "header": {
+    "variant": "xpbar",
+    "barStops": ["#858585", "#6A6A6A", "#656565", "#606060", "#565656", "#3B3B3B", "#363636", "#303030", "#2B2B2B", "#1B1B1B"],
+    "controlStops": ["#696969", "#5F5F5F", "#464646", "#424242", "#4F4F4F"],
+    "closeStops": ["#E37B63", "#E46A4F", "#DE3518", "#E6401C", "#EF886C"],
+    "titleShadow": "#231814"
+  },
+  "button": {
+    "variant": "xp",
+    "radius": 3,
+    "height": 28,
+    "faces": {
+      "primary": {
+        "fill": "#F5F5F5",
+        "text": "#000000"
+      },
+      "secondary": {
+        "fill": "#F5F5F5",
+        "text": "#000000"
+      },
+      "danger": {
+        "fill": "#F5F5F5",
+        "text": "#000000"
+      }
+    },
+    "xp": {
+      "edge": "#575757",
+      "glow": "#F1B860",
+      "defaultRing": "#E29A4A",
+      "face": ["#FCFCFC", "#FCFCFC", "#F5F5F5", "#EBEBEB", "#CCCCCC", "#AEAEAE"],
+      "pressedFace": ["#E0E0E0", "#D1D1D1", "#F5F5F5", "#FCFCFC"]
+    }
+  },
+  "title": {
+    "font": "roboto",
+    "typeface": "Bold",
+    "size": 15,
+    "color": "#FFFFFF"
+  },
+  "body": {
+    "font": "roboto",
+    "typeface": "Regular",
+    "size": 14
+  },
+  "data": {
+    "font": "roboto",
+    "typeface": "Bold",
+    "size": 18,
+    "color": "#000000"
+  },
+  "toggle": {
+    "variant": "check",
+    "radius": 0,
+    "checkOff": "#FFFFFF",
+    "checkOn": "#FFFFFF",
+    "checkEdge": "#4E4E4E",
+    "checkEdgeOn": "#4E4E4E",
+    "checkMark": "#3C3C3C",
+    "checkEdgeWidth": 1,
+    "checkFace": ["#D9D9D9", "#DDDDDD", "#EAEAEA", "#F4F4F4", "#FCFCFC", "#FFFFFF"],
+    "checkHoverRing": "#F1B860"
+  },
+  "slider": {
+    "variant": "pointer",
+    "thickness": 2,
+    "size": 20,
+    "thumbWidth": 11,
+    "thumbRadius": 2,
+    "ticks": 5,
+    "tickColor": "#A1A192",
+    "track": "#9D9C99",
+    "trackLight": "#FFFFFF",
+    "thumbFill": "#DADADA",
+    "thumbEdge": "#C1C1C1",
+    "thumbHover": "#EAEAEA"
+  },
+  "progress": {
+    "variant": "segments",
+    "segments": 24,
+    "gap": 0,
+    "height": 8,
+    "radius": 0,
+    "track": "#FFFFFF",
+    "block": ["#BE510E", "#FFC9A8", "#FFA46B", "#FF9858", "#B94C09", "#B94C09", "#BE510E", "#C75A17"],
+    "frame": {
+      "edge": "#686868",
+      "radius": 2,
+      "pad": 2,
+      "fill": "#FFFFFF"
+    }
+  },
+  "choice": {
+    "variant": "radio",
+    "radioEdge": "#535557",
+    "radioFill": "#F0F0F0",
+    "markFill": "#3C3C3C",
+    "radioRings": ["#E3E3E3", "#EAEAEA", "#F0F0F0"],
+    "radioHoverRing": "#F1B860"
+  },
+  "tabs": {
+    "variant": "xp",
+    "radius": 3,
+    "markFill": "#FDFDFD",
+    "markText": "#000000",
+    "tabText": "#000000",
+    "edge": "#BABABA",
+    "faceStops": ["#ECECEC", "#FFFFFF", "#F8F8F8", "#F0F0F0", "#E3E3E3", "#C6C6C6"],
+    "markLine": "#FFC83C",
+    "markLineStops": ["#E68B2C", "#FFC83C", "#FFC73C"]
+  },
+  "field": {
+    "fill": "#FFFFFF",
+    "outline": "#969696",
+    "radius": 0,
+    "arrow": {
+      "face": ["#FFFFFF", "#F6F6F6", "#D3D3D3", "#D2D2D2"],
+      "hoverFace": ["#FDFDFD", "#E9E9E9", "#D3D3D3", "#D2D2D2"],
+      "pressedFace": ["#D9D9D9", "#FEFEFE", "#FFFFFF", "#FFFFFF"],
+      "edge": "#9B9B9B",
+      "glyph": "#323232",
+      "radius": 2,
+      "size": 17
+    }
+  },
+  "list": {
+    "fill": "#FFFFFF",
+    "text": "#000000",
+    "hover": "#BEBEBE",
+    "radius": 0
+  },
+  "stepper": {
+    "arrows": true
+  },
+  "tooltip": {
+    "fill": "#FFFFE1",
+    "text": "#000000",
+    "radius": 0,
+    "outline": "#000000",
+    "width": 1
+  },
+  "scroll": {
+    "track": "#F4F4F4",
+    "thumb": "#F0F0F0",
+    "thumbHover": "#FAFAFA",
+    "thumbEdge": "#9B9B9B",
+    "thumbRadius": 2,
+    "width": 17
+  },
+  "section": {
+    "color": "#0046D5",
+    "line": "#D6D5D9"
+  }
+}
